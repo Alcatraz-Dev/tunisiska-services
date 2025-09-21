@@ -1,14 +1,15 @@
 import { Link, Stack } from "expo-router";
 import { StyleSheet, View, Text } from "react-native";
+import { AutoText } from "./components/ui/AutoText";
 
 export default function NotFoundScreen() {
   return (
     <>
       <Stack.Screen options={{ title: "Oops!" }} />
       <View style={styles.container}>
-        <Text>This screen doesn't exist.</Text>
+        <AutoText>This screen doesn't exist.</AutoText>
         <Link href="/" style={styles.link}>
-          <Text>Go to home screen!</Text>
+          <AutoText>Go to home screen!</AutoText>
         </Link>
       </View>
     </>

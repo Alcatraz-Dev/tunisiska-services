@@ -1,385 +1,207 @@
-import * as React from 'react'
-import { Text, TextInput, TouchableOpacity, View, StyleSheet, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, ActivityIndicator, Animated, ScrollView } from 'react-native'
-import { useSignUp } from '@clerk/clerk-expo'
-import { Link, useRouter } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
+import * as React from "react";
+import { TouchableOpacity, View, ScrollView, Image, Alert } from "react-native";
+import { useSignUp } from "@clerk/clerk-expo";
+import { Link, useRouter } from "expo-router";
+import { useTheme } from "../context/ThemeContext";
+import { GoogleSignInButton } from "../components/GoogleSignInButton";
+import { useState } from "react";
+import { StatusBar } from "expo-status-bar";
+import { OtpInput } from "react-native-otp-entry";
+import { AutoText } from "../components/ui/AutoText";
+import Input from "../components/ui/Input";
+import { LinearGradient } from "expo-linear-gradient";
+import { getPremiumGradient } from "../utils/getPremiumGradient";
+import { showAlert } from "../utils/showAlert";
 
 export default function SignUpScreen() {
-  const { isLoaded, signUp, setActive } = useSignUp()
-  const router = useRouter()
+  const { isLoaded, signUp, setActive } = useSignUp();
+  const router = useRouter();
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
 
-  const [emailAddress, setEmailAddress] = React.useState('')
-  const [password, setPassword] = React.useState('')
-  const [pendingVerification, setPendingVerification] = React.useState(false)
-  const [code, setCode] = React.useState('')
-  const [isLoading, setIsLoading] = React.useState(false)
-  const [error, setError] = React.useState('')
-  const [passwordVisible, setPasswordVisible] = React.useState(false)
-  const fadeAnim = React.useRef(new Animated.Value(0)).current
+  const [emailAddress, setEmailAddress] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [pendingVerification, setPendingVerification] = React.useState(false);
+  const [code, setCode] = React.useState("");
+  const [userProfile, setUserProfile] = useState<any>(null);
 
-  React.useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 500,
-      useNativeDriver: true,
-    }).start()
-  }, [])
-
-  // Handle submission of sign-up form
   const onSignUpPress = async () => {
-    if (!isLoaded) return
-    
-    setIsLoading(true)
-    setError('')
-
-    // Start sign-up process using email and password provided
+    if (!isLoaded) return;
     try {
-      await signUp.create({
-        emailAddress,
-        password,
-      })
-
-      // Send user an email with verification code
-      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' })
-
-      // Set 'pendingVerification' to true to display second form
-      // and capture OTP code
-      setPendingVerification(true)
-    } catch (err) {
-      // See https://clerk.com/docs/custom-flows/error-handling
-      // for more info on error handling
-      setError('There was an issue creating your account. Please try again.')
-      console.error(JSON.stringify(err, null, 2))
-    } finally {
-      setIsLoading(false)
+      await signUp.create({ emailAddress, password });
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      setPendingVerification(true);
+    } catch (err: any) {
+      console.error(JSON.stringify(err, null, 2));
+      // Clerk returns structured errors
+      const errorMessage =
+        err?.errors?.[0]?.message || "Något gick fel. Försök igen."; // fallback in Swedish
+      showAlert("Fel vid registrering", errorMessage);
     }
-  }
+  };
 
-  // Handle submission of verification form
   const onVerifyPress = async () => {
-    if (!isLoaded) return
-    
-    setIsLoading(true)
-    setError('')
-
+    if (!isLoaded) return;
     try {
-      // Use the code the user provided to attempt verification
       const signUpAttempt = await signUp.attemptEmailAddressVerification({
         code,
-      })
-
-      // If verification was completed, set the session to active
-      // and redirect the user
-      if (signUpAttempt.status === 'complete') {
-        await setActive({ session: signUpAttempt.createdSessionId })
-        router.replace('/')
+      });
+      if (signUpAttempt.status === "complete") {
+        await setActive({ session: signUpAttempt.createdSessionId });
+        router.replace("/");
       } else {
-        // If the status is not complete, check why. User may need to
-        // complete further steps.
-        setError('Verification failed. Please check the code and try again.')
-        console.error(JSON.stringify(signUpAttempt, null, 2))
+        console.error(JSON.stringify(signUpAttempt, null, 2));
       }
-    } catch (err) {
-      // See https://clerk.com/docs/custom-flows/error-handling
-      // for more info on error handling
-      setError('Invalid verification code. Please try again.')
-      console.error(JSON.stringify(err, null, 2))
-    } finally {
-      setIsLoading(false)
+    } catch (err: any) {
+      console.error(JSON.stringify(err, null, 2));
+      const errorMessage =
+        err?.errors?.[0]?.message || "Något gick fel. Försök igen."; // fallback in Swedish
+
+      showAlert("Fel vid verifiering", errorMessage);
     }
-  }
+  };
+
+  const inputStyle = `w-full p-4 rounded-xl border mb-4 ${
+    isDark
+      ? "border-gray-700 bg-dark-card text-white"
+      : "border-gray-300 bg-white text-gray-900"
+  }`;
+
+  const buttonStyle = `w-full p-4 rounded-xl items-center ${
+    isDark ? "bg-blue-600" : "bg-blue-500"
+  }`;
+
+  const buttonTextStyle = "text-white font-semibold";
 
   if (pendingVerification) {
     return (
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}
+      <View
+        className={`flex-1 justify-center px-6 ${
+          isDark ? "bg-dark" : "bg-light"
+        }`}
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <Animated.View style={[styles.innerContainer, { opacity: fadeAnim }]}>
-            <View style={styles.logoContainer}>
-              <Ionicons name="mail-open-outline" size={48} color="#6366F1" />
-              <Text style={styles.title}>Verify Your Email</Text>
-              <Text style={styles.subtitle}>Enter the code sent to your email</Text>
-            </View>
+        {/* Header */}
+        <AutoText
+          className={`text-2xl font-bold mb-4 ${
+            isDark ? "text-white" : "text-gray-900"
+          }`}
+        >
+          Verifiera din e-post
+        </AutoText>
+        <AutoText
+          className={`mb-6 ${isDark ? "text-gray-400" : "text-gray-600"}`}
+        >
+          Ange koden som skickades till din e-post
+        </AutoText>
 
-            {error ? (
-              <View style={styles.errorContainer}>
-                <Ionicons name="alert-circle" size={20} color="#EF4444" />
-                <Text style={styles.errorText}>{error}</Text>
-              </View>
-            ) : null}
+        {/* OTP Input instead of TextInput */}
+        <OtpInput
+          numberOfDigits={6}
+          onTextChange={setCode}
+          focusColor={isDark ? "#60A5FA" : "#3B82F6"}
+          theme={{
+            pinCodeContainerStyle: {
+              borderColor: isDark ? "#374151" : "#D1D5DB",
+              backgroundColor: isDark ? "#1F2937" : "#F9FAFB",
+              borderRadius: 12,
+            },
+            pinCodeTextStyle: {
+              fontSize: 18,
+              color: isDark ? "#F9FAFB" : "#111827",
+            },
+          }}
+        />
 
-            <View style={styles.formContainer}>
-              <View style={styles.inputContainer}>
-                <Ionicons name="key-outline" size={20} color="#64748B" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  value={code}
-                  placeholder="Verification code"
-                  placeholderTextColor="#94A3B8"
-                  onChangeText={setCode}
-                  keyboardType="number-pad"
-                  autoComplete="one-time-code"
-                />
-              </View>
-
-              <TouchableOpacity 
-                style={[styles.button, !code && styles.buttonDisabled]}
-                onPress={onVerifyPress}
-                disabled={!code || isLoading}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <>
-                    <Text style={styles.buttonText}>Verify & Continue</Text>
-                    <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
-                  </>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.secondaryButton}
-                onPress={() => setPendingVerification(false)}
-              >
-                <Text style={styles.secondaryButtonText}>Back to Sign Up</Text>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-        </TouchableWithoutFeedback>
-      </KeyboardAvoidingView>
-    )
+        {/* Verify button */}
+        <TouchableOpacity
+          className={`${buttonStyle} mt-6`}
+          onPress={onVerifyPress}
+          disabled={code.length < 6}
+        >
+          <AutoText className={buttonTextStyle}>Verifiera</AutoText>
+        </TouchableOpacity>
+      </View>
+    );
   }
 
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
+    <LinearGradient
+      colors={getPremiumGradient() as [string, string]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={{ flex: 1 }}
     >
-      <ScrollView 
-        contentContainerStyle={styles.scrollContainer}
-        keyboardShouldPersistTaps="handled"
+      <ScrollView
+        className={`flex-1 px-6 pt-12 `}
+        contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <Animated.View style={[styles.innerContainer, { opacity: fadeAnim }]}>
-            <View style={styles.logoContainer}>
-              <Ionicons name="person-add-outline" size={48} color="#6366F1" />
-              <Text style={styles.title}>Create Account</Text>
-              <Text style={styles.subtitle}>Join us to get started</Text>
-            </View>
+        <AutoText
+          className={`text-3xl font-bold mb-6 text-center ${
+            isDark ? "text-white" : "text-gray-900"
+          }`}
+        >
+          Skapa konto
+        </AutoText>
 
-            {error ? (
-              <View style={styles.errorContainer}>
-                <Ionicons name="alert-circle" size={20} color="#EF4444" />
-                <Text style={styles.errorText}>{error}</Text>
-              </View>
-            ) : null}
+        <Input
+          value={emailAddress}
+          onChangeText={setEmailAddress}
+          placeholder="Ange e-postadress"
+          placeholderTextColor={isDark ? "gray" : "gray"}
+          autoCapitalize="none"
+          className={inputStyle}
+        />
 
-            <View style={styles.formContainer}>
-              <View style={styles.inputContainer}>
-                <Ionicons name="mail-outline" size={20} color="#64748B" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  autoCapitalize="none"
-                  autoComplete="email"
-                  keyboardType="email-address"
-                  value={emailAddress}
-                  placeholder="Email address"
-                  placeholderTextColor="#94A3B8"
-                  onChangeText={setEmailAddress}
-                />
-              </View>
+        <Input
+          value={password}
+          onChangeText={setPassword}
+          placeholder="Ange lösenord"
+          placeholderTextColor={isDark ? "gray" : "gray"}
+          secureTextEntry
+          className={inputStyle}
+        />
 
-              <View style={styles.inputContainer}>
-                <Ionicons name="key-outline" size={20} color="#64748B" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  value={password}
-                  placeholder="Password"
-                  placeholderTextColor="#94A3B8"
-                  secureTextEntry={!passwordVisible}
-                  onChangeText={setPassword}
-                />
-                <TouchableOpacity 
-                  style={styles.visibilityToggle}
-                  onPress={() => setPasswordVisible(!passwordVisible)}
-                >
-                  <Ionicons 
-                    name={passwordVisible ? "eye-off-outline" : "eye-outline"} 
-                    size={20} 
-                    color="#64748B" 
-                  />
-                </TouchableOpacity>
-              </View>
+        <TouchableOpacity className={buttonStyle} onPress={onSignUpPress}>
+          <AutoText className={buttonTextStyle}>Fortsätt</AutoText>
+        </TouchableOpacity>
+        <View
+          className={`flex-row justify-center my-4 border ${
+            isDark ? "border-zinc-600" : "border-zinc-300"
+          }`}
+        ></View>
+        {!userProfile ? (
+          <GoogleSignInButton
+            setUserProfile={setUserProfile}
+            // autoText={AutoText}
+          />
+        ) : (
+          <View className="items-center">
+            <Image
+              source={{ uri: userProfile.imageUrl }}
+              className="w-20 h-20 rounded-full mb-4"
+            />
+            <AutoText className="text-lg font-bold">
+              {userProfile.firstName} {userProfile.lastName}
+            </AutoText>
+            <AutoText>{userProfile.email}</AutoText>
+            <AutoText>
+              {userProfile.city}, {userProfile.country}
+            </AutoText>
+          </View>
+        )}
 
-              <TouchableOpacity 
-                style={[styles.button, (!emailAddress || !password) && styles.buttonDisabled]}
-                onPress={onSignUpPress}
-                disabled={!emailAddress || !password || isLoading}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <>
-                    <Text style={styles.buttonText}>Create Account</Text>
-                    <Ionicons name="arrow-forward" size={20} color="#fff" />
-                  </>
-                )}
-              </TouchableOpacity>
-
-              <View style={styles.termsContainer}>
-                <Text style={styles.termsText}>
-                  By creating an account, you agree to our{' '}
-                  <Text style={styles.link}>Terms of Service</Text> and{' '}
-                  <Text style={styles.link}>Privacy Policy</Text>
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.footer}>
-              <Text style={styles.footerText}>Already have an account?</Text>
-              <Link href="/sign-in" asChild>
-                <TouchableOpacity>
-                  <Text style={styles.signInLink}>Sign in</Text>
-                </TouchableOpacity>
-              </Link>
-            </View>
-          </Animated.View>
-        </TouchableWithoutFeedback>
+        <View className="flex-row justify-center mt-4 gap-2">
+          <AutoText className={`${isDark ? "text-gray-400" : "text-gray-600"}`}>
+            Har du redan ett konto ?
+          </AutoText>
+          <Link href="/sign-in">
+            <AutoText className="text-blue-500 font-semibold">
+              Logga in
+            </AutoText>
+          </Link>
+        </View>
+        <StatusBar style={isDark ? "light" : "dark"} />
       </ScrollView>
-    </KeyboardAvoidingView>
-  )
+    </LinearGradient>
+  );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
-  scrollContainer: {
-    flexGrow: 1,
-    justifyContent: 'center',
-  },
-  innerContainer: {
-    padding: 24,
-  },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 48,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1E293B',
-    marginTop: 16,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#64748B',
-    marginTop: 8,
-  },
-  formContainer: {
-    marginBottom: 32,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    height: 56,
-    marginBottom: 16,
-  },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    height: '100%',
-    fontSize: 16,
-    color: '#1E293B',
-  },
-  visibilityToggle: {
-    padding: 4,
-  },
-  button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#6366F1',
-    borderRadius: 12,
-    height: 56,
-    marginTop: 8,
-    marginBottom: 16,
-    gap: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  secondaryButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    height: 56,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#fff',
-  },
-  secondaryButtonText: {
-    color: '#64748B',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  errorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-  },
-  errorText: {
-    color: '#EF4444',
-    marginLeft: 8,
-    fontSize: 14,
-  },
-  termsContainer: {
-    marginTop: 16,
-    paddingHorizontal: 8,
-  },
-  termsText: {
-    textAlign: 'center',
-    color: '#64748B',
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  link: {
-    color: '#6366F1',
-    fontWeight: '500',
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 4,
-  },
-  footerText: {
-    color: '#64748B',
-    fontSize: 14,
-  },
-  signInLink: {
-    color: '#6366F1',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-})

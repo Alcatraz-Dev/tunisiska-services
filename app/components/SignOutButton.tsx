@@ -2,19 +2,21 @@ import { useAuth } from "@clerk/clerk-expo";
 import { TouchableOpacity, Text, Alert, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
+import { AutoText } from "./ui/AutoText";
+import { showAlert } from "../utils/showAlert";
 
 export function SignOutButton() {
   const { signOut } = useAuth();
   const [loading, setLoading] = useState(false);
 
   const handleSignOut = () => {
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+    showAlert("Logga ut av appen", "Vill du logga ut av appen ? ",[
       {
-        text: "Cancel",
+        text: "Avbryt",
         style: "cancel",
       },
       {
-        text: "Sign Out",
+        text: "Logga ut",
         onPress: async () => {
           setLoading(true);
           try {
@@ -40,7 +42,7 @@ export function SignOutButton() {
       ) : (
         <>
           <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-          <Text className="text-danger font-semibold ml-2">Sign Out</Text>
+          <AutoText className="text-danger font-semibold ml-2">Logga ut</AutoText>
         </>
       )}
     </TouchableOpacity>

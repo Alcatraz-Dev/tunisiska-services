@@ -31,7 +31,15 @@ import swim from "../assets/icons/swim.png";
 import wifi from "../assets/icons/wifi.png";
 import location from "../assets/icons/location.png";
 import edit from "../assets/icons/edit.png";
-
+import mail from "../assets/icons/mail.png";
+import lock from "../assets/icons/lock.png";
+import sheare from "../assets/icons/sheare.png";
+import copie from "../assets/icons/copie.png";
+import glob from "../assets/icons/glob.png";
+import moon from "../assets/icons/moon.png";
+import sun from "../assets/icons/sun.png";
+import system from "../assets/icons/system.png";
+import homeIcon from "../assets/icons/homeIcon.png";
 export default {
   google,
   home,
@@ -66,4 +74,13 @@ export default {
   wifi,
   location,
   edit,
+  mail,
+  lock,
+  sheare,
+  copie,
+  glob,
+  moon,
+  sun,
+  system,
+  homeIcon
 };

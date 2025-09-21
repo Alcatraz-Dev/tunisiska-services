@@ -1,11 +1,16 @@
-import { Redirect, Stack } from 'expo-router'
-import { useAuth } from '@clerk/clerk-expo'
+import { Redirect, Stack } from "expo-router";
+import { useAuth } from "@clerk/clerk-expo";
+import { ThemeProvider } from "../context/ThemeContext";
 export default function UnAuthenticatedLayout() {
-  const { isSignedIn } = useAuth()
+  const { isSignedIn } = useAuth();
 
   if (isSignedIn) {
-    return <Redirect href={'/'} />
+    return <Redirect href={"/"} />;
   }
 
-  return <Stack screenOptions={{ headerShown: false }} />
+  return (
+    <ThemeProvider>
+      <Stack screenOptions={{ headerShown: false }} />
+    </ThemeProvider>
+  );
 }

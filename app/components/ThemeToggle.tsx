@@ -1,7 +1,8 @@
 import React from "react";
-import { TouchableOpacity, Text, View } from "react-native";
+import {  View, Image, Switch } from "react-native";
 import { useTheme } from "../context/ThemeContext";
-import { Ionicons } from "@expo/vector-icons";
+import icons from "../constants/icons";
+import { AutoText } from "./ui/AutoText";
 
 export const ThemeToggle: React.FC = () => {
   const { theme, setTheme, resolvedTheme } = useTheme();
@@ -20,33 +21,32 @@ export const ThemeToggle: React.FC = () => {
   return (
     <View className="flex-row items-center justify-between p-4">
       <View className="flex-row items-center">
-        <Ionicons
-          name={resolvedTheme === "dark" ? "moon" : "sunny"}
-          size={20}
-          color={resolvedTheme === "dark" ? "#e2e8f0" : "#475569"}
-          className="mr-3"
+        <Image
+          source={
+            theme === "system"
+              ? icons.system
+              : resolvedTheme === "dark"
+                ? icons.moon
+                : icons.sun
+          }
+          className="mr-3 w-5 h-5"
+          style={{
+            tintColor: resolvedTheme === "dark" ? "#94a3b8" : "#64748b",
+          }}
         />
-        <Text
+        <AutoText
           className={`${resolvedTheme === "dark" ? "text-dark-text" : "text-light-text"}`}
         >
           {theme === "system"
             ? "System"
             : theme === "dark"
-              ? "Mörkt läge"
-              : "Ljust läge"}
-        </Text>
+              ? "Mörkt "
+              : "Ljust "}
+        </AutoText>
       </View>
 
-      <TouchableOpacity
-        onPress={cycleTheme}
-        className="w-12 h-6 bg-gray-300 dark:bg-gray-600 rounded-full p-1"
-      >
-        <View
-          className={`w-4 h-4 bg-white rounded-full shadow-md transform ${
-            resolvedTheme === "dark" ? "translate-x-6" : "translate-x-0"
-          } transition-transform duration-200`}
-        />
-      </TouchableOpacity>
+      <Switch onChange={cycleTheme} value={resolvedTheme === "dark"}/>
+      
     </View>
   );
 };

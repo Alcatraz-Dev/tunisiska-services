@@ -7,7 +7,7 @@ import barChart from "../assets/images/bar-chart.png";
 import whiteGradient from "../assets/images/white-gradient.png";
 import map from "../assets/images/map.png";
 import noResult from "../assets/images/no-result.png";
-
+import swish from "../assets/images/SwishLogo.png";
 export default {
   avatar,
   newYork,
@@ -17,4 +17,5 @@ export default {
   whiteGradient,
   map,
   noResult,
+  swish
 };

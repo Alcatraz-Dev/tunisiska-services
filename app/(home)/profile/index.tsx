@@ -1,29 +1,45 @@
 import {
   View,
-  Text,
   ScrollView,
   TouchableOpacity,
   Image,
-  Switch,
-  TextInput,
   Alert,
   ActivityIndicator,
+  Linking,
+  Switch,
 } from "react-native";
 import React, { useState, useEffect } from "react";
 import { SignedIn, SignedOut, useUser } from "@clerk/clerk-expo";
-import { Link } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../context/ThemeContext";
 import { ThemeToggle } from "../../components/ThemeToggle";
 import { StatusBar } from "expo-status-bar";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SignOutButton } from "../../components/SignOutButton";
 import icons from "@/app/constants/icons";
-
-
-
+import * as Application from "expo-application";
+import { SafeAreaView } from "react-native-safe-area-context";
+import RedirectIfSignedOut from "@/app/components/RedirectIfSignedOut";
+import { LinearGradient } from "expo-linear-gradient";
+import { getPremiumGradient } from "@/app/utils/getPremiumGradient";
+import LanguageRow from "@/app/components/LanguageRow";
+import { AutoText } from "@/app/components/ui/AutoText";
+import { showAlert } from "@/app/utils/showAlert";
+import NotificationSettings from "@/app/components/NotificationSettings";
 // Interface for user profile data
+interface Referral {
+  id: string;
+  clerkId: string;
+  name: string;
+  joinedAt: string;
+  status: "pending" | "completed" | "active";
+  pointsEarned: number;
+}
 interface UserProfileData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  imageUrl?: string;
   membershipTier: string;
   shipmentsCompleted: number;
   ongoingShipments: number;
@@ -41,6 +57,8 @@ interface UserProfileData {
     picture?: string;
     locale?: string;
   };
+  referrals?: Referral[];
+  signUpMethod: "google" | "email";
 }
 
 const Profile = () => {
@@ -48,125 +66,120 @@ const Profile = () => {
   const { resolvedTheme } = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [referralCode, setReferralCode] = useState("");
-  const [isEditing, setIsEditing] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfileData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+  const [country, setCountry] = useState("Sverige"); // default country
+  const [imageUrl, setImageUrl] = useState("");
+  const router = useRouter();
 
-  // Load user profile data from Clerk metadata
-  useEffect(() => {
-    const loadUserProfile = async () => {
-      if (isLoaded && user) {
-        try {
-          // Get user metadata from Clerk
-          const publicMetadata = user.publicMetadata as Partial<UserProfileData>;
-          const unsafeMetadata = user.unsafeMetadata as { googleProfile?: any };
-          
-          // Create profile from Clerk metadata or use defaults
-          const profileFromClerk: UserProfileData = {
-            membershipTier: publicMetadata.membershipTier || "Standardmedlem",
-            shipmentsCompleted: publicMetadata.shipmentsCompleted || 0,
-            ongoingShipments: publicMetadata.ongoingShipments || 0,
-            points: publicMetadata.points || 100,
-            defaultLanguage: publicMetadata.defaultLanguage || "Svenska",
-            country: publicMetadata.country || "Sverige",
-            referralCode: publicMetadata.referralCode || `SHIP${Math.floor(1000 + Math.random() * 9000)}`,
-            // Extract Google profile data if available
-            googleProfile: unsafeMetadata?.googleProfile || 
-              (user.externalAccounts.find(acc => acc.provider === "google") ? {
-                givenName: user.firstName || undefined,
-                familyName: user.lastName || undefined,
-                picture: user.imageUrl || undefined,
-                locale: "sv-SE",
-              } : undefined),
-          };
-
-          setUserProfile(profileFromClerk);
-          setReferralCode(profileFromClerk.referralCode);
-          
-          // Also store in AsyncStorage for offline access if needed
-          await AsyncStorage.setItem(
-            `userProfile_${user.id}`,
-            JSON.stringify(profileFromClerk)
-          );
-        } catch (error) {
-          console.error("Error loading user profile from Clerk:", error);
-          // Fallback: try to load from AsyncStorage
-          try {
-            const storedProfile = await AsyncStorage.getItem(
-              `userProfile_${user.id}`
-            );
-            if (storedProfile) {
-              const parsedProfile = JSON.parse(storedProfile);
-              setUserProfile(parsedProfile);
-              setReferralCode(parsedProfile.referralCode);
-            } else {
-              // Final fallback to default profile
-              const defaultProfile: UserProfileData = {
-                membershipTier: "Standardmedlem",
-                shipmentsCompleted: 0,
-                ongoingShipments: 0,
-                points: 100,
-                defaultLanguage: "Svenska",
-                country: "Sverige",
-                referralCode: `SHIP${Math.floor(1000 + Math.random() * 9000)}`,
-                googleProfile: user.externalAccounts.find(
-                  acc => acc.provider === "google"
-                )
-                  ? {
-                      givenName: user.firstName || undefined,
-                      familyName: user.lastName || undefined,
-                      picture: user.imageUrl || undefined,
-                      locale: "sv-SE",
-                    }
-                  : undefined,
-              };
-              setUserProfile(defaultProfile);
-              setReferralCode(defaultProfile.referralCode);
-            }
-          } catch (storageError) {
-            console.error("Error loading from AsyncStorage:", storageError);
-          }
-        } finally {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadUserProfile();
-  }, [isLoaded, user]);
-
-  const handleSave = async () => {
-    if (user && userProfile) {
-      try {
-        // Update the referral code in Clerk metadata
-        await user.update({
-          unsafeMetadata: {
-            ...user.publicMetadata,
-            referralCode: referralCode,
-          },
-        });
-        
-        // Update local state
-        const updatedProfile = { ...userProfile, referralCode };
-        setUserProfile(updatedProfile);
-        
-        // Also update AsyncStorage
-        await AsyncStorage.setItem(
-          `userProfile_${user.id}`,
-          JSON.stringify(updatedProfile)
-        );
-        
-        setIsEditing(false);
-        Alert.alert("Sparad", "Din referenskod har uppdaterats!");
-      } catch (error) {
-        console.error("Error updating referral code:", error);
-        Alert.alert("Error", "Kunde inte spara referenskoden");
-      }
+  const pendingReferrals = (userProfile?.referrals ?? []).filter(
+    (r) => r.status === "pending"
+  ).length;
+  // Function to determine membership tier based on points
+  const getMembershipTier = (points: number) => {
+    if (points >= 50000) return "Vipmedlem";
+    if (points >= 20000) return "Supermedlem";
+    if (points >= 10000) return "Mastermedlem";
+    if (points >= 5000) return "Diamondmedlem";
+    if (points >= 2000) return "Platinummedlem";
+    if (points >= 1000) return "Goldmedlem";
+    if (points >= 500) return "Silvermedlem";
+    return "Standardmedlem";
+  };
+  const totalPoints = user?.unsafeMetadata?.points || (0 as number);
+  const getTierColors = (tier: string) => {
+    switch (tier) {
+      case "Platinummedlem":
+        return {
+          bg: isDark ? "bg-gray-800" : "bg-gray-100",
+          text: isDark ? "text-gray-100" : "text-gray-900",
+        };
+      case "Goldmedlem":
+        return {
+          bg: isDark ? "bg-yellow-800" : "bg-yellow-200",
+          text: isDark ? "text-yellow-200" : "text-yellow-900",
+        };
+      case "Silvermedlem":
+        return {
+          bg: isDark ? "bg-slate-800" : "bg-slate-200",
+          text: isDark ? "text-slate-200" : "text-slate-900",
+        };
+      case "Diamondmedlem":
+        return {
+          bg: isDark ? "bg-purple-800" : "bg-purple-200",
+          text: isDark ? "text-purple-200" : "text-purple-900",
+        };
+      case "Mastermedlem":
+        return {
+          bg: isDark ? "bg-pink-800" : "bg-pink-200",
+          text: isDark ? "text-pink-200" : "text-pink-900",
+        };
+      case "Supermedlem":
+        return {
+          bg: isDark ? "bg-red-800" : "bg-red-200",
+          text: isDark ? "text-red-200" : "text-red-900",
+        };
+      case "Vipmedlem":
+        return {
+          bg: isDark ? "bg-rose-800" : "bg-rose-200",
+          text: isDark ? "text-rose-200" : "text-rose-900",
+        };
+      default:
+        return {
+          bg: isDark ? "bg-amber-400" : "bg-amber-300",
+          text: isDark ? "text-amber-100" : "text-amber-800",
+        };
     }
   };
+  const tierColors = getTierColors(
+    userProfile?.membershipTier || "Standardmedlem"
+  );
+  // Load user profile data
+  useEffect(() => {
+    if (!isLoaded || !user) return;
+    const generateReferralCode = (userId: string) => `${userId}`;
+
+    const profileData = {
+      firstName: user.unsafeMetadata?.firstName || "",
+      lastName: user.unsafeMetadata?.lastName || "",
+      email: user.emailAddresses[0]?.emailAddress || "",
+      phoneNumber: user.unsafeMetadata?.phoneNumber || "",
+      address: user.unsafeMetadata?.address || "",
+      city: user.unsafeMetadata?.city || "",
+      postalCode: user.unsafeMetadata?.postalCode || "",
+      country: user.unsafeMetadata?.country || "Sverige",
+      imageUrl: user.unsafeMetadata?.imageUrl || "",
+      referralCode: generateReferralCode(user.id),
+      referrals: user.unsafeMetadata?.referrals || [],
+      membershipTier: getMembershipTier((totalPoints as number) || 0),
+      signUpMethod: user?.unsafeMetadata?.signUpMethod || "email",
+      points: user.unsafeMetadata?.points || 0,
+    };
+
+    setFirstName(profileData.firstName as string);
+    setLastName(profileData.lastName as string);
+    setEmail(profileData.email);
+    setPhoneNumber(profileData.phoneNumber as string);
+    setAddress(profileData.address as string);
+    setCity(profileData.city as string);
+    setPostalCode(profileData.postalCode as string);
+    setCountry(profileData.country as string);
+    setImageUrl((user.unsafeMetadata?.imageUrl as string) || user.imageUrl);
+    setReferralCode(profileData.referralCode as string);
+    setUserProfile(profileData as UserProfileData);
+
+    setLoading(false);
+  }, [isLoaded, user]);
 
   const copyToClipboard = () => {
-    Alert.alert("Kopierad", "Referenskoden har kopierats till urklipp!");
+    showAlert("Kopierad", "Referenskoden har kopierats till urklipp!");
   };
 
   // Show loading state while user data is being fetched
@@ -174,9 +187,9 @@ const Profile = () => {
     return (
       <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-dark">
         <ActivityIndicator size="large" color="#0ea5e9" />
-        <Text className="mt-4 text-gray-600 dark:text-gray-400">
+        <AutoText className="mt-4 text-gray-600 dark:text-gray-400">
           Laddar profil...
-        </Text>
+        </AutoText>
       </View>
     );
   }
@@ -187,127 +200,169 @@ const Profile = () => {
   const isGoogleUser = user?.externalAccounts.some(
     (acc) => acc.provider === "google"
   );
+  const userAvatar = imageUrl || userProfile?.imageUrl;
 
   return (
-    <View className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
+    <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
       <SignedIn>
-        <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-          {/* Header */}
-          <View
-            className={`px-6 pb-6 pt-12 ${isDark ? "bg-zinc-800" : "bg-white"}`}
-          >
-            <View className="flex-row items-center justify-center mb-6 mt-5 relative">
-              {/* Back Button - positioned absolutely on the left */}
-              <View className="absolute left-0">
-                <Link href="/" className="flex-row items-center">
-                  <Ionicons
-                    name="arrow-back"
-                    size={24}
-                    color={isDark ? "#fff" : "#000"}
-                  />
-                </Link>
-              </View>
+        {/* Header */}
 
-              {/* Centered Title */}
-              <Text
-                className={`text-2xl font-extrabold text-center tracking-tighter ${isDark ? "text-white" : "text-gray-900"} `}
-              >
-                Profil
-              </Text>
-
-              {/* Google Badge if signed in with Google */}
-              {isGoogleUser && (
-                <View className="absolute right-0 bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded-full">
-                  <Text className="text-blue-800 dark:text-blue-200 text-xs font-medium">
-                    Google
-                  </Text>
-                </View>
-              )}
-            </View>
+        <View className={`px-6 pt-6 pb-4 ${isDark ? "bg-dark" : "bg-light"}`}>
+          {/* Header Row */}
+          <View className="flex-row items-center justify-between">
+            <TouchableOpacity onPress={() => router.back()} className="p-2">
+              <Ionicons
+                name="arrow-back"
+                size={28}
+                color={isDark ? "#fff" : "#000"}
+              />
+            </TouchableOpacity>
+            <AutoText
+              className={`text-2xl font-extrabold text-center flex-1 mt-3 ${
+                isDark ? "text-white" : "text-gray-900"
+              }`}
+            >
+              Profil
+            </AutoText>
+            <View style={{ width: 28 }} />
           </View>
 
+          {/* Google Badge (if user signed in with Google) */}
+          {isGoogleUser && (
+            <View className="absolute right-6 top-2  bg-blue-100 dark:bg-blue-900 px-3 py-1 rounded-full shadow-md">
+              <AutoText className="text-blue-800 dark:text-blue-200 text-xs font-semibold">
+                Inloggad med Google
+              </AutoText>
+            </View>
+          )}
+
+          {/* Subtitle / description */}
+          <AutoText
+            className={`text-center my-2  text-sm ${
+              isDark ? "text-gray-400" : "text-gray-600"
+            }`}
+          >
+            Hantera din profilinformation, uppdatera detaljer och se din
+            aktivitet.
+          </AutoText>
+        </View>
+        <ScrollView showsVerticalScrollIndicator={false}>
           {/* User Info Card */}
           <View className="px-6 mt-4">
-            <View
-              className={`rounded-2xl p-6 shadow-sm ${isDark ? "bg-dark-card" : "bg-gray-100"}`}
+            <LinearGradient
+              colors={getPremiumGradient() as [string, string]}
+              start={{ x: 0.5, y: 0 }}
+              end={{ x: 0.5, y: 1 }}
+              style={{
+                shadowColor: "#000",
+                shadowOpacity: 0.15,
+                shadowRadius: 6,
+                shadowOffset: { width: 0, height: 3 },
+                elevation: 5,
+                borderRadius: 12,
+                padding: 16,
+              }}
             >
               <View className="items-center mb-4">
                 <View className="w-20 h-20 bg-blue-100 rounded-full items-center justify-center mb-3">
                   {user?.imageUrl ? (
                     <Image
-                      source={{ uri: user.imageUrl }}
-                      className="w-20 h-20 rounded-full"
+                      source={{ uri: userAvatar }}
+                      alt="User Avatar"
+                      className={`w-20 h-20 rounded-full border ${
+                        isDark ? "border-gray-200" : "border-gray-700"
+                      }`}
                     />
                   ) : (
                     <Ionicons name="person" size={32} color="#0ea5e9" />
                   )}
                 </View>
-                <Text
-                  className={`text-xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}
+                <AutoText
+                  className={`text-xl font-bold ${
+                    isDark ? "text-white" : "text-gray-900"
+                  }`}
                 >
-                  {user?.firstName} {user?.lastName}
-                </Text>
-                <Text
-                  className={`mt-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}
+                  {!userProfile
+                    ? ((user?.firstName + " " + user?.lastName) as string)
+                    : userProfile?.firstName && userProfile?.lastName
+                    ? `${userProfile.firstName} ${userProfile.lastName}`
+                    : user?.firstName ?? "Användare"}
+                </AutoText>
+                <AutoText
+                  className={`mt-1 ${
+                    isDark ? "text-gray-200" : "text-gray-600"
+                  }`}
                 >
                   {user?.emailAddresses[0]?.emailAddress}
-                </Text>
+                </AutoText>
 
                 {/* Membership Tier Badge */}
-                <View className="bg-amber-100 dark:bg-amber-900 px-3 py-1 rounded-full mt-2">
-                  <Text className="text-amber-800 dark:text-amber-200 text-sm font-medium">
+                <View
+                  className={`px-3 py-1 rounded-full my-5 ${tierColors.bg}`}
+                >
+                  <AutoText
+                    className={`text-sm font-medium ${tierColors.text}`}
+                  >
                     {userProfile?.membershipTier || "Standardmedlem"}
-                  </Text>
+                  </AutoText>
                 </View>
               </View>
 
-              <View className="flex-row justify-between mt-4">
-                <View className="items-center">
-                  <Text
-                    className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}
+              <View className="flex-row  my-4 mx-5 items-center justify-between">
+                <View className="items-center justify-center ">
+                  <AutoText
+                    className={`text-lg font-bold ${
+                      isDark ? "text-white" : "text-gray-900"
+                    }`}
                   >
-                    {userProfile?.shipmentsCompleted || 0}
-                  </Text>
-                  <Text
-                    className={isDark ? "text-gray-400" : "text-gray-600"}
+                    {userProfile?.referrals?.length || 0}
+                  </AutoText>
+                  <AutoText
+                    className={isDark ? "text-gray-200" : "text-gray-600"}
                   >
                     Leveranser
-                  </Text>
+                  </AutoText>
                 </View>
-                <View className="items-center">
-                  <Text
-                    className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}
+                <View className="items-center ">
+                  <AutoText
+                    className={`text-lg font-bold ${
+                      isDark ? "text-white" : "text-gray-900"
+                    }`}
                   >
-                    {userProfile?.ongoingShipments || 0}
-                  </Text>
-                  <Text
-                    className={isDark ? "text-gray-400" : "text-gray-600"}
+                    {pendingReferrals || 0}
+                  </AutoText>
+                  <AutoText
+                    className={isDark ? "text-gray-200" : "text-gray-600"}
                   >
                     Pågående
-                  </Text>
+                  </AutoText>
                 </View>
                 <View className="items-center">
-                  <Text
-                    className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}
+                  <AutoText
+                    className={`text-lg font-bold ${
+                      isDark ? "text-white" : "text-gray-900"
+                    }`}
                   >
-                    {userProfile?.points || 0}
-                  </Text>
-                  <Text
-                    className={isDark ? "text-gray-400" : "text-gray-600"}
+                    {(user?.unsafeMetadata?.points as number) || 0}
+                  </AutoText>
+                  <AutoText
+                    className={isDark ? "text-gray-200" : "text-gray-600"}
                   >
                     Poäng
-                  </Text>
+                  </AutoText>
                 </View>
               </View>
 
               {/* Additional Google user info */}
               {isGoogleUser && userProfile?.googleProfile && (
                 <View className="mt-4 pt-4 border-t border-gray-700">
-                  <Text
-                    className={`text-sm font-medium ${isDark ? "text-gray-400" : "text-gray-600"} mb-2`}
+                  <AutoText
+                    className={`text-sm font-medium ${
+                      isDark ? "text-gray-400" : "text-gray-600"
+                    } mb-2`}
                   >
                     Google-konto information
-                  </Text>
+                  </AutoText>
                   <View className="flex-row items-center">
                     <Ionicons
                       name="logo-google"
@@ -315,111 +370,119 @@ const Profile = () => {
                       color={isDark ? "#93c5fd" : "#3b82f6"}
                       style={{ marginRight: 8 }}
                     />
-                    <Text
+                    <AutoText
                       className={isDark ? "text-gray-400" : "text-gray-600"}
                     >
                       Ansluten via Google
-                    </Text>
+                    </AutoText>
                   </View>
                 </View>
               )}
-            </View>
+            </LinearGradient>
           </View>
 
           {/* Referral Code Section */}
           <View className="px-6 mt-6">
-            <Text
-              className={`text-lg font-semibold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}
+            <AutoText
+              className={`text-lg font-semibold mb-4 ${
+                isDark ? "text-white" : "text-gray-900"
+              }`}
             >
               Referenskod
-            </Text>
+            </AutoText>
 
             <View
-              className={`rounded-2xl p-5 shadow-sm ${isDark ? "bg-dark-card" : "bg-gray-100"}`}
+              className={`rounded-2xl p-5 shadow-sm ${
+                isDark ? "bg-dark-card" : "bg-gray-100"
+              }`}
             >
-              <Text
-                className={`mb-3 ${isDark ? "text-zinc-400" : "text-zinc-600"}`}
+              <AutoText
+                className={`mb-3 text-xs text-center max-w-sm ${
+                  isDark ? "text-zinc-400" : "text-zinc-600"
+                }`}
               >
                 Dela din referenskod med vänner och få 100 poäng när de
                 registrerar sig!
-              </Text>
+              </AutoText>
 
-              {isEditing ? (
-                <View className="flex-row items-center">
-                  <TextInput
-                    className={`flex-1 rounded-lg p-3 mr-2 ${
-                      isDark
-                        ? "bg-zinc-700 text-white border-gray-600"
-                        : "bg-zinc-100 text-black border-gray-300"
-                    } border`}
-                    value={referralCode}
-                    onChangeText={setReferralCode}
-                    placeholder="Ange referenskod"
-                    placeholderTextColor={isDark ? "#94a3b8" : "#64748b"}
-                  />
-                  <TouchableOpacity
-                    className="bg-zinc-500 p-3 rounded-lg"
-                    onPress={handleSave}
-                  >
-                    <Text className="text-white font-medium">Spara</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View
-                  className={`flex-row items-center justify-between p-4 rounded-lg ${
-                    isDark ? "bg-zinc-700" : "bg-zinc-200"
+              <View
+                className={`flex-row items-center justify-between p-4 rounded-2xl ${
+                  isDark ? "bg-zinc-700" : "bg-zinc-200"
+                }`}
+              >
+                <AutoText
+                  className={`font-semibold text-xs ${
+                    isDark ? "text-gray-200" : "text-gray-800"
                   }`}
                 >
-                  <Text
-                    className={`font-semibold ${isDark ? "text-gray-200" : "text-gray-800"}`}
+                  {userProfile?.referralCode || user?.id}
+                </AutoText>
+                <View className="flex-row">
+                  <TouchableOpacity
+                    className="p-2 mr-2"
+                    onPress={copyToClipboard}
                   >
-                    {userProfile?.referralCode || "SHIP2025"}
-                  </Text>
-                  <View className="flex-row">
-                    <TouchableOpacity
-                      className="p-2 mr-2"
-                      onPress={copyToClipboard}
-                    >
-                      <Ionicons
-                        name="copy-outline"
-                        size={20}
-                        color={isDark ? "#93c5fd" : "#3b82f6"}
-                      />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      className="p-2"
-                      onPress={() => setIsEditing(true)}
-                    >
-                      <Ionicons
-                        name="pencil-outline"
-                        size={20}
-                        color={isDark ? "#93c5fd" : "#3b82f6"}
-                      />
-                    </TouchableOpacity>
-                  </View>
+                    <Ionicons
+                      name="copy-outline"
+                      size={20}
+                      color={isDark ? "#93c5fd" : "#3b82f6"}
+                    />
+                  </TouchableOpacity>
                 </View>
-              )}
+              </View>
             </View>
           </View>
 
           {/* Account Settings */}
           <View className="px-6 mt-6">
-            <Text
-              className={`text-lg font-semibold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}
+            <AutoText
+              className={`text-lg font-semibold mb-4 ${
+                isDark ? "text-white" : "text-gray-900"
+              }`}
             >
               Kontoinställningar
-            </Text>
+            </AutoText>
 
             <View
-              className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? "bg-dark-card" : "bg-gray-100"}`}
+              className={`rounded-2xl shadow-sm overflow-hidden ${
+                isDark ? "bg-dark-card" : "bg-gray-100"
+              }`}
             >
               {[
-                { icon: icons.person, text: "Personlig information" },
-                { icon: icons.wallet, text: "Betalningsmetoder" },
-                { icon: icons.location, text: "Leveransadresser" },
-                { icon: icons.people, text: "Referera vänner" },
+                {
+                  icon: icons.person,
+                  text: "Personlig information",
+                  href: "/profile/personal-information",
+                },
+                {
+                  icon: icons.wallet,
+                  text: "Din konto",
+                  href: "/profile/wallet",
+                },
+                {
+                  icon: icons.calendar,
+                  text: "Dina bokningar",
+                  href: "/profile/booking",
+                },
+
+                {
+                  icon: icons.people,
+                  text: "Referera vänner",
+                  href: "/profile/referral-users",
+                },
+                {
+                  icon: icons.sheare,
+                  text: "Dela appen",
+                  href: "/profile/sheare-app",
+                },
               ].map((item, index) => (
                 <TouchableOpacity
+                  onPress={() =>
+                    router.push({
+                      pathname: item?.href as any,
+                      params: { theme: resolvedTheme },
+                    })
+                  }
                   key={index}
                   className={`flex-row items-center p-4 ${
                     index < 3 ? "border-b" : ""
@@ -430,11 +493,13 @@ const Profile = () => {
                     className="w-5 h-5 mr-3"
                     style={{ tintColor: isDark ? "#94a3b8" : "#64748b" }}
                   />
-                  <Text
-                    className={`flex-1 ${isDark ? "text-white" : "text-gray-900"}`}
+                  <AutoText
+                    className={`flex-1 ${
+                      isDark ? "text-white" : "text-gray-900"
+                    }`}
                   >
                     {item.text}
-                  </Text>
+                  </AutoText>
                   <Image
                     source={icons.rightArrow}
                     className="w-4 h-4"
@@ -447,93 +512,73 @@ const Profile = () => {
 
           {/* Preferences */}
           <View className="px-6 mt-6">
-            <Text
-              className={`text-lg font-semibold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}
+            <AutoText
+              className={`text-lg font-semibold mb-4 ${
+                isDark ? "text-white" : "text-gray-900"
+              }`}
             >
               Inställningar
-            </Text>
+            </AutoText>
 
             <View
-              className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? "bg-dark-card" : "bg-gray-100"}`}
+              className={`rounded-2xl shadow-sm overflow-hidden ${
+                isDark ? "bg-dark-card" : "bg-gray-100"
+              }`}
             >
-              <View
-                className={`flex-row items-center justify-between p-4 border-b ${
-                  isDark ? "border-gray-700" : "border-gray-200"
-                }`}
-              >
-                <View className="flex-row items-center">
-                  <Image
-                    source={icons.bell}
-                    className="w-5 h-5 mr-3"
-                    style={{ tintColor: isDark ? "#94a3b8" : "#64748b" }}
-                  />
-                  <Text
-                    className={isDark ? "text-white" : "text-gray-900"}
-                  >
-                    Notiser
-                  </Text>
-                </View>
-                <Switch
-                  value={notificationsEnabled}
-                  onValueChange={setNotificationsEnabled}
-                  trackColor={{ false: "#E5E7EB", true: "#0ea5e9" }}
-                />
-              </View>
+              {/* Notification Settings */}
+              <NotificationSettings isDark={isDark} />
 
-              <View
-                className={`flex-row items-center justify-between p-4 border-b ${
-                  isDark ? "border-gray-700" : "border-gray-200"
-                }`}
-              >
-                <View className="flex-row items-center">
-                  <Image
-                    source={icons.language}
-                    className="w-5 h-5 mr-3"
-                    style={{ tintColor: isDark ? "#94a3b8" : "#64748b" }}
-                  />
-                  <Text
-                    className={isDark ? "text-white" : "text-gray-900"}
-                  >
-                    Språk
-                  </Text>
-                </View>
-                <View className="flex-row items-center">
-                  <Text
-                    className={`mr-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}
-                  >
-                    {userProfile?.defaultLanguage || "Svenska"}
-                  </Text>
-                  <Image
-                    source={icons.rightArrow}
-                    className="w-4 h-4"
-                    style={{ tintColor: isDark ? "#94a3b8" : "#64748b" }}
-                  />
-                </View>
-              </View>
+              {/* Language Selection */}
+              <LanguageRow userProfile={userProfile} />
 
               {/* Theme Toggle */}
               <ThemeToggle />
             </View>
           </View>
-
           {/* Support */}
           <View className="px-6 mt-6">
-            <Text
-              className={`text-lg font-semibold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}
+            <AutoText
+              className={`text-lg font-semibold mb-4 ${
+                isDark ? "text-white" : "text-gray-900"
+              }`}
             >
               Support
-            </Text>
+            </AutoText>
 
             <View
-              className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? "bg-dark-card" : "bg-gray-100"}`}
+              className={`rounded-2xl shadow-sm overflow-hidden ${
+                isDark ? "bg-dark-card" : "bg-gray-100"
+              }`}
             >
               {[
-                { icon: icons.info, text: "Hjälpcenter" },
-                { icon: icons.shield, text: "Integritetspolicy" },
-                { icon: icons.shield, text: "Användarvillkor" },
+                {
+                  icon: icons.info,
+                  text: "Hjälpcenter",
+                  onPress: () =>
+                    Linking.openURL(
+                      `https://wa.me/${process.env.EXPO_PUBLIC_SUPPORT_WHATSAPP}`
+                    ), // byt till ditt WhatsApp-nummer
+                },
+                {
+                  icon: icons.shield,
+                  text: "Integritetspolicy",
+                  href: "/profile/policy",
+                },
+                {
+                  icon: icons.shield,
+                  text: "Användarvillkor",
+                  href: "/profile/terms",
+                },
               ].map((item, index) => (
                 <TouchableOpacity
                   key={index}
+                  onPress={() => {
+                    if (item.onPress) {
+                      item.onPress();
+                    } else if (item.href) {
+                      router.push(item.href as any);
+                    }
+                  }}
                   className={`flex-row items-center p-4 ${
                     index < 2 ? "border-b" : ""
                   } ${isDark ? "border-gray-700" : "border-gray-200"}`}
@@ -543,11 +588,13 @@ const Profile = () => {
                     className="w-5 h-5 mr-3"
                     style={{ tintColor: isDark ? "#94a3b8" : "#64748b" }}
                   />
-                  <Text
-                    className={`flex-1 ${isDark ? "text-white" : "text-gray-900"}`}
+                  <AutoText
+                    className={`flex-1 ${
+                      isDark ? "text-white" : "text-gray-900"
+                    }`}
                   >
                     {item.text}
-                  </Text>
+                  </AutoText>
                   <Image
                     source={icons.rightArrow}
                     className="w-4 h-4"
@@ -559,69 +606,25 @@ const Profile = () => {
           </View>
 
           {/* Logout Button */}
-          <View className="px-6 mt-6 mb-8">
+          <View className="px-6 mt-6 mb-3">
             <SignOutButton />
+          </View>
+          <View className=" items-center justify-center mb-20">
+            <AutoText
+              className={`mb-2 ${isDark ? "text-zinc-700" : "text-gray-300"}`}
+            >
+              App Version: {Application.nativeApplicationVersion}
+            </AutoText>
           </View>
         </ScrollView>
       </SignedIn>
-
-      <SignedOut>
-        <View
-          className={`flex-1 justify-center items-center p-6 ${
-            isDark ? "bg-gray-900" : "bg-gray-50"
-          }`}
-        >
-          <View className="items-center max-w-xs">
-            <Ionicons
-              name="person-circle-outline"
-              size={80}
-              color={isDark ? "#374151" : "#d1d5db"}
-            />
-            <Text
-              className={`text-2xl font-bold mt-4 mb-2 ${
-                isDark ? "text-white" : "text-gray-900"
-              }`}
-            >
-              Ej inloggad
-            </Text>
-            <Text
-              className={`text-center mb-8 ${
-                isDark ? "text-gray-400" : "text-gray-600"
-              }`}
-            >
-              Logga in för att komma åt din profil och inställningar
-            </Text>
-
-            <View className="w-full gap-3">
-              <Link href="/(auth)/sign-in" asChild>
-                <TouchableOpacity className="bg-blue-500 rounded-xl p-4 items-center">
-                  <Text className="text-white font-semibold">Logga in</Text>
-                </TouchableOpacity>
-              </Link>
-
-              <Link href="/(auth)/sign-up" asChild>
-                <TouchableOpacity
-                  className={`border rounded-xl p-4 items-center ${
-                    isDark
-                      ? "border-gray-700 bg-gray-800"
-                      : "border-gray-300 bg-white"
-                  }`}
-                >
-                  <Text className="text-blue-500 font-semibold">
-                    Skapa konto
-                  </Text>
-                </TouchableOpacity>
-              </Link>
-            </View>
-          </View>
-        </View>
-      </SignedOut>
+      <RedirectIfSignedOut />
       <StatusBar
         translucent
         backgroundColor="transparent"
         style={isDark ? "light" : "dark"}
       />
-    </View>
+    </SafeAreaView>
   );
 };
 

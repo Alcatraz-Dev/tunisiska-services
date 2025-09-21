@@ -1,58 +1,85 @@
 import React from "react";
-import {
-  TouchableOpacity,
-  Text,
-  ActivityIndicator,
-  Alert,
-} from "react-native";
+import { TouchableOpacity, Text, ActivityIndicator, Alert } from "react-native";
 import { useOAuth, useUser } from "@clerk/clerk-expo";
 import { useWarmUpBrowser } from "../hooks/useWarmUpBrowser";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useTheme } from "../context/ThemeContext";
+import { AutoText } from "./ui/AutoText";
+import { showAlert } from "../utils/showAlert";
+import { registerForPushNotificationsAsync } from "../hooks/usePushNotifications";
+import { createNewUser } from "../hooks/useQuery";
 
-export function GoogleSignInButton() {
+type Props = {
+  setUserProfile: (data: any) => void;
+  autoText?: any;
+};
+
+export function GoogleSignInButton({ setUserProfile }: Props) {
   useWarmUpBrowser();
   const { user, isLoaded } = useUser();
   const { startOAuthFlow } = useOAuth({ strategy: "oauth_google" });
   const [loading, setLoading] = React.useState(false);
 
-  // ✅ Function to update Clerk metadata
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
+
   const updateUserMetadata = async (
     userId: string,
     email: string,
     firstName?: string,
-    lastName?: string
+    lastName?: string,
+    imageUrl?: string,
+    address?: string,
+    city?: string,
+    postalCode?: string,
+    country?: string,
+    phoneNumber?: string
   ) => {
     try {
-      if (!user) {
-        console.error("❌ No Clerk user found to update yet");
-        return;
-      }
+      if (!user) return;
 
-      await user.update({
-        unsafeMetadata: {
-          membershipTier: "Standardmedlem",
-          shipmentsCompleted: 0,
-          ongoingShipments: 0,
-          points: 100, // bonus points
-          defaultLanguage: "Svenska",
-          country: "Sverige",
-          referralCode: `SHIP${Math.floor(1000 + Math.random() * 9000)}`,
-          signUpMethod: "google",
-          googleProfile: {
-            givenName: firstName,
-            familyName: lastName,
-            email,
-          },
+      const updatedMetadata = {
+        ...user.publicMetadata,
+        membershipTier: "Standardmedlem",
+        shipmentsCompleted: 0,
+        ongoingShipments: 0,
+        points: 100,
+        defaultLanguage: "Svenska",
+        country: country || "Sverige",
+        referralCode: user?.id,
+        signUpMethod: "google",
+        googleProfile: {
+          givenName: firstName,
+          familyName: lastName,
+          email,
         },
+        address,
+        city,
+        postalCode,
+        phoneNumber,
+      };
+
+      await user.update({ unsafeMetadata: updatedMetadata });
+
+      setUserProfile({
+        firstName: firstName || user.firstName || "",
+        lastName: lastName || user.lastName || "",
+        email,
+        phoneNumber: phoneNumber || user.phoneNumbers[0]?.phoneNumber || "",
+        address: updatedMetadata.address || "",
+        city: updatedMetadata.city || "",
+        postalCode: updatedMetadata.postalCode || "",
+        country: updatedMetadata.country || "",
+        imageUrl: imageUrl || user.imageUrl || "",
       });
 
-      console.log("✅ Clerk metadata updated successfully");
-
-      // Save email locally for quick access
       await AsyncStorage.setItem(`userEmail_${userId}`, email);
+
+      showAlert("Sparad", "Din Google-profil har uppdaterats!");
     } catch (error) {
       console.error("❌ Error updating Clerk metadata:", error);
+      showAlert("Error", "Kunde inte uppdatera Google-profilen");
     }
   };
 
@@ -64,48 +91,45 @@ export function GoogleSignInButton() {
       const { createdSessionId, signUp, setActive } = await startOAuthFlow();
 
       if (createdSessionId) {
-        // Activate session
         // @ts-ignore
         await setActive({ session: createdSessionId });
-
-        // Wait for Clerk hooks to update
         await new Promise((resolve) => setTimeout(resolve, 1000));
 
         if (signUp && signUp.status === "complete") {
-          // 🆕 New user → update metadata
+          // مستخدم جديد
           await updateUserMetadata(
             signUp.createdUserId as string,
             signUp.emailAddress as string,
             signUp.firstName as string,
             signUp.lastName as string
           );
-
-          Alert.alert(
-            "Välkommen!",
-            "Du har loggat in med Google och fått 100 bonuspoäng!"
-          );
         } else if (user) {
-          // 🔄 Existing user → ensure metadata is synced
           await updateUserMetadata(
             user.id,
-            user?.emailAddresses[0]?.emailAddress || "",
-            user?.firstName || undefined,
-            user?.lastName || undefined
+            user.emailAddresses[0]?.emailAddress || "",
+            user.firstName || "",
+            user.lastName || ""
           );
         }
-      } else {
-        console.log("OAuth finished but no session created");
+
+        if (user && user?.emailAddresses[0]?.emailAddress) {
+          const token = await registerForPushNotificationsAsync();
+          const data = await createNewUser({
+            name: user.firstName || "",
+            email: user.emailAddresses[0]?.emailAddress || "",
+            clerkId: user.id,
+            pushToken: token,
+          });
+          console.log(data);
+          return data;
+        }
       }
     } catch (err: any) {
       console.error("OAuth error:", err);
-      if (err?.errors?.[0]?.code === "oauth_callback_error") {
-        console.log("User cancelled Google sign in");
-      } else {
-        Alert.alert(
-          "Error",
-          err.errors?.[0]?.message || "Failed to sign in with Google"
-        );
-      }
+      showAlert(
+        "Error",
+        err.errors?.[0]?.message || "Failed to sign in with Google"
+      );
     } finally {
       setLoading(false);
     }
@@ -113,21 +137,29 @@ export function GoogleSignInButton() {
 
   return (
     <TouchableOpacity
+      className={`flex-row items-center justify-center rounded-full  px-4 py-3 shadow-lg ${
+        isDark ? "bg-light-card" : " bg-dark-card"
+      }`}
       onPress={onPress}
       disabled={loading}
-      className={`flex-row items-center justify-center bg-white border border-gray-300 rounded-xl h-14 mb-4 ${
-        loading && "opacity-70"
-      }`}
       activeOpacity={0.8}
     >
       {loading ? (
-        <ActivityIndicator color="#64748B" />
+        <ActivityIndicator size="small" color={isDark ? "black" : "white"} />
       ) : (
         <>
-          <Ionicons name="logo-google" size={20} color="#DB4437" />
-          <Text className="text-dark font-medium ml-3">
-            Fortsätt med Google
-          </Text>
+          <Ionicons
+            name="logo-google"
+            size={20}
+            color={isDark ? "black" : "white"}
+            style={{ marginRight: 8 }}
+          />
+
+          <AutoText
+            className={`font-medium ${isDark ? "text-dark" : "text-light"}`}
+          >
+            Fortsätt med Google
+          </AutoText>
         </>
       )}
     </TouchableOpacity>
