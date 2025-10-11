@@ -13,7 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/app/context/ThemeContext";
 import { StatusBar } from "expo-status-bar";
 import Animated, { FadeInUp, FadeOutDown } from "react-native-reanimated";
-import { useVideoPlayer, VideoView } from "expo-video";
+import VideoPlayer from "@/app/components/VideoPlayer";
 import { AutoText } from "@/app/components/ui/AutoText";
 import { client } from "@/sanityClient";
 import { singleAnnouncementQuery } from "@/app/hooks/useQuery";
@@ -97,22 +97,7 @@ export default function AnnouncementDetails() {
     if (!media) return null;
 
     if (media.type === "video") {
-      const player = useVideoPlayer({ uri: media.videoUrl }, (p) => {
-        p.loop = true;
-        p.muted = false;
-        p.play();
-      });
-      return (
-        <View
-          style={{ aspectRatio: 16 / 9, borderRadius: 12, overflow: "hidden" }}
-        >
-          <VideoView
-            style={{ width: "100%", height: "100%" }}
-            player={player}
-            surfaceType="textureView"
-          />
-        </View>
-      );
+      return <VideoPlayer uri={media.videoUrl} muted={false} />;
     }
 
     if (media.type === "image") {

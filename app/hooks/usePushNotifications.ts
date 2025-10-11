@@ -11,15 +11,7 @@ import { nativeNotifyAPI } from "@/app/services/nativeNotifyApi";
 import { useAuth } from "@clerk/clerk-expo";
 import { NotificationItem } from "../types/notification";
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+// Notification handler is now managed in NotificationContext.tsx
 
 export default function usePushNotifications() {
   const { addNotification, addMultipleNotifications, markAsRead, markAllAsRead } =
@@ -75,8 +67,11 @@ export default function usePushNotifications() {
   // Fetch Native Notify inbox
   const syncNativeNotifyInbox = async () => {
     try {
+      console.log('🔄 Starting Native Notify inbox sync...');
+
       // Check if we're in Expo Go (limited native module support)
       const isExpoGo = Platform.OS === 'web' || !Device.isDevice;
+      console.log('📱 Is Expo Go:', isExpoGo);
 
       if (isExpoGo) {
         console.log('📱 Running in Expo Go - using local notification state only');
@@ -90,11 +85,18 @@ export default function usePushNotifications() {
       }
 
       console.log('🔄 Syncing Native Notify inbox...');
+      console.log('🔑 Using App ID: 32172, Token: PNF5T5VibvtV6lj8i7pbil');
+
       const inboxResp = await getNotificationInbox(32172, "PNF5T5VibvtV6lj8i7pbil", 10, 99);
+      console.log('📬 Raw inbox response:', JSON.stringify(inboxResp, null, 2));
 
       // Handle different API response formats - sometimes direct array, sometimes wrapped in data
       const inbox = Array.isArray(inboxResp) ? inboxResp : (inboxResp?.data ?? []);
-      console.log('📬 Inbox response:', inbox.length, 'notifications');
+      console.log('📬 Processed inbox:', inbox.length, 'notifications');
+
+      if (inbox.length > 0) {
+        console.log('📋 First notification sample:', JSON.stringify(inbox[0], null, 2));
+      }
 
       const mapped = inbox.map((n: any) => ({
         id: n.notification_id.toString(),
@@ -105,6 +107,7 @@ export default function usePushNotifications() {
         date: n.date ?? n.date_sent ?? new Date().toISOString(),
       }));
 
+      console.log('✅ Mapped notifications:', mapped.length);
       addMultipleNotifications(mapped);
       saveNotifications(mapped);
 
@@ -146,33 +149,53 @@ export default function usePushNotifications() {
   };
 
   useEffect(() => {
-    loadNotifications();
-    loadUnreadCount();
-    
-    // Only register for push notifications on native platforms
-    if (Platform.OS !== 'web') {
-      registerForPushNotificationsAsync().then(async (token) => {
-        if (token) {
-          setExpoPushToken(token);
-          
-          // Register user with Native Notify if we have a userId
-          if (userId) {
-            try {
-              await nativeNotifyAPI.registerUser(userId, token);
-              console.log('✅ User registered with Native Notify');
-            } catch (error) {
-              console.error('❌ Failed to register user with Native Notify:', error);
-            }
-          }
-        }
-      });
-    }
-    
-    syncNativeNotifyInbox();
+   loadNotifications();
+   loadUnreadCount();
+
+   console.log('🔄 Initializing push notifications...');
+   console.log('📱 Platform:', Platform.OS);
+   console.log('🔍 Is device:', Device.isDevice);
+   console.log('👤 User ID:', userId);
+
+   // Only register for push notifications on native platforms
+   if (Platform.OS !== 'web') {
+     registerForPushNotificationsAsync().then(async (token) => {
+       console.log('📲 Push token result:', token ? 'SUCCESS' : 'FAILED');
+       if (token) {
+         console.log('🔑 Expo push token:', token.substring(0, 20) + '...');
+         setExpoPushToken(token);
+
+         // Register user with Native Notify if we have a userId
+         if (userId) {
+           try {
+             console.log('🚀 Registering user with Native Notify...');
+             const registerResult = await nativeNotifyAPI.registerUser(userId, token);
+             console.log('✅ User registration result:', registerResult);
+             if (!registerResult.success) {
+               console.error('❌ User registration failed:', registerResult.error);
+             }
+           } catch (error) {
+             console.error('❌ Failed to register user with Native Notify:', error);
+           }
+         } else {
+           console.log('⚠️ No userId available for Native Notify registration');
+         }
+       } else {
+         console.error('❌ No push token received from Expo');
+       }
+     }).catch((error) => {
+       console.error('❌ Push notification registration failed:', error);
+     });
+   } else {
+     console.log('🌐 Skipping push notifications on web platform');
+   }
+
+   syncNativeNotifyInbox();
 
     // Listen for foreground notifications
     const notificationListener = Notifications.addNotificationReceivedListener(
       async (notification) => {
+        console.log('🔔 Foreground notification received:', JSON.stringify(notification, null, 2));
         const newNotification: NotificationItem = {
           id: notification.request.identifier,
           title: notification.request.content.title ?? "No title",
@@ -181,22 +204,27 @@ export default function usePushNotifications() {
           read: false,
           date: new Date().toISOString() as any ,
         };
+        console.log('📝 Adding notification to state:', newNotification);
         addNotification(newNotification);
         saveNotifications([newNotification]);
         const newCount = unreadCount + 1;
         setUnreadCount(newCount);
         await saveUnreadCount(newCount);
+        console.log('✅ Notification processed, new count:', newCount);
       }
     );
 
     // User taps notification
     const responseListener =
       Notifications.addNotificationResponseReceivedListener(async (response) => {
+        console.log('👆 Notification response received:', JSON.stringify(response, null, 2));
         const notifId = response.notification.request.identifier;
+        console.log('📖 Marking notification as read:', notifId);
         markAsRead(notifId);
         const newCount = Math.max(0, unreadCount - 1);
         setUnreadCount(newCount);
         await saveUnreadCount(newCount);
+        console.log('✅ Notification marked as read, new count:', newCount);
       });
 
     // Sync when app comes to foreground
@@ -215,46 +243,89 @@ export default function usePushNotifications() {
     };
   }, []);
 
-  return { expoPushToken, unreadCount, syncNativeNotifyInbox };
+  // Test function to send a notification directly
+  const testNotification = async () => {
+    if (!userId) {
+      console.log('❌ No userId available for test notification');
+      return;
+    }
+
+    try {
+      console.log('🧪 Sending test notification...');
+      const result = await nativeNotifyAPI.sendNotification({
+        title: 'Test Notification',
+        message: 'This is a test notification from the app',
+        subID: userId,
+        pushData: { type: 'test', timestamp: new Date().toISOString() }
+      });
+      console.log('🧪 Test notification result:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Test notification failed:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  };
+
+  return { expoPushToken, unreadCount, syncNativeNotifyInbox, testNotification };
 }
 
 // Register Expo Push Notifications
 export async function registerForPushNotificationsAsync(): Promise<string | undefined> {
+  console.log('🚀 Starting push notification registration...');
+
   // Skip push notification registration on web unless VAPID is configured
   if (Platform.OS === 'web') {
-    console.log('Push notifications are not supported on web without VAPID configuration');
+    console.log('🌐 Push notifications are not supported on web without VAPID configuration');
     return;
   }
 
+  console.log('📱 Checking if device:', Device.isDevice);
   if (!Device.isDevice) {
+    console.log('📱 Not a real device, showing alert');
     showAlert("Push notifications", "Must use a physical device to receive push notifications.");
     return;
   }
 
+  console.log('🔐 Checking notification permissions...');
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  console.log('🔐 Existing permission status:', existingStatus);
+
   let finalStatus = existingStatus;
   if (existingStatus !== "granted") {
+    console.log('🔐 Requesting permissions...');
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
+    console.log('🔐 Permission request result:', finalStatus);
   }
+
   if (finalStatus !== "granted") {
+    console.log('❌ Permission not granted, showing alert');
     showAlert("Push notifications", "Permission not granted.");
     return;
   }
 
-  const tokenResp = await Notifications.getExpoPushTokenAsync({
-    projectId: "c10467bd-bf7d-44c4-88e8-848ef7c4edbe",
-  });
-
-  // Android channel
-  if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("default", {
-      name: "default",
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: "#FF231F7C",
+  console.log('🔑 Getting Expo push token...');
+  try {
+    const tokenResp = await Notifications.getExpoPushTokenAsync({
+      projectId: "c10467bd-bf7d-44c4-88e8-848ef7c4edbe",
     });
-  }
+    console.log('✅ Push token obtained successfully');
 
-  return tokenResp.data;
+    // Android channel
+    if (Platform.OS === "android") {
+      console.log('🤖 Setting up Android notification channel...');
+      await Notifications.setNotificationChannelAsync("default", {
+        name: "default",
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: "#FF231F7C",
+      });
+      console.log('✅ Android channel configured');
+    }
+
+    return tokenResp.data;
+  } catch (error) {
+    console.error('❌ Failed to get push token:', error);
+    return undefined;
+  }
 }

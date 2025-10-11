@@ -101,13 +101,20 @@ export default defineType({
   preview: {
     select: {
       title: 'title',
-      media: 'media.image',
+      media: 'media',
     },
+
     prepare(selection) {
       const {title, media} = selection
+      let previewMedia = null
+      if (media?.type === 'image') {
+        previewMedia = media.image
+      } else if (media?.type === 'file') {
+        previewMedia = media.video
+      }
       return {
         title,
-        media,
+        media: previewMedia,
       }
     },
   },

@@ -6,11 +6,19 @@ import { NotificationItem } from "@/app/types/notification";
 
 // Configure notification handler for production
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
+  handleNotification: async (notification) => {
+    console.log('🔔 Notification handler called:', JSON.stringify(notification, null, 2));
+
+    // Always show notifications when app is in foreground
+    // For background notifications, let the system decide based on user preferences
+    return {
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    };
+  },
 });
 
 interface NotificationContextProps {
@@ -70,7 +78,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
           allowCriticalAlerts: false,
           provideAppNotificationSettings: false,
           allowProvisional: false,
-          allowAnnouncements: false,
         },
       });
       

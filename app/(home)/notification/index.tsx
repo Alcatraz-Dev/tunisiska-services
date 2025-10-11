@@ -43,7 +43,7 @@ let inboxCache: InboxCache | null = null;
 
 export default function Notification() {
   const { notifications, markAllAsRead, markAsRead } = useNotifications();
-  const { unreadCount, syncNativeNotifyInbox } = usePushNotifications();
+  const { unreadCount, syncNativeNotifyInbox, testNotification } = usePushNotifications();
   const { resolvedTheme } = useTheme();
   const APP_ID = 32172;
   const APP_TOKEN = "PNF5T5VibvtV6lj8i7pbil";
@@ -329,7 +329,9 @@ export default function Notification() {
   const markLastNotification = () => {
     if (notifications.length === 0) return;
     const lastId = notifications[notifications.length - 1].id;
-    markAsRead(lastId);
+    if (lastId) {
+      markAsRead(lastId);
+    }
   };
 
 
@@ -362,26 +364,47 @@ export default function Notification() {
             Här hittar du alla dina senaste aviseringar
           </AutoText>
         </View>
-        {hasUnread && (
+        <View className="flex-row justify-between items-center">
+          {hasUnread && (
+            <TouchableOpacity
+              onPress={() => {
+                // Mark all as read locally and in context
+                const allIds = Array.from(new Set([
+                  ...readIds,
+                  ...data.map((n) => getId(n)),
+                ]));
+                setReadIds(allIds);
+                saveReadIds(allIds);
+                setData((prev) => prev.map((n) => ({ ...n, read: true })));
+                markAllAsRead();
+              }}
+              className="p-2"
+            >
+              <AutoText className="text-sm text-blue-500 font-medium">
+                Läs alla
+              </AutoText>
+            </TouchableOpacity>
+          )}
+
+          {/* Test notification button */}
           <TouchableOpacity
-            onPress={() => {
-              // Mark all as read locally and in context
-              const allIds = Array.from(new Set([
-                ...readIds,
-                ...data.map((n) => getId(n)),
-              ]));
-              setReadIds(allIds);
-              saveReadIds(allIds);
-              setData((prev) => prev.map((n) => ({ ...n, read: true })));
-              markAllAsRead();
+            onPress={async () => {
+              console.log('🧪 Testing notification...');
+              const result = await testNotification();
+              console.log('🧪 Test result:', result);
+              if (result?.success) {
+                showAlert("Test skickad", "En testnotifikation har skickats!");
+              } else {
+                showAlert("Test misslyckades", result?.error || "Okänt fel");
+              }
             }}
-            className="p-2 flex items-end justify-end mx-2"
+            className="p-2"
           >
-            <AutoText className="text-sm text-blue-500 font-medium">
-              Läs alla
+            <AutoText className="text-sm text-green-500 font-medium">
+              Testa notis
             </AutoText>
           </TouchableOpacity>
-        )}
+        </View>
       </View>
 
       <View className="flex-1 px-6 mt-5">

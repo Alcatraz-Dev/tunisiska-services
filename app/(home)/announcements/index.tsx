@@ -7,7 +7,7 @@ import { StatusBar } from "expo-status-bar";
 import { useTheme } from "@/app/context/ThemeContext";
 import Animated, { FadeInUp, FadeOutDown } from "react-native-reanimated";
 import { AutoText } from "@/app/components/ui/AutoText";
-import { useVideoPlayer, VideoView } from "expo-video";
+import VideoPlayer from "@/app/components/VideoPlayer";
 import { client } from "@/sanityClient";
 import { announcementQuery } from "@/app/hooks/useQuery";
 import { TranslatableDateText } from "@/app/utils/dateFormat";
@@ -41,27 +41,7 @@ export default function AnnouncementsScreen() {
     if (!media) return null;
 
     if (media.type === "video" && media.videoUrl) {
-      const player = useVideoPlayer({ uri: media.videoUrl }, (p) => {
-        p.loop = true;
-        p.muted = true;
-        p.play();
-      });
-      return (
-        <View
-          style={{
-            aspectRatio: 16 / 9,
-            borderRadius: 12,
-            overflow: "hidden",
-            marginTop: 8,
-          }}
-        >
-          <VideoView
-            style={{ width: "100%", height: "100%" }}
-            player={player}
-            surfaceType="textureView"
-          />
-        </View>
-      );
+      return <VideoPlayer uri={media.videoUrl} muted={true} />;
     }
 
     if (media.type === "image" && media.imageUrl) {
