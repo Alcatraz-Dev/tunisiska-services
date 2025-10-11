@@ -3,6 +3,7 @@ import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import { Platform, AppState } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
 import { useNotifications } from "@/app/context/NotificationContext";
 import { showAlert } from "@/app/utils/showAlert";
 
@@ -166,25 +167,36 @@ export default function usePushNotifications() {
          setExpoPushToken(token);
 
          // Register user with Native Notify if we have a userId
-         if (userId) {
+         if (userId && userId.trim()) {
            try {
              console.log('🚀 Registering user with Native Notify...');
+             console.log('👤 User ID:', userId);
+             console.log('🔑 Token preview:', token.substring(0, 20) + '...');
+
              const registerResult = await nativeNotifyAPI.registerUser(userId, token);
              console.log('✅ User registration result:', registerResult);
+
              if (!registerResult.success) {
                console.error('❌ User registration failed:', registerResult.error);
+               // Try to register again after a short delay in case of temporary issues
+               setTimeout(async () => {
+                 console.log('🔄 Retrying user registration...');
+                 const retryResult = await nativeNotifyAPI.registerUser(userId, token);
+                 console.log('✅ Retry registration result:', retryResult);
+               }, 2000);
              }
            } catch (error) {
              console.error('❌ Failed to register user with Native Notify:', error);
            }
          } else {
-           console.log('⚠️ No userId available for Native Notify registration');
+           console.log('⚠️ No valid userId available for Native Notify registration');
          }
        } else {
          console.error('❌ No push token received from Expo');
        }
      }).catch((error) => {
        console.error('❌ Push notification registration failed:', error);
+       // Don't show alert for Expo Go failures, just log
      });
    } else {
      console.log('🌐 Skipping push notifications on web platform');
@@ -252,6 +264,28 @@ export default function usePushNotifications() {
 
     try {
       console.log('🧪 Sending test notification...');
+
+      // For Expo Go testing, also add to local notifications
+      const isExpoGo = Platform.OS === 'web' || !Device.isDevice;
+      if (isExpoGo) {
+        console.log('🧪 Expo Go detected - adding local test notification');
+        const testNotif = {
+          id: `test-${Date.now()}`,
+          title: 'Test Notification',
+          message: 'This is a test notification from the app',
+          type: 'test',
+          read: false,
+          date: new Date().toISOString(),
+        };
+        addNotification(testNotif);
+        saveNotifications([testNotif]);
+        const newCount = unreadCount + 1;
+        setUnreadCount(newCount);
+        await saveUnreadCount(newCount);
+        return { success: true, message: 'Local test notification added' };
+      }
+
+      // For real devices, send via Native Notify
       const result = await nativeNotifyAPI.sendNotification({
         title: 'Test Notification',
         message: 'This is a test notification from the app',
@@ -281,8 +315,9 @@ export async function registerForPushNotificationsAsync(): Promise<string | unde
 
   console.log('📱 Checking if device:', Device.isDevice);
   if (!Device.isDevice) {
-    console.log('📱 Not a real device, showing alert');
-    showAlert("Push notifications", "Must use a physical device to receive push notifications.");
+    console.log('📱 Not a real device - Expo Go detected, push notifications not available');
+    console.log('💡 To test push notifications, build a development build: npx expo run:ios or npx expo run:android');
+    // Don't show alert in Expo Go, just log the information
     return;
   }
 
@@ -305,9 +340,12 @@ export async function registerForPushNotificationsAsync(): Promise<string | unde
   }
 
   console.log('🔑 Getting Expo push token...');
+  const projectId = Constants.expoConfig?.extra?.eas?.projectId || "c7b65ce0-2aa6-4b42-b6d7-4f04277bc839";
+  console.log('📋 Using project ID:', projectId);
+
   try {
     const tokenResp = await Notifications.getExpoPushTokenAsync({
-      projectId: "c10467bd-bf7d-44c4-88e8-848ef7c4edbe",
+      projectId: projectId,
     });
     console.log('✅ Push token obtained successfully');
 

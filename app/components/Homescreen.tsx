@@ -117,8 +117,11 @@ export default function HomePage() {
   };
 
   const unCountNotifications = async () => {
+    console.log('🔢 Calculating unread notification count...');
+
     // Check if we're in Expo Go (limited native module support)
     const isExpoGo = !Device.isDevice || Platform.OS === 'web';
+    console.log('📱 Is Expo Go:', isExpoGo);
 
     // For Expo Go, skip native-notify API calls and use local state
     if (isExpoGo) {
@@ -132,6 +135,7 @@ export default function HomePage() {
 
         // Use local notifications from context as primary source
         const localUnreadCount = notifications.filter((n) => !n.read).length;
+        console.log('📊 Local unread count:', localUnreadCount);
         setUnreadNotificationCount(localUnreadCount);
 
         // Also check stored unread count from usePushNotifications hook
@@ -156,6 +160,7 @@ export default function HomePage() {
         "PNF5T5VibvtV6lj8i7pbil"
       );
       const count = unreadResp?.data ?? 0;
+      console.log('📊 API unread count:', count);
       setUnreadNotificationCount(count);
       return;
     } catch {}
@@ -179,16 +184,18 @@ export default function HomePage() {
       const scoped = filterForUser(raw);
       const processed = applyOverlays(scoped, read, hidden);
       const unreadCount = processed.filter((n: any) => !n.read).length;
+      console.log('📊 Fallback unread count:', unreadCount);
       setUnreadNotificationCount(unreadCount);
     } catch (error) {
       // Final fallback: use local notification state from context
       const localUnreadCount = notifications.filter((n) => !n.read).length;
+      console.log('📊 Final fallback unread count:', localUnreadCount);
       setUnreadNotificationCount(localUnreadCount);
     }
   };
   useEffect(() => {
     unCountNotifications();
-  }, [READ_IDS_KEY, HIDDEN_IDS_KEY, userId]);
+  }, [READ_IDS_KEY, HIDDEN_IDS_KEY, userId, notifications]);
   const createUser = async () => {
     if (!user || !userId || userCreated) return;
 
@@ -300,6 +307,7 @@ export default function HomePage() {
               {/* Notifications */}
               <TouchableOpacity
                 onPress={async () => {
+                  // Refresh unread count before navigating
                   await unCountNotifications();
                   router.push("/notification");
                 }}
