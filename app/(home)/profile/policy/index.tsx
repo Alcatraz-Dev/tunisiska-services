@@ -4,18 +4,65 @@ import {
   SafeAreaView,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/app/context/ThemeContext";
 import { StatusBar } from "expo-status-bar";
 import { AutoText } from "@/app/components/ui/AutoText";
+import { RichTextRenderer } from "@/app/components/ui/RichTextRenderer";
+import { client } from "@/sanityClient";
+import { policyQuery } from "@/app/hooks/useQuery";
 
 export default function Policy() {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
   const router = useRouter();
+
+  const [policy, setPolicy] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPolicy = async () => {
+      try {
+        const data = await client.fetch(policyQuery);
+        setPolicy(data);
+      } catch (error) {
+        console.error("Error fetching policy:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPolicy();
+  }, []);
+
+  if (loading) {
+    return (
+      <SafeAreaView
+        className={`flex-1 items-center justify-center ${
+          isDark ? "bg-dark" : "bg-light"
+        }`}
+      >
+        <ActivityIndicator size="large" color={isDark ? "#fff" : "#000"} />
+      </SafeAreaView>
+    );
+  }
+
+  if (!policy) {
+    return (
+      <SafeAreaView
+        className={`flex-1 items-center justify-center ${
+          isDark ? "bg-dark" : "bg-light"
+        }`}
+      >
+        <AutoText className={isDark ? "text-white" : "text-gray-900"}>
+          Privacy Policy not found
+        </AutoText>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
@@ -38,7 +85,7 @@ export default function Policy() {
               isDark ? "text-white" : "text-gray-900"
             }`}
           >
-            Policy
+            {policy?.title || "Policy"}
           </AutoText>
         </View>
         <AutoText
@@ -55,47 +102,21 @@ export default function Policy() {
         className="flex-1 px-6 mt-4"
         showsVerticalScrollIndicator={false}
       >
-        {/* Integritetspolicy */}
-        <View className="mb-6">
+        <RichTextRenderer
+          content={policy?.content || []}
+          className={isDark ? "text-gray-300" : "text-gray-700"}
+        />
+
+        {/* Last Updated */}
+        {policy?.lastUpdated && (
           <AutoText
-            className={`text-lg font-semibold mb-2 ${
-              isDark ? "text-white" : "text-gray-900"
+            className={`text-xs text-center mt-10 mb-6 ${
+              isDark ? "text-gray-500" : "text-gray-500"
             }`}
           >
-            Integritetspolicy
+            Senast uppdaterad: {new Date(policy.lastUpdated).toLocaleDateString('sv-SE')}
           </AutoText>
-          <AutoText className={`${isDark ? "text-gray-300" : "text-gray-700"}`}>
-            Vi samlar endast in den information som är nödvändig för att kunna
-            erbjuda dig våra tjänster, som namn, e-postadress och
-            kontaktuppgifter. Din information delas aldrig med tredje part utan
-            ditt samtycke.
-          </AutoText>
-        </View>
-
-        {/* Användarvillkor */}
-        <View className="mb-6">
-          <AutoText
-            className={`text-lg font-semibold mb-2 ${
-              isDark ? "text-white" : "text-gray-900"
-            }`}
-          >
-            Användarvillkor
-          </AutoText>
-          <AutoText className={`${isDark ? "text-gray-300" : "text-gray-700"}`}>
-            Genom att använda denna app godkänner du våra villkor. Du förbinder
-            dig att inte missbruka tjänsten och att alltid följa gällande lagar.
-            Vi förbehåller oss rätten att ändra villkoren vid behov.
-          </AutoText>
-        </View>
-
-        {/* Uppdatering */}
-        <AutoText
-          className={`text-xs text-center mt-10 mb-6 ${
-            isDark ? "text-gray-500" : "text-gray-500"
-          }`}
-        >
-          Senast uppdaterad: September 2025
-        </AutoText>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

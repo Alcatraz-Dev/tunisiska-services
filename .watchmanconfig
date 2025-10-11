@@ -1,0 +1,12 @@
+{
+  "ignore_dirs": [
+    "ios/build",
+    "ios/DerivedData",
+    "android/app/build",
+    "android/.gradle",
+    "node_modules/.cache",
+    ".expo",
+    ".next",
+    ".git"
+  ]
+}

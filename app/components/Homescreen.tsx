@@ -1,10 +1,15 @@
 import { SignedIn, useAuth, useUser } from "@clerk/clerk-expo";
+import {
+  getUnreadNotificationInboxCount,
+  getNotificationInbox,
+} from "native-notify";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Link, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useState } from "react";
-import { Image, ScrollView, TouchableOpacity, View } from "react-native";
+import { Image, ScrollView, TouchableOpacity, View, Platform } from "react-native";
+import * as Device from "expo-device";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AnnouncementsCarousel from "../components/AnnouncementsCarousel";
 import AppFooter from "../components/AppFooter";
@@ -17,7 +22,6 @@ import CategoryTabs from "./CategoryTabs";
 import RedirectIfSignedOut from "./RedirectIfSignedOut";
 import { AutoText } from "./ui/AutoText";
 import Input from "./ui/Input";
-import { registerForPushNotificationsAsync } from "../hooks/usePushNotifications";
 import { createUserDirectInSanity } from "../utils/sanityDirect";
 
 interface UserProfileData {
@@ -69,7 +73,7 @@ const services = [
 ];
 
 const categories = [
-  "All",
+  "Alla",
   "Transport",
   "Städning & FlyttServices",
   "FlyttServices",
@@ -80,17 +84,111 @@ export default function HomePage() {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
   const { isLoaded, user } = useUser();
+  const { isLoaded: isAuthLoaded, userId } = useAuth();
   const [userProfile, setUserProfile] = useState<UserProfileData | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeCategory, setActiveCategory] = useState("All");
+  const [activeCategory, setActiveCategory] = useState("Alla");
   const [imageUrl, setImageUrl] = useState("");
   const { notifications, notificationsEnabled } = useNotifications();
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [readIds, setReadIds] = useState<string[]>([]);
+  const [hiddenIds, setHiddenIds] = useState<string[]>([]);
+  const READ_IDS_KEY = useMemo(() => `notification_read_ids:${userId ?? "anon"}`, [userId]);
+  const HIDDEN_IDS_KEY = useMemo(() => `notification_hidden_ids:${userId ?? "anon"}`, [userId]);
+
   const router = useRouter();
-  const { isLoaded: isAuthLoaded, userId } = useAuth();
+
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [userCreated, setUserCreated] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const getId = (n: any) => (n.id ?? n.notification_id ?? '').toString();
+  const filterForUser = (items: any[]) => {
+    if (!userId) return items;
+    const keys = ['subscriber_id','subscriberId','user_id','userId','indie_id','indieId','sub_id','subId'];
+    const hasAny = items.some((it) => keys.some((k) => it && typeof it === 'object' && k in it));
+    if (!hasAny) return items;
+    return items.filter((it) => keys.some((k) => it?.[k]?.toString?.() === userId?.toString()))
+  };
+  const applyOverlays = (items: any[], read: string[], hidden: string[]) => {
+    const readSet = new Set(read);
+    const hiddenSet = new Set(hidden);
+    return items.filter((n) => !hiddenSet.has(getId(n))).map((n) => ({ ...n, read: n.read || readSet.has(getId(n)) }));
+  };
+
+  const unCountNotifications = async () => {
+    // Check if we're in Expo Go (limited native module support)
+    const isExpoGo = !Device.isDevice || Platform.OS === 'web';
+
+    // For Expo Go, skip native-notify API calls and use local state
+    if (isExpoGo) {
+      try {
+        const [storedRead, storedHidden] = await Promise.all([
+          AsyncStorage.getItem(READ_IDS_KEY),
+          AsyncStorage.getItem(HIDDEN_IDS_KEY),
+        ]);
+        const read = storedRead ? JSON.parse(storedRead) : [];
+        const hidden = storedHidden ? JSON.parse(storedHidden) : [];
+
+        // Use local notifications from context as primary source
+        const localUnreadCount = notifications.filter((n) => !n.read).length;
+        setUnreadNotificationCount(localUnreadCount);
+
+        // Also check stored unread count from usePushNotifications hook
+        const storedUnreadCount = await AsyncStorage.getItem("unreadCount");
+        if (storedUnreadCount) {
+          const count = Number(storedUnreadCount);
+          // Use the higher count to ensure we don't miss notifications
+          setUnreadNotificationCount(Math.max(localUnreadCount, count));
+        }
+      } catch (error) {
+        console.warn('Error getting unread count in Expo Go:', error);
+        const localUnreadCount = notifications.filter((n) => !n.read).length;
+        setUnreadNotificationCount(localUnreadCount);
+      }
+      return;
+    }
+
+    // Fast path: use dedicated unread count API (for real devices)
+    try {
+      const unreadResp = await getUnreadNotificationInboxCount(
+        32172,
+        "PNF5T5VibvtV6lj8i7pbil"
+      );
+      const count = unreadResp?.data ?? 0;
+      setUnreadNotificationCount(count);
+      return;
+    } catch {}
+
+    // Fallback: derive from inbox + local overlays
+    try {
+      const [storedRead, storedHidden] = await Promise.all([
+        AsyncStorage.getItem(READ_IDS_KEY),
+        AsyncStorage.getItem(HIDDEN_IDS_KEY),
+      ]);
+      const read = storedRead ? JSON.parse(storedRead) : [];
+      const hidden = storedHidden ? JSON.parse(storedHidden) : [];
+
+      const response = await getNotificationInbox(
+        32172,
+        "PNF5T5VibvtV6lj8i7pbil",
+        50,
+        0
+      );
+      const raw = Array.isArray(response) ? response : response?.data ?? [];
+      const scoped = filterForUser(raw);
+      const processed = applyOverlays(scoped, read, hidden);
+      const unreadCount = processed.filter((n: any) => !n.read).length;
+      setUnreadNotificationCount(unreadCount);
+    } catch (error) {
+      // Final fallback: use local notification state from context
+      const localUnreadCount = notifications.filter((n) => !n.read).length;
+      setUnreadNotificationCount(localUnreadCount);
+    }
+  };
+  useEffect(() => {
+    unCountNotifications();
+  }, [READ_IDS_KEY, HIDDEN_IDS_KEY, userId]);
   const createUser = async () => {
     if (!user || !userId || userCreated) return;
 
@@ -100,12 +198,9 @@ export default function HomePage() {
     try {
       console.log("🔄 Creating user directly in Sanity...");
 
-      const pushToken = await registerForPushNotificationsAsync();
-
       const userData = {
         clerkId: userId,
         email: user.emailAddresses[0]?.emailAddress || "",
-        pushToken: pushToken || undefined,
       };
 
       const result = await createUserDirectInSanity(userData);
@@ -149,24 +244,11 @@ export default function HomePage() {
         s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         s.description.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory =
-        activeCategory === "All" || s.category === activeCategory;
+        activeCategory === "Alla" || s.category === activeCategory;
       return matchesSearch && matchesCategory;
     });
   }, [searchQuery, activeCategory]);
 
-  const pushNotifications = async () => {
-    // if (notificationsEnabled) {
-    //   await Notifications.scheduleNotificationAsync({
-    //     content: {
-    //       title: "Test Notification",
-    //       body: "This is a local test notification 🚀",
-    //       data: { type: "info" },
-    //     },
-    //     trigger: null, // immediate
-    //   });
-    // }
-    router.push("/(home)/pushNotifications");
-  };
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
       <SignedIn>
@@ -217,13 +299,18 @@ export default function HomePage() {
               </Link>
               {/* Notifications */}
               <TouchableOpacity
-                onPress={() => router.push("/notification")}
+                onPress={async () => {
+                  await unCountNotifications();
+                  router.push("/notification");
+                }}
                 className="w-10 h-10 rounded-full items-center justify-center mb-10 relative"
               >
-                {notificationsEnabled && unreadCount > 0 && (
-                  <View className="absolute top-0 right-0 min-w-[16px] h-4 bg-primary rounded-full items-center justify-center px-1">
+                {unreadNotificationCount > 0 && (
+                  <View className="absolute -top-1 -right-0 min-w-[18px] h-[18px] bg-primary rounded-full items-center justify-center">
                     <AutoText className="text-white text-[10px] font-bold">
-                      {unreadCount > 99 ? "+99" : unreadCount}
+                      {unreadNotificationCount > 99
+                        ? "99+"
+                        : unreadNotificationCount}
                     </AutoText>
                   </View>
                 )}
@@ -352,39 +439,6 @@ export default function HomePage() {
                 </AutoText>
               </View>
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={pushNotifications}
-              className="bg-indigo-100 dark:bg-indigo-900 p-4 rounded-xl mt-3 mb-4 items-center"
-            >
-              <View className="flex-row items-center">
-                <Ionicons
-                  name="play-circle"
-                  size={20}
-                  color="#6366f1"
-                  className="mr-2"
-                />
-                <AutoText className="text-indigo-600 dark:text-indigo-300 font-medium">
-                  Push notifications
-                </AutoText>
-              </View>
-            </TouchableOpacity>
-
-            {/* <TouchableOpacity
-              onPress={() => router.push("/(home)/welcome")}
-              className="bg-indigo-100 dark:bg-indigo-900 p-4 rounded-xl mt-6 mb-4 items-center"
-            >
-              <View className="flex-row items-center">
-                <Ionicons
-                  name="home-outline"
-                  size={20}
-                  color="#6366f1"
-                  className="mr-2"
-                />
-                <Text className="text-indigo-600 dark:text-indigo-300 font-medium">
-                  Se hemsidan
-                </Text>
-              </View>
-            </TouchableOpacity> */}
             {/* Footer */}
             <AppFooter />
           </ScrollView>

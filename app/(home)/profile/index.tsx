@@ -82,6 +82,10 @@ const Profile = () => {
   const pendingReferrals = (userProfile?.referrals ?? []).filter(
     (r) => r.status === "pending"
   ).length;
+  
+  // Initialize isDark early so it can be used in getTierColors
+  const isDark = resolvedTheme === "dark";
+  
   // Function to determine membership tier based on points
   const getMembershipTier = (points: number) => {
     if (points >= 50000) return "Vipmedlem";
@@ -193,8 +197,6 @@ const Profile = () => {
       </View>
     );
   }
-
-  const isDark = resolvedTheme === "dark";
 
   // Check if user signed in with Google
   const isGoogleUser = user?.externalAccounts.some(

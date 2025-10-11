@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tunisiska Services - Payment</title>
+    <script src="https://js.stripe.com/v3/"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .payment-container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+        
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .amount {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+            margin: 20px 0;
+        }
+        
+        .points {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        
+        .payment-button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 16px 32px;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .payment-button:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+        
+        .payment-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-weight: 500;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .test-cards {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            text-align: left;
+        }
+        
+        .test-cards h4 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .test-cards p {
+            margin: 5px 0;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="payment-container">
+        <div class="logo">🏠 Tunisiska Services</div>
+        <div class="amount" id="amount">0 SEK</div>
+        <div class="points" id="points">0 poäng</div>
+        
+        <div id="status" class="status" style="display: none;"></div>
+        
+        <button id="paymentButton" class="payment-button">
+            Betala nu
+        </button>
+        
+        <div class="test-cards">
+            <h4>🧪 Test Cards</h4>
+            <p><strong>Success:</strong> 4242 4242 4242 4242</p>
+            <p><strong>Decline:</strong> 4000 0000 0000 0002</p>
+            <p><strong>Any future date & CVC</strong></p>
+        </div>
+    </div>
+
+    <script>
+        // Get URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const amount = urlParams.get('amount') || '100';
+        const points = urlParams.get('points') || '1000';
+        
+        // Update UI
+        document.getElementById('amount').textContent = amount + ' SEK';
+        document.getElementById('points').textContent = points + ' poäng';
+        
+        // Initialize Stripe
+        const stripe = Stripe('pk_test_51234567890abcdefghijklmnopqrstuvwxyz');
+        
+        const paymentButton = document.getElementById('paymentButton');
+        const statusDiv = document.getElementById('status');
+        
+        function showStatus(message, type) {
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+        }
+        
+        function setLoading(loading) {
+            paymentButton.disabled = loading;
+            if (loading) {
+                paymentButton.innerHTML = '<span class="loading"></span>Behandlar...';
+            } else {
+                paymentButton.innerHTML = 'Betala nu';
+            }
+        }
+        
+        async function createPaymentIntent() {
+            try {
+                const response = await fetch('/payment-sheet', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ amount: parseFloat(amount) }),
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('Error creating payment intent:', error);
+                throw error;
+            }
+        }
+        
+        async function handlePayment() {
+            try {
+                setLoading(true);
+                showStatus('Förbereder betalning...', 'info');
+                
+                // Create payment intent
+                const { paymentIntent } = await createPaymentIntent();
+                
+                showStatus('Öppnar Stripe Checkout...', 'info');
+                
+                // Redirect to Stripe Checkout
+                const { error } = await stripe.redirectToCheckout({
+                    clientSecret: paymentIntent,
+                });
+                
+                if (error) {
+                    throw new Error(error.message);
+                }
+                
+            } catch (error) {
+                console.error('Payment error:', error);
+                showStatus(`Betalningsfel: ${error.message}`, 'error');
+                setLoading(false);
+            }
+        }
+        
+        // Handle successful payment (when redirected back)
+        if (window.location.search.includes('payment_intent=')) {
+            showStatus('🎉 Betalning lyckades! Du kan stänga denna sida.', 'success');
+            setLoading(false);
+            
+            // Notify the app that payment was successful
+            setTimeout(() => {
+                if (window.ReactNativeWebView) {
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                        type: 'PAYMENT_SUCCESS',
+                        amount: amount,
+                        points: points
+                    }));
+                }
+            }, 1000);
+        }
+        
+        // Handle payment errors
+        if (window.location.search.includes('error=')) {
+            showStatus('❌ Betalning misslyckades. Försök igen.', 'error');
+            setLoading(false);
+        }
+        
+        // Add event listener
+        paymentButton.addEventListener('click', handlePayment);
+        
+        // Auto-start payment if in Expo Go
+        if (window.location.search.includes('auto=true')) {
+            setTimeout(handlePayment, 1000);
+        }
+    </script>
+</body>
+</html>
+

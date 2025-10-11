@@ -1,10 +1,5 @@
 import React, { useState } from "react";
-import {
-  View,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-} from "react-native";
+import { View, TouchableOpacity, ScrollView, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Calendar } from "react-native-calendars";
@@ -80,10 +75,7 @@ export default function ShippingPage() {
 
   const handleBooking = () => {
     if (!selectedTrip || selectedCategories.length === 0 || !kg) {
-      return showAlert(
-        "Fel",
-        "Vänligen välj schema, kategori och fyll i vikt"
-      );
+      return showAlert("Fel", "Vänligen välj schema, kategori och fyll i vikt");
     }
 
     const totalCost = calculateTotal();
@@ -140,13 +132,14 @@ export default function ShippingPage() {
           Välj datum
         </AutoText>
         <Calendar
+          key={isDark ? "dark" : "light"} // Tvinga omrendering vid temabyte
           markedDates={markedDates}
           onDayPress={handleDateSelect}
           theme={{
-            calendarBackground: "#1c1c1e",
-            textSectionTitleColor: "#fff",
-            dayTextColor: "#fff",
-            monthTextColor: "#fff",
+            calendarBackground: isDark ? "#1c1c1e" : "#fff",
+            textSectionTitleColor: isDark ? "#fff" : "#000",
+            dayTextColor: isDark ? "#fff" : "#000",
+            monthTextColor: isDark ? "#fff" : "#000",
             arrowColor: "#0ea5e9",
             todayTextColor: "#0ea5e9",
             selectedDayBackgroundColor: "#0ea5e9",

@@ -1,81 +1,142 @@
-// app/context/NotificationContext.tsx
-import React, { createContext, useState, useContext, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Notifications from "expo-notifications";
+import { Platform } from "react-native";
+import { NotificationItem } from "@/app/types/notification";
 
-export type NotificationItem = {
-  id: string;
-  read: boolean;
-  title: string;
-  message: string;
-  type: string;
-  date: string;
-};
+// Configure notification handler for production
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
-type NotificationContextType = {
+interface NotificationContextProps {
   notifications: NotificationItem[];
   setNotifications: React.Dispatch<React.SetStateAction<NotificationItem[]>>;
-  notificationsEnabled: boolean;
-  setNotificationsEnabled: React.Dispatch<React.SetStateAction<boolean>>;
-  addNotification: (notif: Omit<NotificationItem, "id" | "read" | "date">) => void;
+  addNotification: (notif: NotificationItem) => void;
+  addMultipleNotifications: (notifs: NotificationItem[]) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
-};
+  notificationsEnabled: boolean;
+  setNotificationsEnabled: (value: boolean) => void;
+  permissionStatus: Notifications.NotificationPermissionsStatus | null;
+  requestPermissions: () => Promise<boolean>;
+}
 
-const STORAGE_KEY = "appNotifications";
-const ENABLE_KEY = "notificationsEnabled";
-const NotificationContext = createContext<NotificationContextType | undefined>(
+const NotificationContext = createContext<NotificationContextProps | undefined>(
   undefined
 );
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const initial: NotificationItem[] = [
-    /* your initial list (the 15 items you prepared) */
-  ];
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [permissionStatus, setPermissionStatus] = useState<Notifications.NotificationPermissionsStatus | null>(null);
 
-  const [notifications, setNotifications] = useState<NotificationItem[]>(initial);
-  const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(true);
-
-  // Load saved notifications + enabled flag
   useEffect(() => {
-    (async () => {
-      try {
-        const saved = await AsyncStorage.getItem(STORAGE_KEY);
-        if (saved) setNotifications(JSON.parse(saved));
-        const enabled = await AsyncStorage.getItem(ENABLE_KEY);
-        if (enabled !== null) setNotificationsEnabled(enabled === "true");
-      } catch (e) {
-        console.error("Failed to load notifications:", e);
+    // Initialize permissions and load settings
+    const initializeNotifications = async () => {
+      // Load notificationsEnabled from AsyncStorage
+      const value = await AsyncStorage.getItem("notificationsEnabled");
+      if (value !== null) setNotificationsEnabled(value === "true");
+      
+      // Get current permission status
+      const status = await Notifications.getPermissionsAsync();
+      setPermissionStatus(status);
+      
+      // If permissions are granted, set initial badge count
+      if (status.granted) {
+        await Notifications.setBadgeCountAsync(0);
       }
-    })();
+      
+      console.log('📱 Notification permissions:', status);
+    };
+    
+    initializeNotifications();
   }, []);
 
-  // Persist on change
-  useEffect(() => {
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(notifications));
-  }, [notifications]);
-
-  useEffect(() => {
-    AsyncStorage.setItem(ENABLE_KEY, notificationsEnabled.toString());
-  }, [notificationsEnabled]);
-
-  const addNotification = (notif: Omit<NotificationItem, "id" | "read" | "date">) => {
-    const newItem: NotificationItem = {
-      id: Date.now().toString(),
-      read: false,
-      date: new Date().toISOString(),
-      ...notif,
-    };
-    setNotifications((prev) => [newItem, ...prev]);
+  const requestPermissions = async (): Promise<boolean> => {
+    try {
+      const { status } = await Notifications.requestPermissionsAsync({
+        ios: {
+          allowAlert: true,
+          allowBadge: true,
+          allowSound: true,
+          allowDisplayInCarPlay: false,
+          allowCriticalAlerts: false,
+          provideAppNotificationSettings: false,
+          allowProvisional: false,
+          allowAnnouncements: false,
+        },
+      });
+      
+      const newStatus = await Notifications.getPermissionsAsync();
+      setPermissionStatus(newStatus);
+      
+      console.log('🔔 Permission request result:', status, newStatus);
+      return status === 'granted' || newStatus.granted;
+    } catch (error) {
+      console.error('❌ Error requesting permissions:', error);
+      return false;
+    }
   };
 
-  const markAsRead = (id: string) => {
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+  const saveNotificationsEnabled = async (value: boolean) => {
+    if (value && permissionStatus && !permissionStatus.granted) {
+      const granted = await requestPermissions();
+      if (!granted) {
+        console.log('⚠️ Permissions not granted, keeping notifications disabled');
+        return;
+      }
+    }
+    
+    setNotificationsEnabled(value);
+    await AsyncStorage.setItem("notificationsEnabled", value.toString());
   };
 
-  const markAllAsRead = () => {
+  const addNotification = (notif: NotificationItem) => {
+    setNotifications((prev) => [notif, ...prev]);
+  };
+
+  const addMultipleNotifications = (notifs: NotificationItem[]) => {
+    setNotifications((prev) => {
+      const merged = [...notifs, ...prev];
+      const unique = Array.from(new Map(merged.map((n) => [n.id, n])).values());
+      return unique;
+    });
+  };
+
+  const markAsRead = async (id: string) => {
+    setNotifications((prev) => {
+      const updated = prev.map((n) => (n.id === id ? { ...n, read: true } : n));
+      // Update badge count only if permissions are granted
+      const unreadCount = updated.filter(n => !n.read).length;
+      
+      if (permissionStatus?.granted && notificationsEnabled) {
+        Notifications.setBadgeCountAsync(unreadCount).catch((error) => {
+          console.warn('⚠️ Failed to set badge count:', error);
+        });
+      }
+      
+      return updated;
+    });
+  };
+
+  const markAllAsRead = async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    
+    // Clear badge when all notifications are read, only if permissions granted
+    if (permissionStatus?.granted && notificationsEnabled) {
+      try {
+        await Notifications.setBadgeCountAsync(0);
+      } catch (error) {
+        console.warn('⚠️ Failed to clear badge count:', error);
+      }
+    }
   };
 
   return (
@@ -83,11 +144,14 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
       value={{
         notifications,
         setNotifications,
-        notificationsEnabled,
-        setNotificationsEnabled,
         addNotification,
+        addMultipleNotifications,
         markAsRead,
         markAllAsRead,
+        notificationsEnabled,
+        setNotificationsEnabled: saveNotificationsEnabled,
+        permissionStatus,
+        requestPermissions,
       }}
     >
       {children}
@@ -96,7 +160,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
 };
 
 export const useNotifications = () => {
-  const ctx = useContext(NotificationContext);
-  if (!ctx) throw new Error("useNotifications must be used within NotificationProvider");
-  return ctx;
+  const context = useContext(NotificationContext);
+  if (!context) throw new Error("useNotifications must be used within a Provider");
+  return context;
 };

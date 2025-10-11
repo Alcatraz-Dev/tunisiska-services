@@ -1,3 +1,4 @@
+
 import WaveTabBar from "../components/WaveTabBar/WaveTabBar";
 import { ThemeProvider } from "../context/ThemeContext";
 import { SafeAreaProvider } from "react-native-safe-area-context";

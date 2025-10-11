@@ -1,13 +1,15 @@
 import {defineCliConfig} from 'sanity/cli'
-import {notificationActions} from '../actions/sendNotification'
 
 export default defineCliConfig({
   api: {
     projectId: 'ci4uj541',
-    dataset: 'production',
+    dataset: 'production'
   },
   deployment: {
+    /**
+     * Enable auto-updates for studios.
+     * Learn more at https://www.sanity.io/docs/cli#auto-updates
+     */
     autoUpdates: true,
-  },
-  
+  }
 })

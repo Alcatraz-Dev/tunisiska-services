@@ -1,19 +1,81 @@
-import React, { useState } from "react";
-import { View, TouchableOpacity, ScrollView } from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, TouchableOpacity, ScrollView, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useTheme } from "@/app/context/ThemeContext";
-import { demoAnnouncements } from "@/app/constants/demoAnnouncements";
 import Animated, { FadeInUp, FadeOutDown } from "react-native-reanimated";
 import { AutoText } from "@/app/components/ui/AutoText";
+import { useVideoPlayer, VideoView } from "expo-video";
+import { client } from "@/sanityClient";
+import { announcementQuery } from "@/app/hooks/useQuery";
+import { TranslatableDateText } from "@/app/utils/dateFormat";
 
 export default function AnnouncementsScreen() {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
   const router = useRouter();
-  const [announcements] = useState(demoAnnouncements);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  useEffect(() => {
+    const fetchAnnouncements = async () => {
+      try {
+        const response = await client.fetch(announcementQuery);
+        const data = response;
+        setAnnouncements(data);
+      } catch (error) {
+        console.error("Error fetching announcements:", error);
+      }
+    };
+    fetchAnnouncements();
+  }, []);
+
+  const AnnouncementMedia = ({
+    media,
+  }: {
+    media:
+      | { type: "image"; imageUrl?: string }
+      | { type: "video"; videoUrl?: string }
+      | undefined;
+  }) => {
+    if (!media) return null;
+
+    if (media.type === "video" && media.videoUrl) {
+      const player = useVideoPlayer({ uri: media.videoUrl }, (p) => {
+        p.loop = true;
+        p.muted = true;
+        p.play();
+      });
+      return (
+        <View
+          style={{
+            aspectRatio: 16 / 9,
+            borderRadius: 12,
+            overflow: "hidden",
+            marginTop: 8,
+          }}
+        >
+          <VideoView
+            style={{ width: "100%", height: "100%" }}
+            player={player}
+            surfaceType="textureView"
+          />
+        </View>
+      );
+    }
+
+    if (media.type === "image" && media.imageUrl) {
+      return (
+        <Image
+          source={{ uri: media.imageUrl }}
+          style={{ width: "100%", height: 200, borderRadius: 12, marginTop: 8 }}
+          resizeMode="cover"
+        />
+      );
+    }
+
+    return null;
+  };
 
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
@@ -46,67 +108,79 @@ export default function AnnouncementsScreen() {
           Senaste nyheter, kampanjer och uppdateringar
         </AutoText>
       </View>
+
       {/* Announcements list */}
       <ScrollView className="p-6 mt-5">
-        {/* <AnimatePresence> */}
-        {announcements.map((a, index) => (
-          <Animated.View
-            entering={FadeInUp.delay(200 * index)}
-            exiting={FadeOutDown}
-            key={a.id}
-             style={{
-          shadowColor: "#000",
-          shadowOpacity: 0.15,
-          shadowRadius: 4,
-          shadowOffset: { width: 0, height: 2 },
-          elevation: 3,
-        }}
-          >
-            <TouchableOpacity
-              key={a.id}
-              activeOpacity={0.8}
-              onPress={() => router.push(`/(home)/announcements/${a.slug}`)}
-              className={`mb-5 flex-row items-start p-4 rounded-2xl shadow-sm ${
-                isDark ? "bg-dark-card" : "bg-white"
-              }`}
-              style={{ borderLeftWidth: 1, borderLeftColor: `${a.color}`}}
+        {announcements.map((a, index) => {
+          const media = a.media as
+            | any
+            | { type: "image"; imageUrl?: string }
+            | { type: "video"; videoUrl?: string }
+            | undefined;
+
+          return (
+            <Animated.View
+              entering={FadeInUp.delay(200 * index)}
+              exiting={FadeOutDown}
+              key={a.slug}
+              style={{
+                shadowColor: "#000",
+                shadowOpacity: 0.15,
+                shadowRadius: 4,
+                shadowOffset: { width: 0, height: 2 },
+                elevation: 3,
+              }}
             >
-              {/* Icon */}
-              <View
-                className="w-10 h-10 rounded-full items-center justify-center mr-4 mt-4"
-                style={{ backgroundColor: `${a.color}20` }}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => router.push(`/(home)/announcements/${a.slug}`)}
+                className={`mb-5 flex-row items-start p-4 rounded-2xl shadow-sm ${
+                  isDark ? "bg-dark-card" : "bg-white"
+                }`}
+                style={{ borderLeftWidth: 1, borderLeftColor: `${a.color}` }}
               >
-                <Ionicons name={a.icon as any} size={18} color={a.color} />
-              </View>
-              {/* Content */}
-              <View className="flex-1">
-                <AutoText
-                  className={`text-base font-bold mb-1 ${
-                    isDark ? "text-white" : "text-gray-900"
-                  }`}
+                {/* Icon */}
+                {/* <View
+                  className="w-10 h-10 rounded-full items-center justify-center mr-4 mt-4"
+                  style={{ backgroundColor: `${a.color}20` }}
                 >
-                  {a.title}
-                </AutoText>
-                <AutoText
-                  className={`text-sm leading-5 mb-2 ${
-                    isDark ? "text-gray-300" : "text-gray-700"
-                  }`}
-                  numberOfLines={2}
-                >
-                  {a.message}
-                </AutoText>
-                <AutoText
-                  className={`text-xs ${
-                    isDark ? "text-gray-500" : "text-gray-400"
-                  }`}
-                >
-                  {a.date}
-                </AutoText>
-              </View>
-            </TouchableOpacity>
-          </Animated.View>
-        ))}
+                  <Ionicons name={a.icon as any} size={18} color={a.color} />
+                </View> */}
+
+                {/* Content */}
+                <View className="flex-1">
+                  <AutoText
+                    className={`text-base font-bold mb-1 ${
+                      isDark ? "text-white" : "text-gray-900"
+                    }`}
+                  >
+                    {a.title}
+                  </AutoText>
+                  <AutoText
+                    className={`text-sm leading-5 mb-2 ${
+                      isDark ? "text-gray-300" : "text-gray-700"
+                    }`}
+                    numberOfLines={2}
+                  >
+                    {a.message}
+                  </AutoText>
+
+                  {/* Media preview */}
+                  <AnnouncementMedia media={media} />
+
+                  <TranslatableDateText
+                    dateString={a.date}
+                    className={`text-xs mt-2 ${
+                      isDark ? "text-gray-500" : "text-gray-400"
+                    }`}
+                  />
+                </View>
+              </TouchableOpacity>
+            </Animated.View>
+          );
+        })}
       </ScrollView>
+
       <StatusBar style={isDark ? "light" : "dark"} />
     </SafeAreaView>
   );

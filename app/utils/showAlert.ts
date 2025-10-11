@@ -1,5 +1,5 @@
 import { Alert, AlertButton } from "react-native";
-import { useLanguage } from "@/app/hooks/useLanguage";
+import { useLanguageStore } from "@/app/hooks/useLanguage";
 import { translate } from "@/app/hooks/useTranslation"; // async function
 
 export async function showAlert(
@@ -7,7 +7,7 @@ export async function showAlert(
   message: string,
   buttons?: AlertButton[]
 ) {
-  const { language } = useLanguage.getState();
+  const { language } = useLanguageStore.getState();
 
   // 🔄 Translate title & message
   const translatedTitle = await translate(title, language);

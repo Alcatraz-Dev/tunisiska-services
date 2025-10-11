@@ -15,12 +15,7 @@ export default defineType({
       title: "Email",
       type: "string",
     }),
-   
-    defineField({
-      name: "pushToken",
-      title: "Expo Push Token",
-      type: "string",
-    }),
+  
    
   ],
   preview: {

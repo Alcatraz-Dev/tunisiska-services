@@ -6,9 +6,11 @@ export default function RedirectIfSignedOut() {
   const router = useRouter();
 
   return (
+    <>
     <SignedOut>
       <SignedOutRedirect router={router} />
     </SignedOut>
+    </>
   );
 }
 

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { View, Text } from "react-native";
 import Reanimated, {
   useSharedValue,
@@ -12,12 +12,14 @@ import { MaterialIcons } from "@expo/vector-icons";
 export default function AutoSwipeHint() {
   const translateX = useSharedValue(0);
 
-  // Automatic left-right animation
-  translateX.value = withRepeat(
-    withTiming(15, { duration: 300, easing: Easing.inOut(Easing.ease) }),
-    -1,
-    true // reverse back and forth
-  );
+  useEffect(() => {
+    // Automatic left-right animation
+    translateX.value = withRepeat(
+      withTiming(15, { duration: 300, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true // reverse back and forth
+    );
+  }, []);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],

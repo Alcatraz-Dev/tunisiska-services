@@ -1,0 +1,13 @@
+diff --git a/node_modules/native-notify/index.js b/node_modules/native-notify/index.js
+index 687e943..7a18cab 100644
+--- a/node_modules/native-notify/index.js
++++ b/node_modules/native-notify/index.js
+@@ -90,7 +90,7 @@ export default function registerNNPushToken(appId, appToken) {
+             
+             return () => {
+                 responseListener.current &&
+-                    Notifications.removeNotificationSubscription(responseListener.current);
++                    responseListener.current.remove();
+             };
+ 
+             // return () => { Notifications.removeNotificationSubscription(responseListener); };

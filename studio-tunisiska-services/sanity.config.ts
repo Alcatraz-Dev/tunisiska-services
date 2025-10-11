@@ -1,10 +1,9 @@
-import { defineConfig } from 'sanity'
-import { structureTool } from 'sanity/structure'
-import { visionTool } from '@sanity/vision'
-import { schemaTypes } from './schemaTypes'
-import { Structure } from './Structure'
-import { notificationActions } from '../actions/sendNotification'
-
+import {defineConfig} from 'sanity'
+import {structureTool} from 'sanity/structure'
+import {visionTool} from '@sanity/vision'
+import {schemaTypes} from './schemaTypes'
+import {Structure} from './Structure'
+import {colorInput} from '@sanity/color-input'
 export default defineConfig({
   name: 'default',
   title: 'Tunisiska Services',
@@ -16,14 +15,10 @@ export default defineConfig({
     structureTool({
       structure: Structure,
     }),
-    visionTool(),
+    visionTool(), colorInput()
   ],
 
   schema: {
     types: schemaTypes,
-  },
-
-  document: {
-    actions: (prev, context) => notificationActions(prev, context),
   },
 })

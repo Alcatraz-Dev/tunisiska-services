@@ -4,22 +4,69 @@ import {
   SafeAreaView,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/app/context/ThemeContext";
 import { StatusBar } from "expo-status-bar";
 import { AutoText } from "@/app/components/ui/AutoText";
+import { RichTextRenderer } from "@/app/components/ui/RichTextRenderer";
+import { client } from "@/sanityClient";
+import { termsQuery } from "@/app/hooks/useQuery";
 
 export default function Terms() {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
   const router = useRouter();
 
+  const [terms, setTerms] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTerms = async () => {
+      try {
+        const data = await client.fetch(termsQuery);
+        setTerms(data);
+      } catch (error) {
+        console.error("Error fetching terms:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTerms();
+  }, []);
+
+  if (loading) {
+    return (
+      <SafeAreaView
+        className={`flex-1 items-center justify-center ${
+          isDark ? "bg-dark" : "bg-light"
+        }`}
+      >
+        <ActivityIndicator size="large" color={isDark ? "#fff" : "#000"} />
+      </SafeAreaView>
+    );
+  }
+
+  if (!terms) {
+    return (
+      <SafeAreaView
+        className={`flex-1 items-center justify-center ${
+          isDark ? "bg-dark" : "bg-light"
+        }`}
+      >
+        <AutoText className={isDark ? "text-white" : "text-gray-900"}>
+          Terms of Service not found
+        </AutoText>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
-       <StatusBar style={isDark ? "light" : "dark"} />
+      <StatusBar style={isDark ? "light" : "dark"} />
       {/* Header */}
       <View className={`px-6 pt-6 pb-4 ${isDark ? "bg-dark" : "bg-light"}`}>
         <View className="flex-row items-center justify-center relative mb-2">
@@ -38,7 +85,7 @@ export default function Terms() {
               isDark ? "text-white" : "text-gray-900"
             }`}
           >
-            Användarvillkor
+            {terms?.title || "Användarvillkor"}
           </AutoText>
         </View>
         <AutoText
@@ -55,47 +102,21 @@ export default function Terms() {
         className="flex-1 px-6 mt-4"
         showsVerticalScrollIndicator={false}
       >
-        {/* Villkor */}
-        <View className="mb-6">
+        <RichTextRenderer
+          content={terms?.content || []}
+          className={isDark ? "text-gray-300" : "text-gray-700"}
+        />
+
+        {/* Last Updated */}
+        {terms?.lastUpdated && (
           <AutoText
-            className={`text-lg font-semibold mb-2 ${
-              isDark ? "text-white" : "text-gray-900"
+            className={`text-xs text-center mt-10 mb-6 ${
+              isDark ? "text-gray-500" : "text-gray-500"
             }`}
           >
-            Allmänna villkor
+            Senast uppdaterad: {new Date(terms.lastUpdated).toLocaleDateString('sv-SE')}
           </AutoText>
-          <AutoText className={`${isDark ? "text-gray-300" : "text-gray-700"}`}>
-            Genom att använda denna app godkänner du att följa våra regler och
-            riktlinjer. Du ansvarar för att all information du tillhandahåller är
-            korrekt och uppdaterad.
-          </AutoText>
-        </View>
-
-        {/* Ansvar */}
-        <View className="mb-6">
-          <AutoText
-            className={`text-lg font-semibold mb-2 ${
-              isDark ? "text-white" : "text-gray-900"
-            }`}
-          >
-            Ansvar
-          </AutoText>
-          <AutoText className={`${isDark ? "text-gray-300" : "text-gray-700"}`}>
-            Vi strävar efter att erbjuda en säker och stabil tjänst, men vi kan
-            inte hållas ansvariga för eventuella störningar eller förlust av
-            data. Användare är ansvariga för sitt eget konto och aktivitet.
-          </AutoText>
-        </View>
-
-        {/* Uppdateringar */}
-        <AutoText
-          className={`text-xs text-center mt-10 mb-6 ${
-            isDark ? "text-gray-500" : "text-gray-500"
-          }`}
-        >
-          Senast uppdaterad: September 2025
-        </AutoText>
-      
+        )}
       </ScrollView>
     </SafeAreaView>
   );

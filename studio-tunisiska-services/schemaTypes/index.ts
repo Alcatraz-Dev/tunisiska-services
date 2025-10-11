@@ -1,7 +1,11 @@
 
-import notification from "./notification";
+import announcement from "./announcement";
+import { liveStatus } from "./liveStatus";
 import user from "./user";
+import footer from "./footer";
+import terms from "./terms";
+import policy from "./policy";
 
 
 
-export const schemaTypes = [user , notification ];
+export const schemaTypes = [user , liveStatus, announcement, footer, terms, policy ];

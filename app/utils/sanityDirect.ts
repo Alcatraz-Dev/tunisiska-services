@@ -1,4 +1,4 @@
-// utils/sanityDirect.ts
+
 
 import { client } from "@/sanityClient";
 
@@ -6,7 +6,6 @@ import { client } from "@/sanityClient";
 export interface UserData {
   clerkId: string;
   email: string;
-  pushToken?: string;
 }
 
 export const createUserDirectInSanity = async (userData: UserData): Promise<{success: boolean, error?: string}> => {
@@ -21,12 +20,12 @@ export const createUserDirectInSanity = async (userData: UserData): Promise<{suc
 
     if (existingUser) {
       console.log('✅ User already exists in Sanity');
-      // Update existing user if pushToken is different
-      if (userData.pushToken && existingUser.pushToken !== userData.pushToken) {
+      // Update existing user if email is different
+      if (userData.email && existingUser.email !== userData.email) {
         console.log('🔄 Updating push token for existing user');
         await client
           .patch(existingUser._id)
-          .set({ pushToken: userData.pushToken })
+          .set({ email: userData.email })
           .commit();
       }
       return { success: true };
