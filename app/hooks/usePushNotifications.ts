@@ -61,6 +61,13 @@ export default function usePushNotifications() {
         }
       } else {
         console.log('📱 Skipping badge count load in Expo Go/simulator');
+        // Clear badge count in Expo Go to prevent showing stale counts
+        try {
+          await Notifications.setBadgeCountAsync(0);
+          console.log('✅ Badge count cleared in Expo Go');
+        } catch (error) {
+          console.error('❌ Failed to clear badge count in Expo Go:', error);
+        }
       }
     }
   };

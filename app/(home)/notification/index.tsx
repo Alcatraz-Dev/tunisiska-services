@@ -43,7 +43,7 @@ let inboxCache: InboxCache | null = null;
 
 export default function Notification() {
   const { notifications, markAllAsRead, markAsRead } = useNotifications();
-  const { unreadCount, syncNativeNotifyInbox, testNotification } = usePushNotifications();
+  const { unreadCount, syncNativeNotifyInbox } = usePushNotifications();
   const { resolvedTheme } = useTheme();
   const APP_ID = 32172;
   const APP_TOKEN = "PNF5T5VibvtV6lj8i7pbil";
@@ -364,7 +364,7 @@ export default function Notification() {
             Här hittar du alla dina senaste aviseringar
           </AutoText>
         </View>
-        <View className="flex-row justify-between items-center">
+        <View className="flex-row justify-end items-center">
           {hasUnread && (
             <TouchableOpacity
               onPress={() => {
@@ -386,24 +386,6 @@ export default function Notification() {
             </TouchableOpacity>
           )}
 
-          {/* Test notification button */}
-          <TouchableOpacity
-            onPress={async () => {
-              console.log('🧪 Testing notification...');
-              const result = await testNotification();
-              console.log('🧪 Test result:', result);
-              if (result?.success) {
-                showAlert("Test skickad", "En testnotifikation har skickats!");
-              } else {
-                showAlert("Test misslyckades", result?.error || "Okänt fel");
-              }
-            }}
-            className="p-2"
-          >
-            <AutoText className="text-sm text-green-500 font-medium">
-              Testa notis
-            </AutoText>
-          </TouchableOpacity>
         </View>
       </View>
 

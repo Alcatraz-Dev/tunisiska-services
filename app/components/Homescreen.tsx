@@ -8,6 +8,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Link, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useState } from "react";
+import { useFocusEffect } from "expo-router";
 import { Image, ScrollView, TouchableOpacity, View, Platform } from "react-native";
 import * as Device from "expo-device";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -196,6 +197,11 @@ export default function HomePage() {
   useEffect(() => {
     unCountNotifications();
   }, [READ_IDS_KEY, HIDDEN_IDS_KEY, userId, notifications]);
+
+  // Refresh unread count when screen comes into focus
+  useFocusEffect(() => {
+    unCountNotifications();
+  });
   const createUser = async () => {
     if (!user || !userId || userCreated) return;
 

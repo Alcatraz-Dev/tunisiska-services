@@ -1,5 +1,3 @@
-
-
 import { client } from "@/sanityClient";
 
 
@@ -7,6 +5,31 @@ export interface UserData {
   clerkId: string;
   email: string;
 }
+
+export const getUserFromSanity = async (clerkId: string): Promise<{success: boolean, user?: any, error?: string}> => {
+  try {
+    console.log('🔍 Fetching user from Sanity:', clerkId);
+
+    const user = await client.fetch(
+      `*[_type == "users" && clerkId == $clerkId][0]`,
+      { clerkId }
+    );
+
+    if (user) {
+      console.log('✅ User found in Sanity');
+      return { success: true, user };
+    } else {
+      console.log('❌ User not found in Sanity');
+      return { success: false, error: 'User not found' };
+    }
+  } catch (error: any) {
+    console.error('❌ Error fetching user from Sanity:', error);
+    return {
+      success: false,
+      error: error.message || 'Unknown error occurred'
+    };
+  }
+};
 
 export const createUserDirectInSanity = async (userData: UserData): Promise<{success: boolean, error?: string}> => {
   try {
@@ -22,7 +45,7 @@ export const createUserDirectInSanity = async (userData: UserData): Promise<{suc
       console.log('✅ User already exists in Sanity');
       // Update existing user if email is different
       if (userData.email && existingUser.email !== userData.email) {
-        console.log('🔄 Updating push token for existing user');
+        console.log('🔄 Updating email for existing user');
         await client
           .patch(existingUser._id)
           .set({ email: userData.email })
