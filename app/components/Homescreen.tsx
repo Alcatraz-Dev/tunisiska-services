@@ -319,7 +319,7 @@ export default function HomePage() {
                 }}
                 className="w-10 h-10 rounded-full items-center justify-center mb-10 relative"
               >
-                {unreadNotificationCount > 0 && (
+                {(unreadNotificationCount > 0 || (!Device.isDevice && Platform.OS !== 'web')) && (
                   <View className="absolute -top-1 -right-0 min-w-[18px] h-[18px] bg-primary rounded-full items-center justify-center">
                     <AutoText className="text-white text-[10px] font-bold">
                       {unreadNotificationCount > 99

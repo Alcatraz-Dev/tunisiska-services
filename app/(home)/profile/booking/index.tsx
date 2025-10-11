@@ -6,46 +6,85 @@ import { useTheme } from "@/app/context/ThemeContext";
 import Animated, { FadeInUp, FadeOutDown } from "react-native-reanimated";
 import { AutoText } from "@/app/components/ui/AutoText";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-const demoBookings = [
-  {
-    id: "1",
-    category: "Transport",
-    date: "2025-09-15",
-    pickup: "Stockholm Central",
-    dropoff: "Arlanda Flygplats",
-    status: "Avslutad",
-    slug: "transport",
-  },
-  {
-    id: "2",
-    category: "Flytt",
-    date: "2025-09-10",
-    pickup: "Göteborg",
-    dropoff: "Malmö",
-    status: "Avbokad",
-    slug: "flytt",
-  },
-  {
-    id: "3",
-    category: "Städning & Flytt",
-    date: "2025-09-05",
-    pickup: "Uppsala",
-    dropoff: "Uppsala",
-    status: "Avslutad",
-    slug: "stadning-flytt",
-  },
-];
+import { TaxiOrderService } from "@/app/services/taxiOrderService";
+import { useAuth } from "@clerk/clerk-expo";
 
 export default function BookingHistoryScreen() {
-  const { resolvedTheme } = useTheme(); // Add a ready flag
+  const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
   const router = useRouter();
-  const [bookings, setBookings] = useState(demoBookings);
+  const { userId } = useAuth();
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setBookings([...demoBookings]);
-  }, [resolvedTheme]);
+    const fetchTaxiOrders = async () => {
+      if (!userId) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const result = await TaxiOrderService.getUserTaxiOrders(userId);
+        if (result.success && result.orders) {
+          // Transform the orders to match the expected format
+          const transformedOrders = result.orders.map((order: any) => ({
+            id: order._id,
+            category: "Taxi",
+            date: new Date(order.scheduledDateTime).toLocaleDateString('sv-SE'),
+            pickup: order.pickupAddress,
+            dropoff: order.destinationAddress,
+            status: getStatusText(order.status),
+            slug: order._id, // Use order ID as slug for details
+            price: `${order.totalPrice} SEK`,
+            passengers: order.numberOfPassengers,
+            isRoundTrip: order.isRoundTrip,
+            notes: order.notes,
+          }));
+          setBookings(transformedOrders);
+        }
+      } catch (error) {
+        console.error('Error fetching taxi orders:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTaxiOrders();
+  }, [userId]);
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'pending': return 'Väntar';
+      case 'confirmed': return 'Bekräftad';
+      case 'in_progress': return 'Pågående';
+      case 'completed': return 'Avslutad';
+      case 'cancelled': return 'Avbokad';
+      default: return 'Okänd';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Avslutad': return 'bg-green-100';
+      case 'Bekräftad': return 'bg-blue-100';
+      case 'Pågående': return 'bg-yellow-100';
+      case 'Väntar': return 'bg-gray-100';
+      case 'Avbokad': return 'bg-red-100';
+      default: return 'bg-gray-100';
+    }
+  };
+
+  const getStatusTextColor = (status: string) => {
+    switch (status) {
+      case 'Avslutad': return 'text-green-700';
+      case 'Bekräftad': return 'text-blue-700';
+      case 'Pågående': return 'text-yellow-700';
+      case 'Väntar': return 'text-gray-700';
+      case 'Avbokad': return 'text-red-600';
+      default: return 'text-gray-700';
+    }
+  };
 
   const renderBooking = ({ item, index }: any) => (
     <Animated.View
@@ -79,12 +118,12 @@ export default function BookingHistoryScreen() {
 
           <View
             className={`px-3 py-1 rounded-full ${
-              item.status === "Avslutad" ? "bg-green-100" : "bg-red-100"
+              getStatusColor(item.status)
             }`}
           >
             <AutoText
               className={`text-xs font-bold ${
-                item.status === "Avslutad" ? "text-green-700" : "text-red-600"
+                getStatusTextColor(item.status)
               }`}
             >
               {item.status}
@@ -109,6 +148,18 @@ export default function BookingHistoryScreen() {
           >
             Till: {item.dropoff}
           </AutoText>
+          <AutoText
+            className={`text-xs ${isDark ? "text-gray-300" : "text-gray-700"}`}
+          >
+            Passagerare: {item.passengers}
+          </AutoText>
+          {item.isRoundTrip && (
+            <AutoText
+              className={`text-xs ${isDark ? "text-gray-300" : "text-gray-700"}`}
+            >
+              Tur och retur
+            </AutoText>
+          )}
         </View>
 
         {/* Button */}
@@ -170,7 +221,15 @@ export default function BookingHistoryScreen() {
       </View>
 
       {/* Content */}
-      {bookings.length === 0 ? (
+      {loading ? (
+        <View className="flex-1 justify-center items-center">
+          <AutoText
+            className={`text-base ${isDark ? "text-gray-400" : "text-gray-600"}`}
+          >
+            Laddar bokningar...
+          </AutoText>
+        </View>
+      ) : bookings.length === 0 ? (
         <View
           className="flex-1 justify-center items-center"
           style={{
@@ -182,7 +241,7 @@ export default function BookingHistoryScreen() {
           }}
         >
           <Ionicons
-            name="calendar-outline"
+            name="car-outline"
             size={60}
             color={isDark ? "#6B7280" : "#9CA3AF"}
           />
@@ -191,7 +250,14 @@ export default function BookingHistoryScreen() {
               isDark ? "text-gray-400" : "text-gray-600"
             }`}
           >
-            Inga bokningar än
+            Inga taxibokningar än
+          </AutoText>
+          <AutoText
+            className={`mt-2 text-sm text-center px-8 ${
+              isDark ? "text-gray-500" : "text-gray-500"
+            }`}
+          >
+            Dina taxibokningar kommer att visas här när du har gjort några
           </AutoText>
         </View>
       ) : (
