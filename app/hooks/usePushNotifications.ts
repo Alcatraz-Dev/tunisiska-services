@@ -116,6 +116,7 @@ export default function usePushNotifications() {
         type: n.category ?? "default",
         read: n.read ?? false,
         date: n.date ?? n.date_sent ?? new Date().toISOString(),
+        image: n.image ?? n.image_url ?? n.photo ?? n.picture,
       }));
 
       console.log('✅ Mapped notifications:', mapped.length);
@@ -296,14 +297,15 @@ export default function usePushNotifications() {
       // For simulators/web, add to local notifications only
       const isSimulator = Platform.OS === 'web' || !Device.isDevice;
       if (isSimulator) {
-        console.log('🧪 Simulator detected - adding local test notification');
+        console.log('🧪 Simulator detected - adding local test notification with image');
         const testNotif = {
           id: `test-${Date.now()}`,
-          title: 'Test Notification',
-          message: 'This is a test notification from the app',
+          title: 'Test Notification with Image',
+          message: 'This is a test notification with an image from the app',
           type: 'test',
           read: false,
           date: new Date().toISOString(),
+          image: 'https://picsum.photos/200/200?random=' + Date.now(), // Random test image
         };
         addNotification(testNotif);
         saveNotifications([testNotif]);
@@ -326,16 +328,20 @@ export default function usePushNotifications() {
           console.warn('⚠️ Failed to show local notification in simulator:', error);
         }
 
-        return { success: true, message: 'Local test notification added' };
+        return { success: true, message: 'Local test notification with image added' };
       }
 
       // For real devices (including Expo Go on device), send via Native Notify
       console.log('🧪 Sending via Native Notify for real device');
       const result = await nativeNotifyAPI.sendNotification({
-        title: 'Test Notification',
-        message: 'This is a test notification from the app',
+        title: 'Test Notification with Image',
+        message: 'This is a test notification with an image from the app',
         subID: userId,
-        pushData: { type: 'test', timestamp: new Date().toISOString() }
+        pushData: {
+          type: 'test',
+          timestamp: new Date().toISOString(),
+          image: 'https://picsum.photos/200/200?random=' + Date.now()
+        }
       });
       console.log('🧪 Test notification result:', result);
       return result;

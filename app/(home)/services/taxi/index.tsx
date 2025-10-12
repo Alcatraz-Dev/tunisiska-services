@@ -47,6 +47,7 @@ export default function Taxi() {
   const [estimatedPrice, setEstimatedPrice] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'points' | 'combined' | 'cash'>('cash');
   const [currentUserPoints, setCurrentUserPoints] = useState(0);
+  const [pointsToUse, setPointsToUse] = useState(0);
 
   // Pre-fill user information from Clerk
   useEffect(() => {
@@ -71,6 +72,17 @@ export default function Taxi() {
     const price = TaxiOrderService.calculateTaxiPrice(distance, isRoundTrip, scheduledDateTime, passengerCount);
     setEstimatedPrice(price);
   }, [isRoundTrip, date, time, passengers]);
+
+  const handlePointsChange = (points: string) => {
+    const pointsNum = parseInt(points) || 0;
+    const maxPoints = Math.min(currentUserPoints, estimatedPrice * 10); // Assuming 1 SEK = 10 points
+    setPointsToUse(Math.min(pointsNum, maxPoints));
+  };
+
+  const getFinalPrice = () => {
+    const pointsValue = pointsToUse / 10; // Convert points to SEK
+    return Math.max(0, estimatedPrice - pointsValue);
+  };
 
   // Real payment processing function
   const processPayment = async (method: string, amount: number): Promise<boolean> => {
@@ -399,7 +411,7 @@ export default function Taxi() {
         estimatedDistance,
         totalPrice,
         paymentMethod,
-        pointsUsed: paymentMethod === 'points' ? totalPrice * 10 : paymentMethod === 'combined' ? Math.min(totalPrice * 5, 500) : 0, // Calculate points used
+        pointsUsed: pointsToUse,
         notes: notes || undefined,
       };
 
@@ -841,6 +853,25 @@ export default function Taxi() {
                 {currentUserPoints} poäng
               </AutoText>
             </View>
+            {paymentMethod === 'points' && (
+              <View className="mt-3 pt-3 border-t border-white/20">
+                <View className="flex-row items-center justify-between">
+                  <AutoText className="text-white text-sm">Använd poäng:</AutoText>
+                  <Input
+                    placeholder="0"
+                    keyboardType="numeric"
+                    value={pointsToUse.toString()}
+                    onChangeText={handlePointsChange}
+                    className={`border rounded p-2 w-20 text-center ${
+                      isDark ? 'bg-gray-700 text-white' : 'bg-white text-black'
+                    }`}
+                  />
+                </View>
+                <AutoText className="text-white/80 text-xs mt-1">
+                  Du har {currentUserPoints} poäng tillgängliga
+                </AutoText>
+              </View>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -893,6 +924,25 @@ export default function Taxi() {
                 {currentUserPoints} poäng
               </AutoText>
             </View>
+            {paymentMethod === 'combined' && (
+              <View className="mt-3 pt-3 border-t border-white/20">
+                <View className="flex-row items-center justify-between">
+                  <AutoText className="text-white text-sm">Använd poäng:</AutoText>
+                  <Input
+                    placeholder="0"
+                    keyboardType="numeric"
+                    value={pointsToUse.toString()}
+                    onChangeText={handlePointsChange}
+                    className={`border rounded p-2 w-20 text-center ${
+                      isDark ? 'bg-gray-700 text-white' : 'bg-white text-black'
+                    }`}
+                  />
+                </View>
+                <AutoText className="text-white/80 text-xs mt-1">
+                  Du har {currentUserPoints} poäng tillgängliga
+                </AutoText>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -913,116 +963,48 @@ export default function Taxi() {
           style={{ height: 80, textAlignVertical: "top" }}
         />
 
-        {/* Price Display */}
-        <View className={`p-4 rounded-lg mb-4 ${
-          isDark ? "bg-dark-card border-gray-600" : "bg-light-card border-gray-300"
-        } border`}>
-          <AutoText className={`text-lg font-semibold mb-3 ${
-            isDark ? "text-white" : "text-black"
-          }`}>
-            Prisberäkning
+        {/* Price Summary */}
+        <View className={`border rounded-lg p-4 mb-6 ${isDark ? 'bg-dark-card' : 'bg-light-card'}`}>
+          <AutoText className={`text-lg font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            Prissammanfattning
           </AutoText>
-
-          {(() => {
-            const scheduledDateTime = date ? new Date(date.getFullYear(), date.getMonth(), date.getDate(), time.getHours(), time.getMinutes()).toISOString() : undefined;
-            const passengerCount = parseInt(passengers) || 1;
-            const breakdown = TaxiOrderService.getPriceBreakdown(15, isRoundTrip, scheduledDateTime, passengerCount);
-            return (
-              <View className="space-y-1">
-                <View className="flex-row justify-between">
-                  <AutoText className={`text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                    Grundavgift
-                  </AutoText>
-                  <AutoText className={`text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                    {breakdown.baseFare} SEK
-                  </AutoText>
-                </View>
-
-                <View className="flex-row justify-between">
-                  <AutoText className={`text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                    Distans (15 km × 12 SEK/km)
-                  </AutoText>
-                  <AutoText className={`text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                    {breakdown.distanceCost} SEK
-                  </AutoText>
-                </View>
-
-                {breakdown.timeCost > 0 && (
-                  <View className="flex-row justify-between">
-                    <AutoText className={`text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                      Tidsavgift
-                    </AutoText>
-                    <AutoText className={`text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                      {breakdown.timeCost} SEK
-                    </AutoText>
-                  </View>
-                )}
-
-                {breakdown.passengerSurcharge > 0 && (
-                  <View className="flex-row justify-between">
-                    <AutoText className={`text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                      Passagerartillägg ({passengerCount - 1} × 15 SEK)
-                    </AutoText>
-                    <AutoText className={`text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                      {breakdown.passengerSurcharge} SEK
-                    </AutoText>
-                  </View>
-                )}
-
-                {breakdown.surcharges > 0 && (
-                  <View className="flex-row justify-between">
-                    <AutoText className={`text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                      Tillägg (tider, bränsle, etc.)
-                    </AutoText>
-                    <AutoText className={`text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                      {breakdown.surcharges} SEK
-                    </AutoText>
-                  </View>
-                )}
-
-                <View className="flex-row justify-between border-t border-gray-300 pt-2 mt-2">
-                  <AutoText className={`font-semibold ${isDark ? "text-white" : "text-black"}`}>
-                    Totalt (inkl. moms)
-                  </AutoText>
-                  <View className="items-end">
-                    <AutoText className={`text-xl font-bold ${
-                      isDark ? "text-green-400" : "text-green-600"
-                    }`}>
-                      {breakdown.total} SEK
-                    </AutoText>
-                    {paymentMethod === 'points' && (
-                      <AutoText className={`text-sm ${
-                        isDark ? "text-gray-400" : "text-gray-600"
-                      }`}>
-                        ({breakdown.total * 10} poäng)
-                      </AutoText>
-                    )}
-                    {paymentMethod === 'combined' && (() => {
-                      const maxPointsValue = Math.min(breakdown.total * 0.5, 100);
-                      const pointsToUse = Math.min(maxPointsValue * 10, currentUserPoints);
-                      const pointsValue = pointsToUse / 10;
-                      const remainingAmount = breakdown.total - pointsValue;
-                      return (
-                        <AutoText className={`text-sm ${
-                          isDark ? "text-gray-400" : "text-gray-600"
-                        }`}>
-                          ({pointsToUse} poäng + {remainingAmount} SEK)
-                        </AutoText>
-                      );
-                    })()}
-                  </View>
-                </View>
-
-                <AutoText className={`text-xs mt-2 ${
-                  isDark ? "text-gray-400" : "text-gray-600"
-                }`}>
-                  Priset är en uppskattning och kan variera beroende på exakt rutt och trafikförhållanden.
-                  {isRoundTrip && " • Tur-och-returpris inkluderat."}
-                  {passengerCount > 1 && ` • ${passengerCount} passagerare inkluderat.`}
-                </AutoText>
+          <View className="flex-row justify-between mb-2">
+            <AutoText className={isDark ? 'text-gray-400' : 'text-gray-600'}>Grundpris:</AutoText>
+            <AutoText className={isDark ? 'text-white' : 'text-black'}>{estimatedPrice} SEK</AutoText>
+          </View>
+          {currentUserPoints > 0 && paymentMethod !== 'cash' && paymentMethod !== 'stripe' && (
+            <>
+              <View className="flex-row justify-between items-center mb-2">
+                <AutoText className={isDark ? 'text-gray-400' : 'text-gray-600'}>Använd poäng:</AutoText>
+                <Input
+                  placeholder="0"
+                  keyboardType="numeric"
+                  value={pointsToUse.toString()}
+                  onChangeText={handlePointsChange}
+                  className={`border rounded p-2 w-20 text-center ${
+                    isDark ? 'bg-gray-700 text-white' : 'bg-white text-black'
+                  }`}
+                />
               </View>
-            );
-          })()}
+              <AutoText className={`text-xs mb-2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                Du har {currentUserPoints} poäng tillgängliga
+              </AutoText>
+              {pointsToUse > 0 && (
+                <View className="flex-row justify-between mb-2">
+                  <AutoText className={isDark ? 'text-gray-400' : 'text-gray-600'}>Poängrabatt:</AutoText>
+                  <AutoText className="text-green-500">-{(pointsToUse / 10).toFixed(0)} SEK</AutoText>
+                </View>
+              )}
+            </>
+          )}
+          <View className="border-t border-gray-300 pt-2 mt-2">
+            <View className="flex-row justify-between">
+              <AutoText className={`font-bold ${isDark ? 'text-white' : 'text-black'}`}>Att betala:</AutoText>
+              <AutoText className={`font-bold ${isDark ? 'text-white' : 'text-black'}`}>
+                {paymentMethod === 'cash' || paymentMethod === 'stripe' ? estimatedPrice : getFinalPrice()} SEK
+              </AutoText>
+            </View>
+          </View>
         </View>
 
         {/* Confirm Booking */}

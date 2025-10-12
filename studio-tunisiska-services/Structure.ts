@@ -1,7 +1,7 @@
-import { FaUsers, FaBell, FaFileContract, FaShieldAlt, FaTaxi } from 'react-icons/fa'
-import { CgMediaLive } from 'react-icons/cg'
-import { MdOutlinePermMedia } from 'react-icons/md'
-import { MdWeb } from 'react-icons/md'
+import {FaUsers, FaBell, FaFileContract, FaShieldAlt, FaTaxi, FaTruck} from 'react-icons/fa'
+import {CgMediaLive} from 'react-icons/cg'
+import {MdOutlinePermMedia} from 'react-icons/md'
+import {MdWeb} from 'react-icons/md'
 
 export const Structure = (S: any) =>
   S.list()
@@ -16,6 +16,12 @@ export const Structure = (S: any) =>
         .title(' Taxi Orders')
         .icon(FaTaxi)
         .child(S.documentList().title('All Taxi Orders').filter('_type == "taxiOrder"')),
+      S.listItem()
+        .title(' Flytt utan städning Orders')
+        .icon(FaTruck)
+        .child(
+          S.documentList().title('All Flytt utan städning Orders').filter('_type == "moveOrder"'),
+        ),
 
       S.listItem()
         .title(' Announcements')
@@ -30,7 +36,9 @@ export const Structure = (S: any) =>
       S.listItem()
         .title(' Footer')
         .icon(MdWeb)
-        .child(S.document().title('Footer Configuration').schemaType('footer').documentId('footer')),
+        .child(
+          S.document().title('Footer Configuration').schemaType('footer').documentId('footer'),
+        ),
 
       S.listItem()
         .title(' Terms of Service')

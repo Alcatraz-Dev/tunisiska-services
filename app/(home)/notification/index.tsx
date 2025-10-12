@@ -9,7 +9,7 @@ import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getNotificationInbox } from "native-notify";
-import { FlatList, RefreshControl, TouchableOpacity, View, InteractionManager } from "react-native";
+import { FlatList, RefreshControl, TouchableOpacity, View, InteractionManager, Image } from "react-native";
 import Animated, { FadeInUp, FadeOutDown } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@clerk/clerk-expo";
@@ -26,6 +26,7 @@ interface NotificationItem {
   read?: boolean;
   date?: string;
   date_sent?: string;
+  image?: string;
 }
 
 // Lightweight in-memory cache for first page per user (session-scoped)
@@ -88,7 +89,7 @@ export default function Notification() {
       });
   };
 
-  const hasUnread = notifications.some((n) => !n.read);
+  const hasUnread = data.some((n) => !n.read);
   // Safely mark an item as read in both local state and context
   const saveReadIds = async (ids: string[]) => {
     try { await AsyncStorage.setItem(READ_IDS_KEY, JSON.stringify(ids)); } catch {}
@@ -293,7 +294,20 @@ export default function Notification() {
             >
               {item.message || 'No Message'}
             </AutoText>
-            <TranslatableDateText 
+            {/* Display image if available */}
+            {item.image && (
+              <Image
+                source={{ uri: item.image }}
+                style={{
+                  width: 60,
+                  height: 60,
+                  borderRadius: 8,
+                  marginTop: 8,
+                  resizeMode: 'cover'
+                }}
+              />
+            )}
+            <TranslatableDateText
               dateString={item.date || item.date_sent}
               className={`text-xs mt-3 ${
                 isDark ? "text-gray-400" : "text-gray-500"

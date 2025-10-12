@@ -120,12 +120,12 @@ export default function HomePage() {
   const unCountNotifications = async () => {
     console.log('🔢 Calculating unread notification count...');
 
-    // Check if we're in Expo Go (limited native module support)
-    const isExpoGo = !Device.isDevice || Platform.OS === 'web';
-    console.log('📱 Is Expo Go:', isExpoGo);
+    // Check if we're on web/simulator (limited native module support)
+    const isWebOrSimulator = Platform.OS === 'web' || !Device.isDevice;
+    console.log('📱 Is web/simulator:', isWebOrSimulator);
 
-    // For Expo Go, skip native-notify API calls and use local state
-    if (isExpoGo) {
+    // For web/simulator, use local state only
+    if (isWebOrSimulator) {
       try {
         const [storedRead, storedHidden] = await Promise.all([
           AsyncStorage.getItem(READ_IDS_KEY),
@@ -147,24 +147,27 @@ export default function HomePage() {
           setUnreadNotificationCount(Math.max(localUnreadCount, count));
         }
       } catch (error) {
-        console.warn('Error getting unread count in Expo Go:', error);
+        console.warn('Error getting unread count in web/simulator:', error);
         const localUnreadCount = notifications.filter((n) => !n.read).length;
         setUnreadNotificationCount(localUnreadCount);
       }
       return;
     }
 
-    // Fast path: use dedicated unread count API (for real devices)
+    // For real devices, try Native Notify API first
     try {
+      console.log('📱 Real device detected - trying Native Notify API');
       const unreadResp = await getUnreadNotificationInboxCount(
         32172,
         "PNF5T5VibvtV6lj8i7pbil"
       );
       const count = unreadResp?.data ?? 0;
-      console.log('📊 API unread count:', count);
+      console.log('📊 Native Notify unread count:', count);
       setUnreadNotificationCount(count);
       return;
-    } catch {}
+    } catch (error) {
+      console.warn('Native Notify API failed, trying fallback:', error);
+    }
 
     // Fallback: derive from inbox + local overlays
     try {

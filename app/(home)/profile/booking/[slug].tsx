@@ -21,6 +21,7 @@ import BookingProgress from "@/app/components/BookingProgress";
 import { AutoText } from "@/app/components/ui/AutoText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TaxiOrderService } from "@/app/services/taxiOrderService";
+import { MoveOrderService } from "@/app/services/moveOrderService";
 import * as Linking from "expo-linking";
 import { showAlert } from "@/app/utils/showAlert";
 
@@ -33,12 +34,13 @@ export default function BookingDetailsScreen() {
   const [booking, setBooking] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [serviceType, setServiceType] = useState<'taxi' | 'move' | null>(null);
   const progress = useSharedValue(0);
 
   // Handle slug parameter - it might be an array or string
   const orderId = Array.isArray(slug) ? slug[0] : slug;
 
-  const fetchTaxiOrder = async (isRefresh = false) => {
+  const fetchOrder = async (isRefresh = false) => {
     if (!orderId) {
       if (!isRefresh) setLoading(false);
       return;
@@ -49,31 +51,63 @@ export default function BookingDetailsScreen() {
         setRefreshing(true);
       }
 
-      const result = await TaxiOrderService.getTaxiOrder(orderId as string);
+      // Try to fetch as taxi order first
+      let result = await TaxiOrderService.getTaxiOrder(orderId as string);
+      let orderType: 'taxi' | 'move' = 'taxi';
+
+      // If taxi order not found, try move order
+      if (!result.success || !result.order) {
+        result = await MoveOrderService.getMoveOrder(orderId as string);
+        orderType = 'move';
+      }
 
       if (result.success && result.order) {
-        // Transform the order data for display
         const order = result.order;
-        const transformedBooking = {
-          id: order._id || "N/A",
-          category: "Taxi",
-          date: order.scheduledDateTime ? new Date(order.scheduledDateTime).toLocaleDateString('sv-SE') : "Datum saknas",
-          pickup: order.pickupAddress || "Plats saknas",
-          dropoff: order.destinationAddress || "Plats saknas",
-          status: getStatusText(order.status || "unknown"),
-          price: order.totalPrice ? `${order.totalPrice} SEK` : "Pris saknas",
-          passengers: order.numberOfPassengers || 1,
-          isRoundTrip: Boolean(order.isRoundTrip),
-          returnDateTime: order.returnDateTime,
-          estimatedDistance: order.estimatedDistance || 0,
-          notes: order.notes || "",
-          customerInfo: order.customerInfo || { name: "Namn saknas", phone: "Telefon saknas" },
-          paymentMethod: order.paymentMethod || 'stripe',
-          createdAt: order.createdAt,
-          scheduledDateTime: order.scheduledDateTime,
-        };
+        let transformedBooking: any;
+
+        if (orderType === 'taxi') {
+          transformedBooking = {
+            id: order._id || "N/A",
+            category: "Taxi",
+            date: order.scheduledDateTime ? new Date(order.scheduledDateTime).toLocaleDateString('sv-SE') : "Datum saknas",
+            pickup: order.pickupAddress || "Plats saknas",
+            dropoff: order.destinationAddress || "Plats saknas",
+            status: getStatusText(order.status || "unknown"),
+            price: order.totalPrice ? `${order.totalPrice} SEK` : "Pris saknas",
+            passengers: order.numberOfPassengers || 1,
+            isRoundTrip: Boolean(order.isRoundTrip),
+            returnDateTime: order.returnDateTime,
+            estimatedDistance: order.estimatedDistance || 0,
+            notes: order.notes || "",
+            customerInfo: order.customerInfo || { name: "Namn saknas", phone: "Telefon saknas" },
+            paymentMethod: order.paymentMethod || 'stripe',
+            createdAt: order.createdAt,
+            scheduledDateTime: order.scheduledDateTime,
+          };
+        } else {
+          // Move order
+          transformedBooking = {
+            id: order._id || "N/A",
+            category: "Flytt utan städning",
+            date: order.scheduledDateTime ? new Date(order.scheduledDateTime).toLocaleDateString('sv-SE') : "Datum saknas",
+            pickup: order.pickupAddress || "Plats saknas",
+            dropoff: order.deliveryAddress || "Plats saknas",
+            status: getStatusText(order.status || "unknown"),
+            price: order.totalPrice ? `${order.totalPrice} SEK` : "Pris saknas",
+            passengers: order.numberOfPersons || 1,
+            isRoundTrip: false,
+            returnDateTime: null,
+            estimatedDistance: 0,
+            notes: order.notes || "",
+            customerInfo: order.customerInfo || { name: "Namn saknas", phone: "Telefon saknas" },
+            paymentMethod: order.paymentMethod || 'cash',
+            createdAt: order.createdAt,
+            scheduledDateTime: order.scheduledDateTime,
+          };
+        }
 
         setBooking(transformedBooking);
+        setServiceType(orderType);
 
         // Set progress based on status
         if (order.status === "completed") progress.value = 1;
@@ -81,7 +115,7 @@ export default function BookingDetailsScreen() {
         else progress.value = 0;
       }
     } catch (error) {
-      console.error('Error fetching taxi order:', error);
+      console.error('Error fetching order:', error);
     } finally {
       if (isRefresh) {
         setRefreshing(false);
@@ -92,11 +126,11 @@ export default function BookingDetailsScreen() {
   };
 
   const onRefresh = () => {
-    fetchTaxiOrder(true);
+    fetchOrder(true);
   };
 
   useEffect(() => {
-    fetchTaxiOrder();
+    fetchOrder();
   }, [orderId]);
 
   const getStatusText = (status: string) => {
@@ -115,7 +149,7 @@ export default function BookingDetailsScreen() {
   }));
 
   const handleCancelOrder = async () => {
-    if (!booking) return;
+    if (!booking || !serviceType) return;
 
     // Show confirmation alert
     showAlert(
@@ -128,11 +162,23 @@ export default function BookingDetailsScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              const result = await TaxiOrderService.cancelTaxiOrder(orderId as string, "Cancelled by user");
+              let result;
+              if (serviceType === 'taxi') {
+                result = await TaxiOrderService.cancelTaxiOrder(orderId as string, "Cancelled by user");
+              } else {
+                result = await MoveOrderService.cancelMoveOrder(orderId as string, "Cancelled by user");
+              }
+
               if (result.success) {
                 showAlert("Bokning avbokad", "Din bokning har blivit avbokad.");
                 // Refresh the booking data
-                const updatedResult = await TaxiOrderService.getTaxiOrder(orderId as string);
+                let updatedResult;
+                if (serviceType === 'taxi') {
+                  updatedResult = await TaxiOrderService.getTaxiOrder(orderId as string);
+                } else {
+                  updatedResult = await MoveOrderService.getMoveOrder(orderId as string);
+                }
+
                 if (updatedResult.success && updatedResult.order) {
                   const updatedOrder = updatedResult.order;
                   const updatedBooking = {
@@ -491,18 +537,18 @@ export default function BookingDetailsScreen() {
                   <View className="items-center">
                     <View className={`p-3 rounded-xl mb-3 ${isDark ? "bg-purple-500/20" : "bg-purple-100"}`}>
                       <Ionicons
-                        name="people-outline"
+                        name={serviceType === 'taxi' ? "people-outline" : "cube-outline"}
                         size={22}
                         color={isDark ? "#C084FC" : "#8B5CF6"}
                       />
                     </View>
                     <AutoText className={`font-semibold text-base mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>
-                      Passagerare
+                      {serviceType === 'taxi' ? 'Passagerare' : 'Personer'}
                     </AutoText>
                     <AutoText className={`text-3xl font-bold mb-2 ${isDark ? "text-purple-300" : "text-purple-700"}`}>
                       {String(booking.passengers || 1)}
                     </AutoText>
-                    {booking.estimatedDistance && (
+                    {serviceType === 'taxi' && booking.estimatedDistance && (
                       <AutoText className={`text-sm text-center ${isDark ? "text-gray-400" : "text-gray-600"}`}>
                         ~{String(booking.estimatedDistance)} km
                       </AutoText>

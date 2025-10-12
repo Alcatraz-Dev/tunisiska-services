@@ -3,7 +3,15 @@ import React, { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { AutoText } from "./ui/AutoText";
 
-const categories = ["Elektronik", "Möbler", "Kläder", "Annat"];
+const categories = [
+  { label: "Möbler", value: "furniture" },
+  { label: "Elektronik", value: "electronics" },
+  { label: "Lådor", value: "boxes" },
+  { label: "Kläder", value: "clothing" },
+  { label: "Skör", value: "fragile" },
+  { label: "Tunga föremål", value: "heavy_items" },
+  { label: "Vitvaror", value: "appliances" },
+];
 
 export default function MoveCategoryCheckbox({
   isDark,
@@ -58,14 +66,14 @@ export default function MoveCategoryCheckbox({
         >
           {categories.map((item) => (
             <TouchableOpacity
-              key={item}
-              onPress={() => toggleCategory(item)}
+              key={item.value}
+              onPress={() => toggleCategory(item.value)}
               className="p-4 flex-row items-center justify-between border-b border-gray-200"
             >
               <AutoText className={`${isDark ? "text-white" : "text-black"}`}>
-                {item}
+                {item.value}
               </AutoText>
-              {selectedCategories.includes(item) && (
+              {selectedCategories.includes(item.value) && (
                 <Ionicons
                   name="checkmark"
                   size={20}

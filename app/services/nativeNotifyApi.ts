@@ -19,6 +19,7 @@ export interface NotificationPayload {
   pushData?: Record<string, any>;
   bigPictureURL?: string;
   subID?: string;
+  image?: string; // Add image field for convenience
 }
 
 export interface BulkNotificationPayload extends NotificationPayload {
@@ -143,6 +144,16 @@ export class NativeNotifyAPI {
 
         if (payload.bigPictureURL) {
           (apiPayload as any).bigPictureURL = payload.bigPictureURL;
+        }
+
+        // Add image to pushData if provided in payload
+        if (payload.pushData?.image) {
+          (apiPayload as any).bigPictureURL = payload.pushData.image;
+        }
+
+        // Also check for direct image field
+        if (payload.image) {
+          (apiPayload as any).bigPictureURL = payload.image;
         }
 
         const url = payload.subID

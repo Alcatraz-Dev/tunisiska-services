@@ -7,6 +7,7 @@ import Animated, { FadeInUp, FadeOutDown } from "react-native-reanimated";
 import { AutoText } from "@/app/components/ui/AutoText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TaxiOrderService } from "@/app/services/taxiOrderService";
+import { MoveOrderService } from "@/app/services/moveOrderService";
 import { useAuth } from "@clerk/clerk-expo";
 
 export default function BookingHistoryScreen() {
@@ -18,39 +19,71 @@ export default function BookingHistoryScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchTaxiOrders = async () => {
+    const fetchAllOrders = async () => {
       if (!userId) {
         setLoading(false);
         return;
       }
 
       try {
-        const result = await TaxiOrderService.getUserTaxiOrders(userId);
-        if (result.success && result.orders) {
-          // Transform the orders to match the expected format
-          const transformedOrders = result.orders.map((order: any) => ({
+        // Fetch both taxi and move orders
+        const [taxiResult, moveResult] = await Promise.all([
+          TaxiOrderService.getUserTaxiOrders(userId),
+          MoveOrderService.getUserMoveOrders(userId)
+        ]);
+
+        const allOrders: any[] = [];
+
+        // Transform taxi orders
+        if (taxiResult.success && taxiResult.orders) {
+          const transformedTaxiOrders = taxiResult.orders.map((order: any) => ({
             id: order._id,
             category: "Taxi",
             date: new Date(order.scheduledDateTime).toLocaleDateString('sv-SE'),
             pickup: order.pickupAddress,
             dropoff: order.destinationAddress,
             status: getStatusText(order.status),
-            slug: order._id, // Use order ID as slug for details
+            slug: order._id,
             price: `${order.totalPrice} SEK`,
             passengers: order.numberOfPassengers,
             isRoundTrip: order.isRoundTrip,
             notes: order.notes,
+            serviceType: 'taxi'
           }));
-          setBookings(transformedOrders);
+          allOrders.push(...transformedTaxiOrders);
         }
+
+        // Transform move orders
+        if (moveResult.success && moveResult.orders) {
+          const transformedMoveOrders = moveResult.orders.map((order: any) => ({
+            id: order._id,
+            category: "Flytt utan städning",
+            date: new Date(order.scheduledDateTime).toLocaleDateString('sv-SE'),
+            pickup: order.pickupAddress,
+            dropoff: order.deliveryAddress,
+            status: getStatusText(order.status),
+            slug: order._id,
+            price: `${order.totalPrice} SEK`,
+            passengers: order.numberOfPersons,
+            isRoundTrip: false,
+            notes: order.notes,
+            serviceType: 'move'
+          }));
+          allOrders.push(...transformedMoveOrders);
+        }
+
+        // Sort by date (newest first)
+        allOrders.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        setBookings(allOrders);
       } catch (error) {
-        console.error('Error fetching taxi orders:', error);
+        console.error('Error fetching orders:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchTaxiOrders();
+    fetchAllOrders();
   }, [userId]);
 
   const getStatusText = (status: string) => {
@@ -148,11 +181,19 @@ export default function BookingHistoryScreen() {
           >
             Till: {item.dropoff}
           </AutoText>
-          <AutoText
-            className={`text-xs ${isDark ? "text-gray-300" : "text-gray-700"}`}
-          >
-            Passagerare: {item.passengers}
-          </AutoText>
+          {item.serviceType === 'taxi' ? (
+            <AutoText
+              className={`text-xs ${isDark ? "text-gray-300" : "text-gray-700"}`}
+            >
+              Passagerare: {item.passengers}
+            </AutoText>
+          ) : (
+            <AutoText
+              className={`text-xs ${isDark ? "text-gray-300" : "text-gray-700"}`}
+            >
+              Personer: {item.passengers}
+            </AutoText>
+          )}
           {item.isRoundTrip && (
             <AutoText
               className={`text-xs ${isDark ? "text-gray-300" : "text-gray-700"}`}
@@ -241,7 +282,7 @@ export default function BookingHistoryScreen() {
           }}
         >
           <Ionicons
-            name="car-outline"
+            name="document-text-outline"
             size={60}
             color={isDark ? "#6B7280" : "#9CA3AF"}
           />
@@ -250,14 +291,14 @@ export default function BookingHistoryScreen() {
               isDark ? "text-gray-400" : "text-gray-600"
             }`}
           >
-            Inga taxibokningar än
+            Inga bokningar än
           </AutoText>
           <AutoText
             className={`mt-2 text-sm text-center px-8 ${
               isDark ? "text-gray-500" : "text-gray-500"
             }`}
           >
-            Dina taxibokningar kommer att visas här när du har gjort några
+            Dina bokningar kommer att visas här när du har gjort några
           </AutoText>
         </View>
       ) : (
@@ -267,6 +308,7 @@ export default function BookingHistoryScreen() {
           keyExtractor={(item) => item?.id}
           renderItem={renderBooking}
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 100 }}
         />
       )}
     </SafeAreaView>
