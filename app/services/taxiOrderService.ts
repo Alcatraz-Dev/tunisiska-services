@@ -16,7 +16,7 @@ export interface TaxiOrderData {
   estimatedDistance?: number;
   totalPrice: number;
   pointsUsed?: number;
-  paymentMethod: 'stripe' | 'points' | 'combined';
+  paymentMethod: 'stripe' | 'points' | 'combined' | 'cash';
   notes?: string;
 }
 
@@ -161,13 +161,14 @@ export class TaxiOrderService {
     }
   }
 
-  // Calculate taxi price based on distance and Swedish taxi pricing standards
-  static calculateTaxiPrice(distance: number, isRoundTrip: boolean = false, scheduledDateTime?: string): number {
+  // Calculate taxi price based on distance, passengers, and Swedish taxi pricing standards
+  static calculateTaxiPrice(distance: number, isRoundTrip: boolean = false, scheduledDateTime?: string, numberOfPassengers: number = 1): number {
     // Swedish taxi pricing based on industry standards
     const BASE_FARE = 45; // SEK - Basic starting fee
     const PRICE_PER_KM = 12; // SEK per kilometer
     const PRICE_PER_MINUTE = 8; // SEK per minute (for time-based billing)
     const MINIMUM_FARE = 85; // SEK - Minimum charge
+    const PASSENGER_SURCHARGE = 15; // SEK per additional passenger beyond 1
 
     // Estimate time based on distance (assuming average speed of 30 km/h in city)
     const estimatedMinutes = Math.max(5, (distance / 30) * 60); // Minimum 5 minutes
@@ -182,6 +183,11 @@ export class TaxiOrderService {
     // Time-based component (minimum charge covers basic time)
     if (estimatedMinutes > 10) {
       totalPrice += (estimatedMinutes - 10) * PRICE_PER_MINUTE;
+    }
+
+    // Passenger surcharge (beyond 1 passenger)
+    if (numberOfPassengers > 1) {
+      totalPrice += (numberOfPassengers - 1) * PASSENGER_SURCHARGE;
     }
 
     // Apply minimum fare
@@ -221,10 +227,11 @@ export class TaxiOrderService {
   }
 
   // Calculate price breakdown for transparency
-  static getPriceBreakdown(distance: number, isRoundTrip: boolean = false, scheduledDateTime?: string): {
+  static getPriceBreakdown(distance: number, isRoundTrip: boolean = false, scheduledDateTime?: string, numberOfPassengers: number = 1): {
     baseFare: number;
     distanceCost: number;
     timeCost: number;
+    passengerSurcharge: number;
     surcharges: number;
     subtotal: number;
     vat: number;
@@ -234,6 +241,7 @@ export class TaxiOrderService {
     const PRICE_PER_KM = 12;
     const PRICE_PER_MINUTE = 8;
     const MINIMUM_FARE = 85;
+    const PASSENGER_SURCHARGE_RATE = 15; // SEK per additional passenger
 
     const estimatedMinutes = Math.max(5, (distance / 30) * 60);
     let subtotal = BASE_FARE;
@@ -245,6 +253,10 @@ export class TaxiOrderService {
     // Time cost
     const timeCost = estimatedMinutes > 10 ? (estimatedMinutes - 10) * PRICE_PER_MINUTE : 0;
     subtotal += timeCost;
+
+    // Passenger surcharge
+    const passengerSurcharge = numberOfPassengers > 1 ? (numberOfPassengers - 1) * PASSENGER_SURCHARGE_RATE : 0;
+    subtotal += passengerSurcharge;
 
     // Apply minimum fare
     subtotal = Math.max(subtotal, MINIMUM_FARE);
@@ -282,6 +294,7 @@ export class TaxiOrderService {
       baseFare: BASE_FARE,
       distanceCost: Math.round(distanceCost),
       timeCost: Math.round(timeCost),
+      passengerSurcharge: Math.round(passengerSurcharge),
       surcharges: Math.round(surcharges),
       subtotal: Math.round(preVatTotal),
       vat: Math.round(vat),

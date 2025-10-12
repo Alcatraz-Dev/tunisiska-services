@@ -77,13 +77,13 @@ export default function usePushNotifications() {
     try {
       console.log('🔄 Starting Native Notify inbox sync...');
 
-      // Check if we're in Expo Go (limited native module support)
-      const isExpoGo = Platform.OS === 'web' || !Device.isDevice;
-      console.log('📱 Is Expo Go:', isExpoGo);
+      // Check if we're on web (no native modules) or simulator (limited native modules)
+      const isWebOrSimulator = Platform.OS === 'web' || !Device.isDevice;
+      console.log('📱 Is web/simulator:', isWebOrSimulator);
 
-      if (isExpoGo) {
-        console.log('📱 Running in Expo Go - using local notification state only');
-        // In Expo Go, just ensure we have the latest local count
+      if (isWebOrSimulator) {
+        console.log('📱 Running on web/simulator - using local notification state only');
+        // On web/simulator, just ensure we have the latest local count
         const storedCount = await AsyncStorage.getItem("unreadCount");
         if (storedCount) {
           const count = Number(storedCount);
@@ -91,6 +91,9 @@ export default function usePushNotifications() {
         }
         return;
       }
+
+      // On real devices (including Expo Go), try Native Notify
+      console.log('📱 Running on real device - attempting Native Notify sync');
 
       console.log('🔄 Syncing Native Notify inbox...');
       console.log('🔑 Using App ID: 32172, Token: PNF5T5VibvtV6lj8i7pbil');
@@ -168,7 +171,10 @@ export default function usePushNotifications() {
    // Only register for push notifications on native platforms
    if (Platform.OS !== 'web') {
      registerForPushNotificationsAsync().then(async (token) => {
+       const isSimulator = !Device.isDevice;
        console.log('📲 Push token result:', token ? 'SUCCESS' : 'FAILED');
+       console.log('📱 Is simulator:', isSimulator);
+
        if (token) {
          console.log('🔑 Expo push token:', token.substring(0, 20) + '...');
          setExpoPushToken(token);
@@ -199,11 +205,20 @@ export default function usePushNotifications() {
            console.log('⚠️ No valid userId available for Native Notify registration');
          }
        } else {
-         console.error('❌ No push token received from Expo');
+         // Only log as error if not in simulator (where push tokens are expected to fail)
+         if (!isSimulator) {
+           console.error('❌ No push token received from Expo');
+         } else {
+           console.log('📱 Simulator detected - push notifications not available (expected)');
+         }
        }
      }).catch((error) => {
-       console.error('❌ Push notification registration failed:', error);
-       // Don't show alert for Expo Go failures, just log
+       const isSimulator = !Device.isDevice;
+       if (!isSimulator) {
+         console.error('❌ Push notification registration failed:', error);
+       } else {
+         console.log('📱 Push notification registration skipped in simulator (expected)');
+       }
      });
    } else {
      console.log('🌐 Skipping push notifications on web platform');
@@ -230,6 +245,12 @@ export default function usePushNotifications() {
         setUnreadCount(newCount);
         await saveUnreadCount(newCount);
         console.log('✅ Notification processed, new count:', newCount);
+
+        // In Expo Go, also show the notification as a local alert since push notifications don't work
+        const isExpoGo = Platform.OS === 'web' || !Device.isDevice;
+        if (isExpoGo) {
+          showAlert(newNotification.title, newNotification.message);
+        }
       }
     );
 
@@ -272,10 +293,10 @@ export default function usePushNotifications() {
     try {
       console.log('🧪 Sending test notification...');
 
-      // For Expo Go testing, also add to local notifications
-      const isExpoGo = Platform.OS === 'web' || !Device.isDevice;
-      if (isExpoGo) {
-        console.log('🧪 Expo Go detected - adding local test notification');
+      // For simulators/web, add to local notifications only
+      const isSimulator = Platform.OS === 'web' || !Device.isDevice;
+      if (isSimulator) {
+        console.log('🧪 Simulator detected - adding local test notification');
         const testNotif = {
           id: `test-${Date.now()}`,
           title: 'Test Notification',
@@ -289,10 +310,27 @@ export default function usePushNotifications() {
         const newCount = unreadCount + 1;
         setUnreadCount(newCount);
         await saveUnreadCount(newCount);
+
+        // Also show a local notification in simulator
+        try {
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: testNotif.title,
+              body: testNotif.message,
+              data: { type: testNotif.type },
+            },
+            trigger: null, // Show immediately
+          });
+          console.log('✅ Local notification shown in simulator');
+        } catch (error) {
+          console.warn('⚠️ Failed to show local notification in simulator:', error);
+        }
+
         return { success: true, message: 'Local test notification added' };
       }
 
-      // For real devices, send via Native Notify
+      // For real devices (including Expo Go on device), send via Native Notify
+      console.log('🧪 Sending via Native Notify for real device');
       const result = await nativeNotifyAPI.sendNotification({
         title: 'Test Notification',
         message: 'This is a test notification from the app',

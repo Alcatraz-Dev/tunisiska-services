@@ -1,7 +1,5 @@
-import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
-import { registerIndieID, unRegisterIndieID } from 'native-notify';
+
+import { registerIndieID, unregisterIndieDevice } from 'native-notify';
 
 // Native Notify Configuration
 const NATIVE_NOTIFY_CONFIG = {
@@ -10,6 +8,7 @@ const NATIVE_NOTIFY_CONFIG = {
   BASE_URL: "https://app.nativenotify.com",
   MAX_RETRIES: 3,
   RETRY_DELAY: 1000, // 1 second
+  ICON_URL: "https://studio-tunisiska.com/favicon.png",
 };
 
 // Types
@@ -103,7 +102,7 @@ export class NativeNotifyAPI {
   async unregisterUser(userId: string): Promise<NotificationResponse> {
     try {
       await retryApiCall(async () => {
-        await unRegisterIndieID(userId, this.appId, this.appToken);
+        await unregisterIndieDevice(userId, this.appId, this.appToken);
       });
 
       return {
@@ -129,7 +128,8 @@ export class NativeNotifyAPI {
           title: payload.title,
           body: payload.message,
           dateSent: new Date().toISOString(),
-          pushData: JSON.stringify(payload.pushData || {}),
+          pushData: payload.pushData ? JSON.stringify(payload.pushData) : '{}',
+          icon: NATIVE_NOTIFY_CONFIG.ICON_URL,
         };
 
         if (payload.subID) {
@@ -145,7 +145,7 @@ export class NativeNotifyAPI {
           (apiPayload as any).bigPictureURL = payload.bigPictureURL;
         }
 
-        const url = payload.subID 
+        const url = payload.subID
           ? `${NATIVE_NOTIFY_CONFIG.BASE_URL}/api/indie/notification`
           : `${NATIVE_NOTIFY_CONFIG.BASE_URL}/api/notification`;
 
@@ -158,10 +158,21 @@ export class NativeNotifyAPI {
         });
 
         if (!fetchResponse.ok) {
-          throw new Error(`HTTP error! status: ${fetchResponse.status}`);
+          const errorText = await fetchResponse.text();
+          console.error('Server error response:', errorText);
+          throw new Error(`HTTP error! status: ${fetchResponse.status} - ${errorText}`);
         }
 
-        return await fetchResponse.json();
+        const responseText = await fetchResponse.text();
+        console.log('Raw response:', responseText);
+
+        // Try to parse as JSON, but handle non-JSON responses
+        try {
+          return JSON.parse(responseText);
+        } catch (parseError) {
+          console.warn('Response is not valid JSON, treating as success:', responseText);
+          return { success: true, message: responseText };
+        }
       });
 
       return {
@@ -190,6 +201,7 @@ export class NativeNotifyAPI {
           subIDs: payload.subIDs,
           dateSent: new Date().toISOString(),
           pushData: JSON.stringify(payload.pushData || {}),
+          icon: NATIVE_NOTIFY_CONFIG.ICON_URL,
         };
 
         if (payload.subtitle) {
@@ -246,6 +258,7 @@ export class NativeNotifyAPI {
           sendTime: payload.sendTime,
           timezone: payload.timezone || "America/New_York",
           pushData: JSON.stringify(payload.pushData || {}),
+          icon: NATIVE_NOTIFY_CONFIG.ICON_URL,
         };
 
         if (payload.subtitle) {

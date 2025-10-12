@@ -83,7 +83,7 @@ export default defineType({
       name: "numberOfPassengers",
       title: "Number of Passengers",
       type: "number",
-      validation: (Rule) => Rule.min(1).max(8).required(),
+      validation: (Rule) => Rule.min(1).max(4).required(),
     }),
     defineField({
       name: "isRoundTrip",
@@ -124,6 +124,7 @@ export default defineType({
           { title: "Stripe", value: "stripe" },
           { title: "Points", value: "points" },
           { title: "Combined", value: "combined" },
+          { title: "Cash", value: "cash" },
         ],
         layout: "radio",
       },

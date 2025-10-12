@@ -329,18 +329,18 @@ export default function BookingDetailsScreen() {
             >
               <View className="flex-row justify-between items-start">
                 <View className="flex-1">
-                  <AutoText className="text-2xl font-bold text-white mb-1">
+                  <AutoText className={`text-2xl font-bold  mb-1 ${isDark ? "text-white" : "text-gray-900"}`}>
                     {String(booking.category || "Taxi")}
                   </AutoText>
-                  <AutoText className="text-blue-100 text-sm">
+                  <AutoText className={`text-sm ${isDark ? "text-blue-100" : "text-blue-900"}`}>
                     Boknings-ID: {String(booking.id?.slice(-8) || "N/A")}
                   </AutoText>
                 </View>
                 <View
-                  className="px-4 py-2 rounded-full bg-white/20 backdrop-blur-sm border border-white/30"
+                  className={`px-4 py-2 rounded-full  backdrop-blur-sm border ${isDark ? "border-white/30 bg-white/20" : "border-black/50 bg-white/20"}`}
                 >
                   <AutoText
-                    className="text-xs font-semibold text-white"
+                    className={`text-xs font-semibold ${isDark ? "text-white" : "text-black"}`}
                   >
                     {String(booking.status || "Okänd")}
                   </AutoText>
@@ -350,20 +350,20 @@ export default function BookingDetailsScreen() {
               {/* Quick Info Row */}
               <View className="flex-row justify-between items-center mt-4 pt-4 border-t border-white/20">
                 <View className="items-center">
-                  <Ionicons name="calendar-outline" size={20} color="white" />
-                  <AutoText className="text-white text-xs mt-1">
+                  <Ionicons name="calendar-outline" size={20} color={`${isDark ? "white" :"black"}`} />
+                  <AutoText className={`text-xs mt-1 ${isDark ? "text-white" : "text-black"}`}>
                     {String(booking.date || "Datum saknas")}
                   </AutoText>
                 </View>
                 <View className="items-center">
-                  <Ionicons name="people-outline" size={20} color="white" />
-                  <AutoText className="text-white text-xs mt-1">
+                  <Ionicons name="people-outline" size={20} color={`${isDark ? "white" :"black"}`} />
+                   <AutoText className={`text-xs mt-1 ${isDark ? "text-white" : "text-black"}`}>
                     {String(booking.passengers || 1)} pass
                   </AutoText>
                 </View>
                 <View className="items-center">
-                  <Ionicons name="cash-outline" size={20} color="white" />
-                  <AutoText className="text-white text-xs mt-1">
+                  <Ionicons name="cash-outline" size={20} color={`${isDark ? "white" :"black"}`} />
+                   <AutoText className={`text-xs mt-1 ${isDark ? "text-white" : "text-black"}`}>
                     {String(booking.price || "Pris saknas")}
                   </AutoText>
                 </View>
@@ -637,17 +637,17 @@ export default function BookingDetailsScreen() {
           >
             <View className="items-center">
               <View className="flex-row items-center mb-2">
-                <Ionicons name="cash-outline" size={24} color="white" />
-                <AutoText className="text-white text-lg font-semibold ml-2">
+                <Ionicons name="cash-outline" size={24} color={isDark ? "#fff" : "#000"} />
+                <AutoText className={`text-lg font-semibold ml-2 ${isDark ? "text-white" : "text-gray-900"}`}>
                   Betalning
                 </AutoText>
               </View>
-              <AutoText className="text-3xl font-bold text-white mb-2">
+              <AutoText className={`text-3xl font-bold mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>
                 {String(booking.price || "Pris saknas")}
               </AutoText>
-              <View className={`px-4 py-2 rounded-full ${isDark ? "bg-white/20" : "bg-white/30"} backdrop-blur-sm`}>
-                <AutoText className="text-white text-sm font-medium">
-                  {String(booking.paymentMethod === 'stripe' ? '💳 Kortbetalning' : booking.paymentMethod === 'points' ? '🎯 Poäng' : booking.paymentMethod === 'combined' ? '🔄 Kombinerat' : '❓ Okänd metod')}
+              <View className={`px-4 py-2 rounded-full border ${isDark ? "border-white/30 bg-white/20" : "border-black/50 bg-white/20"} backdrop-blur-sm`}>
+                <AutoText className={`text-sm font-medium ${isDark ? "text-white" : "text-gray-900"}`}>
+                  {String(booking.paymentMethod === 'stripe' ? 'Kortbetalning' : booking.paymentMethod === 'points' ? 'Poäng' : booking.paymentMethod === 'combined' ? 'Kombinerat' : booking.paymentMethod === 'cash' ? 'Kontant' : 'Okänd metod')}
                 </AutoText>
               </View>
             </View>

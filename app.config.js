@@ -101,7 +101,14 @@ module.exports = {
           sounds: ['./app/assets/sounds/notification.wav'],
           enableBackgroundRemoteNotifications: true,
           iosDisplayInForeground: true,
-          mode: IS_DEV ? 'development' : 'production'
+          mode: IS_DEV ? 'development' : 'production',
+          ios: {
+            icon: './app/assets/icons/adaptive-icon.png'
+          },
+          android: {
+            icon: './app/assets/icons/adaptive-icon.png',
+            color: '#ffffff'
+          }
         }
       ]
     ],

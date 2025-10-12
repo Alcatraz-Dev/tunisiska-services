@@ -179,6 +179,17 @@ export default function Payment({
         colors: {
           primary: "#2563EB",
           background: isDark ? "#1C1C1E" : "#FFFFFF",
+          componentBackground: isDark ? "#2C2C2E" : "#F9F9F9",
+          componentBorder: isDark ? "#3C3C3E" : "#E5E5E5",
+          componentDivider: isDark ? "#3C3C3E" : "#E5E5E5",
+          primaryText: isDark ? "#FFFFFF" : "#000000",
+          secondaryText: isDark ? "#CCCCCC" : "#666666",
+          componentText: isDark ? "#FFFFFF" : "#000000",
+          placeholderText: isDark ? "#888888" : "#999999",
+        },
+        shapes: {
+          borderRadius: 8,
+          borderWidth: 1,
         },
       },
       customerId: customer.id || customer,
