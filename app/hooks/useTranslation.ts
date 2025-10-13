@@ -45,7 +45,7 @@ export async function translate(text: Translatable, targetLang: string) {
 }
 
 export function useTranslationText(text: Translatable, lang?: string) {
-  const [translated, setTranslated] = useState(text.toString());
+  const [translated, setTranslated] = useState(text?.toString() || '');
   const deviceLang = Localization.getLocales()[0]?.languageCode || "sv";
 
   useEffect(() => {

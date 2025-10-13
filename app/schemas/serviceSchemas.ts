@@ -18,10 +18,11 @@ export interface ServiceBase {
 
 export enum ServiceType {
   MOVE = 'move',
-  TAXI = 'taxi', 
+  TAXI = 'taxi',
   CLEANING = 'cleaning',
   SHIPPING = 'shipping',
-  CLEANING_MOVE = 'cleaning-move'
+  CLEANING_MOVE = 'cleaning-move',
+  MOVE_CLEANING = 'move_cleaning'
 }
 
 export enum OrderStatus {
@@ -150,7 +151,7 @@ export enum ShippingSpeed {
   OVERNIGHT = 'overnight' // Next day
 }
 
-// Cleaning + Move Service Schema  
+// Cleaning + Move Service Schema
 export interface CleaningMoveServiceOrder extends ServiceBase {
   serviceType: ServiceType.CLEANING_MOVE;
   // Move details
@@ -163,6 +164,24 @@ export interface CleaningMoveServiceOrder extends ServiceBase {
   cleaningType: CleaningType;
   cleanBothLocations: boolean;
   cleaningInstructions?: string;
+  estimatedHours?: number;
+}
+
+// Move + Cleaning Service Schema
+export interface MoveCleaningServiceOrder extends ServiceBase {
+  serviceType: ServiceType.MOVE_CLEANING;
+  // Move details
+  pickupAddress: string;
+  deliveryAddress: string;
+  itemCategories: MoveItemCategory[];
+  numberOfItems: number;
+  numberOfPersons: number;
+  hasElevator: boolean;
+  // Cleaning details
+  cleaningAreas: string[];
+  cleaningIntensity: 'basic' | 'deep' | 'move_out';
+  cleaningSupplies: boolean;
+  specialRequirements?: string;
   estimatedHours?: number;
 }
 
@@ -185,12 +204,13 @@ export interface PriceModifier {
 }
 
 // Union type for all service orders
-export type ServiceOrder = 
-  | MoveServiceOrder 
-  | TaxiServiceOrder 
-  | CleaningServiceOrder 
-  | ShippingServiceOrder 
-  | CleaningMoveServiceOrder;
+export type ServiceOrder =
+  | MoveServiceOrder
+  | TaxiServiceOrder
+  | CleaningServiceOrder
+  | ShippingServiceOrder
+  | CleaningMoveServiceOrder
+  | MoveCleaningServiceOrder;
 
 // Order tracking and notifications
 export interface OrderUpdate {

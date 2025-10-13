@@ -46,11 +46,11 @@ const services = [
   },
   {
     id: "2",
-    title: "Hemstädning + Flytt",
-    description: "Boka professionell hemstädning med flytthjälp.",
-    icon: "home-outline",
+    title: "Flytt och städning hjälp",
+    description: "Boka professionell flytt och städning tillsammans.",
+    icon: "construct-outline",
     color: "#10B981",
-    route: "/(home)/services/cleaning-move",
+    route: "/(home)/services/move-cleaning",
     category: "Städning & FlyttServices",
   },
   {

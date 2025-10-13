@@ -7,7 +7,10 @@ import terms from "./terms";
 import policy from "./policy";
 import taxiOrder from "./taxiOrder";
 import moveOrder from "./moveOrder";
+import moveCleaningOrder from "./moveCleaningOrder";
+import shippingOrder from "./shippingOrder";
+import shippingSchedule from "./shippingSchedule";
 
 
 
-export const schemaTypes = [user , liveStatus, announcement, footer, terms, policy, taxiOrder, moveOrder ];
+export const schemaTypes = [user , liveStatus, announcement, footer, terms, policy, taxiOrder, moveOrder, moveCleaningOrder, shippingOrder, shippingSchedule ];

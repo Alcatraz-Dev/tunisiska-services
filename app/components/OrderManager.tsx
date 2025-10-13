@@ -78,6 +78,7 @@ export default function OrderManager({ onBack }: OrderManagerProps) {
       case ServiceType.CLEANING: return 'sparkles-outline';
       case ServiceType.SHIPPING: return 'cube-outline';
       case ServiceType.CLEANING_MOVE: return 'construct-outline';
+      case ServiceType.MOVE_CLEANING: return 'construct-outline';
       default: return 'briefcase-outline';
     }
   };
@@ -89,6 +90,7 @@ export default function OrderManager({ onBack }: OrderManagerProps) {
       case ServiceType.CLEANING: return 'Städning';
       case ServiceType.SHIPPING: return 'Frakt';
       case ServiceType.CLEANING_MOVE: return 'Flytt & Städning';
+      case ServiceType.MOVE_CLEANING: return 'Flytt och städning hjälp';
       default: return 'Tjänst';
     }
   };
@@ -269,6 +271,29 @@ export default function OrderManager({ onBack }: OrderManagerProps) {
                   </AutoText>
                   <AutoText className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                     ✨ Typ: {(order as any).cleaningType}
+                  </AutoText>
+                </>
+              )}
+
+              {order.serviceType === ServiceType.MOVE_CLEANING && (
+                <>
+                  <AutoText className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                    📍 Från: {(order as any).pickupAddress}
+                  </AutoText>
+                  <AutoText className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                    📍 Till: {(order as any).deliveryAddress}
+                  </AutoText>
+                  <AutoText className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                    📦 Föremål: {(order as any).numberOfItems}
+                  </AutoText>
+                  <AutoText className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                    👥 Personer: {(order as any).numberOfPersons}
+                  </AutoText>
+                  <AutoText className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                    🧹 Städning: {(order as any).cleaningAreas?.join(', ')}
+                  </AutoText>
+                  <AutoText className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                    ✨ Intensitet: {(order as any).cleaningIntensity}
                   </AutoText>
                 </>
               )}

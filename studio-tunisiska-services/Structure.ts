@@ -1,4 +1,4 @@
-import {FaUsers, FaBell, FaFileContract, FaShieldAlt, FaTaxi, FaTruck} from 'react-icons/fa'
+import {FaUsers, FaBell, FaFileContract, FaShieldAlt, FaTaxi, FaTruck, FaBroom, FaShippingFast} from 'react-icons/fa'
 import {CgMediaLive} from 'react-icons/cg'
 import {MdOutlinePermMedia} from 'react-icons/md'
 import {MdWeb} from 'react-icons/md'
@@ -21,6 +21,24 @@ export const Structure = (S: any) =>
         .icon(FaTruck)
         .child(
           S.documentList().title('All Flytt utan städning Orders').filter('_type == "moveOrder"'),
+        ),
+      S.listItem()
+        .title(' Flytt och städning hjälp Orders')
+        .icon(FaBroom)
+        .child(
+          S.documentList().title('All Flytt och städning hjälp Orders').filter('_type == "moveCleaningOrder"'),
+        ),
+      S.listItem()
+        .title(' Shipping Orders')
+        .icon(FaShippingFast)
+        .child(
+          S.documentList().title('All Shipping Orders').filter('_type == "shippingOrder"'),
+        ),
+      S.listItem()
+        .title(' Shipping Schedules')
+        .icon(FaShippingFast)
+        .child(
+          S.documentList().title('All Shipping Schedules').filter('_type == "shippingSchedule"'),
         ),
 
       S.listItem()

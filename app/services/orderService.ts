@@ -1,8 +1,8 @@
 // Service Ordering API and Business Logic
-import { 
-  ServiceOrder, 
-  ServiceType, 
-  OrderStatus, 
+import {
+  ServiceOrder,
+  ServiceType,
+  OrderStatus,
   ServicePricing,
   ServicePayment,
   MoveServiceOrder,
@@ -10,6 +10,7 @@ import {
   CleaningServiceOrder,
   ShippingServiceOrder,
   CleaningMoveServiceOrder,
+  MoveCleaningServiceOrder,
   MoveItemCategory,
   VehicleType,
   CleaningType,
@@ -204,6 +205,19 @@ export class PricingService {
         { name: 'Deep Clean', type: 'percentage', value: 25 },
         { name: 'No Elevator', type: 'fixed', value: 300 },
       ]
+    },
+    [ServiceType.MOVE_CLEANING]: {
+      serviceType: ServiceType.MOVE_CLEANING,
+      basePrice: 1500, // SEK
+      pricePerHour: 500,
+      pricePerItem: 30,
+      modifiers: [
+        { name: 'No Elevator', type: 'fixed', value: 200 },
+        { name: 'Heavy Items', type: 'percentage', value: 15 },
+        { name: 'Deep Clean', type: 'percentage', value: 25 },
+        { name: 'Move Out Clean', type: 'percentage', value: 50 },
+        { name: 'Weekend', type: 'percentage', value: 20 },
+      ]
     }
   };
 
@@ -231,6 +245,9 @@ export class PricingService {
         break;
       case ServiceType.CLEANING_MOVE:
         totalPrice += this.calculateCleaningMovePrice(orderData as Partial<CleaningMoveServiceOrder>, pricing);
+        break;
+      case ServiceType.MOVE_CLEANING:
+        totalPrice += this.calculateMoveCleaningPrice(orderData as Partial<MoveCleaningServiceOrder>, pricing);
         break;
     }
 
@@ -288,7 +305,21 @@ export class PricingService {
 
   private static calculateCleaningMovePrice(order: Partial<CleaningMoveServiceOrder>, pricing: ServicePricing): number {
     let price = 0;
-    
+
+    if (order.numberOfItems && pricing.pricePerItem) {
+      price += order.numberOfItems * pricing.pricePerItem;
+    }
+
+    if (order.estimatedHours && pricing.pricePerHour) {
+      price += order.estimatedHours * pricing.pricePerHour;
+    }
+
+    return price;
+  }
+
+  private static calculateMoveCleaningPrice(order: Partial<MoveCleaningServiceOrder>, pricing: ServicePricing): number {
+    let price = 0;
+
     if (order.numberOfItems && pricing.pricePerItem) {
       price += order.numberOfItems * pricing.pricePerItem;
     }
@@ -389,6 +420,9 @@ export class OrderValidator {
         break;
       case ServiceType.CLEANING_MOVE:
         this.validateCleaningMoveOrder(order as Partial<CleaningMoveServiceOrder>, errors);
+        break;
+      case ServiceType.MOVE_CLEANING:
+        this.validateMoveCleaningOrder(order as Partial<MoveCleaningServiceOrder>, errors);
         break;
     }
 
@@ -491,6 +525,34 @@ export class OrderValidator {
     // Validate cleaning aspects
     if (!order.cleaningType) {
       errors.push('Cleaning type is required');
+    }
+  }
+
+  private static validateMoveCleaningOrder(order: Partial<MoveCleaningServiceOrder>, errors: string[]) {
+    // Validate move aspects
+    if (!order.pickupAddress) {
+      errors.push('Pickup address is required');
+    }
+
+    if (!order.deliveryAddress) {
+      errors.push('Delivery address is required');
+    }
+
+    if (!order.numberOfItems || order.numberOfItems <= 0) {
+      errors.push('Number of items must be greater than 0');
+    }
+
+    if (!order.numberOfPersons || order.numberOfPersons <= 0) {
+      errors.push('Number of persons must be greater than 0');
+    }
+
+    // Validate cleaning aspects
+    if (!order.cleaningAreas || order.cleaningAreas.length === 0) {
+      errors.push('Cleaning areas are required');
+    }
+
+    if (!order.cleaningIntensity) {
+      errors.push('Cleaning intensity is required');
     }
   }
 }
