@@ -11,6 +11,7 @@ import { useUser } from "@clerk/clerk-expo";
 import { AutoText } from "@/app/components/ui/AutoText";
 import Input from "@/app/components/ui/Input";
 import { showAlert } from "@/app/utils/showAlert";
+import { ShippingOrderService } from "@/app/services/shippingOrderService";
 
 // 🔹 Fetch shipping schedules from Sanity
 const fetchShippingSchedules = async () => {
@@ -19,12 +20,12 @@ const fetchShippingSchedules = async () => {
     const schedules = await client.fetch(`
       *[_type == "shippingSchedule" && status == "available"] {
         _id,
-        date,
         route,
         departureTime,
         capacity,
         availableCapacity,
-        vehicle
+        vehicle,
+        pickupLocations
       }
     `);
     return schedules;
@@ -42,6 +43,7 @@ export default function ShippingPage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [availableTrips, setAvailableTrips] = useState<any[]>([]);
   const [selectedTrip, setSelectedTrip] = useState<any>(null);
+  const [selectedPickupLocation, setSelectedPickupLocation] = useState<any>(null);
   const [shippingSchedules, setShippingSchedules] = useState<any[]>([]);
 
   const [kg, setKg] = useState("");
@@ -90,17 +92,21 @@ export default function ShippingPage() {
   // 🔹 När datum väljs → filtrera trips för det datumet
   const handleDateSelect = (day: any) => {
     setSelectedDate(day.dateString);
-    const trips = shippingSchedules.filter((s) => s.date === day.dateString);
+    const trips = shippingSchedules.filter((s) => {
+      const scheduleDate = new Date(s.departureTime).toISOString().split('T')[0];
+      return scheduleDate === day.dateString;
+    });
     setAvailableTrips(trips);
     setSelectedTrip(null);
   };
 
   // 🔹 Markera datumen som finns i schemat
   const markedDates = shippingSchedules.reduce((acc: any, s) => {
-    acc[s.date] = {
+    const scheduleDate = new Date(s.departureTime).toISOString().split('T')[0];
+    acc[scheduleDate] = {
       marked: true,
       dotColor: "#0ea5e9",
-      selected: selectedDate === s.date,
+      selected: selectedDate === scheduleDate,
       selectedColor: "#0ea5e9",
     };
     return acc;
@@ -125,21 +131,201 @@ export default function ShippingPage() {
     return Math.round(total);
   };
 
-  const handleBooking = () => {
-    if (!selectedTrip || selectedCategories.length === 0 || !kg) {
-      return showAlert("Fel", "Vänligen välj schema, kategori och fyll i vikt");
+  const handleBooking = async () => {
+    if (!selectedTrip || selectedCategories.length === 0 || !kg || !customerName || !customerPhone || !recipientName || !recipientPhone) {
+      return showAlert("Fel", "Vänligen fyll i alla obligatoriska fält");
     }
 
     const totalCost = calculateTotal();
 
-    showAlert(
-      "Bokning bekräftad",
-      `Datum: ${selectedTrip.date}\nPlats: ${selectedTrip.location}\nTid: ${
-        selectedTrip.time
-      }\nKategori: ${selectedCategories.join(
-        ", "
-      )}\nVikt: ${kg} kg\nTotal: ${totalCost} kr`
-    );
+    // Process payment first
+    const paymentSuccess = await processPayment(paymentMethod, totalCost);
+    if (!paymentSuccess) {
+      return;
+    }
+
+    // Create shipping order
+    const orderData = {
+      userId: user?.id || '',
+      customerInfo: {
+        name: customerName,
+        phone: customerPhone,
+        email: customerEmail,
+      },
+      pickupAddress: selectedPickupLocation?.location || selectedTrip.route?.split('_')[0]?.replace('stockholm', 'Stockholm').replace('goteborg', 'Göteborg').replace('malmo', 'Malmö') || 'Stockholm',
+      deliveryAddress: selectedTrip.route?.split('_')[1]?.replace('tunis', 'Tunis') || 'Tunis',
+      scheduledDateTime: selectedPickupLocation?.pickupDateTime || selectedTrip.departureTime,
+      packageDetails: {
+        weight: parseFloat(kg),
+        dimensions: {
+          length: 30,
+          width: 20,
+          height: 15,
+        },
+        description: selectedCategories.join(', '),
+        value: 1000,
+        isFragile: selectedCategories.includes('fragile'),
+      },
+      shippingSpeed: 'standard' as const,
+      requiresSignature: true,
+      totalPrice: totalCost,
+      pointsUsed: (paymentMethod === 'points' || paymentMethod === 'combined') ? pointsToUse : 0,
+      paymentMethod,
+      notes: `Recipient: ${recipientName} (${recipientPhone})`,
+    };
+
+    const result = await ShippingOrderService.createShippingOrder(orderData);
+
+    if (result.success) {
+      showAlert("Bokning bekräftad", `Din fraktbeställning har skapats! Order ID: ${result.order?._id?.substring(0, 8)}`);
+      router.back();
+    } else {
+      showAlert("Fel", "Kunde inte skapa bokning: " + result.error);
+    }
+  };
+
+  // Payment processing function
+  const processPayment = async (method: string, amount: number): Promise<boolean> => {
+    console.log(`Processing ${method} payment for ${amount} SEK`);
+
+    if (method === 'cash') {
+      return true;
+    }
+
+    if (method === 'points') {
+      if (!user) {
+        showAlert("Fel", "Du måste vara inloggad");
+        return false;
+      }
+
+      const pointsNeeded = amount * 10;
+      const currentPoints = (user.unsafeMetadata as any)?.points || 0;
+
+      if (currentPoints < pointsNeeded) {
+        showAlert("Otillräckliga poäng", `Du har ${currentPoints} poäng men behöver ${pointsNeeded} poäng för denna betalning.`);
+        return false;
+      }
+
+      try {
+        await user.update({
+          unsafeMetadata: {
+            ...user.unsafeMetadata,
+            points: currentPoints - pointsNeeded
+          }
+        });
+        setUserPoints(currentPoints - pointsNeeded);
+        console.log(`Points payment successful: ${pointsNeeded} points deducted`);
+        return true;
+      } catch (error) {
+        console.error('Points payment failed:', error);
+        return false;
+      }
+    }
+
+    if (method === 'combined') {
+      if (!user) {
+        showAlert("Fel", "Du måste vara inloggad");
+        return false;
+      }
+
+      const maxPointsValue = Math.min(amount * 0.5, 100);
+      const pointsToUseValue = Math.min(maxPointsValue * 10, userPoints);
+      const pointsValue = pointsToUseValue / 10;
+      const remainingAmount = amount - pointsValue;
+
+      const currentPoints = (user.unsafeMetadata as any)?.points || 0;
+
+      if (currentPoints < pointsToUseValue) {
+        showAlert("Otillräckliga poäng", `Du har ${currentPoints} poäng men behöver ${pointsToUseValue} poäng för denna kombinerade betalning.`);
+        return false;
+      }
+
+      try {
+        await user.update({
+          unsafeMetadata: {
+            ...user.unsafeMetadata,
+            points: currentPoints - pointsToUseValue
+          }
+        });
+        setUserPoints(currentPoints - pointsToUseValue);
+
+        if (remainingAmount > 0) {
+          const stripeSuccess = await processPayment('stripe', remainingAmount);
+          if (!stripeSuccess) {
+            // Refund points if Stripe fails
+            await user.update({
+              unsafeMetadata: {
+                ...user.unsafeMetadata,
+                points: ((user.unsafeMetadata as any)?.points || 0) + pointsToUseValue
+              }
+            });
+            return false;
+          }
+        }
+
+        return true;
+      } catch (error) {
+        console.error('Combined payment failed:', error);
+        return false;
+      }
+    }
+
+    if (method === 'stripe') {
+      try {
+        const { initPaymentSheet, presentPaymentSheet } = await import('@stripe/stripe-react-native');
+
+        const { getBestServerURL } = await import('@/app/config/stripe');
+        const serverUrl = await getBestServerURL();
+
+        const response = await fetch(`${serverUrl}/payment-sheet`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ amount, currency: 'sek' }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Server error response:', errorText);
+          throw new Error(`Server error: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        console.log('Payment sheet data received:', Object.keys(data));
+
+        const { error: initError } = await initPaymentSheet({
+          merchantDisplayName: 'Tunisiska Services',
+          customerId: data.customer.id || data.customer,
+          customerEphemeralKeySecret: data.ephemeralKey,
+          paymentIntentClientSecret: data.paymentIntent,
+          returnURL: 'tunisiska-services://stripe-redirect',
+        });
+
+        if (initError) {
+          console.error('Payment sheet initialization error:', initError);
+          showAlert("Fel", "Kunde inte initiera betalning");
+          return false;
+        }
+
+        const { error: paymentError } = await presentPaymentSheet();
+
+        if (paymentError) {
+          console.error('Payment error:', paymentError);
+          showAlert("Betalning misslyckades", paymentError.message);
+          return false;
+        }
+
+        console.log('Stripe payment successful');
+        return true;
+      } catch (error: any) {
+        console.error('Stripe payment failed:', error);
+        showAlert("Fel", "Betalning misslyckades: " + error.message);
+        return false;
+      }
+    }
+
+    return false;
   };
 
   return (
@@ -208,7 +394,7 @@ export default function ShippingPage() {
                 isDark ? "text-white" : "text-gray-900"
               }`}
             >
-              Tillgängliga resor
+              Tillgängliga fraktavgångar
             </AutoText>
             {availableTrips.map((trip, index) => (
               <TouchableOpacity
@@ -242,7 +428,10 @@ export default function ShippingPage() {
                         : "text-gray-600"
                   }`}
                 >
-                  {trip.date} – {trip.departureTime} ({trip.vehicle?.replace('_', ' ') || 'Unknown'})
+                  {new Date(trip.departureTime).toLocaleTimeString('sv-SE', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })} ({trip.vehicle?.replace('_', ' ') || 'Unknown'})
                 </AutoText>
                 <AutoText
                   className={`text-xs ${
@@ -254,6 +443,61 @@ export default function ShippingPage() {
                   }`}
                 >
                   Kapacitet: {trip.availableCapacity || trip.capacity}kg tillgänglig
+                </AutoText>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {/* Pickup Location Selection */}
+        {selectedTrip && selectedTrip.pickupLocations && selectedTrip.pickupLocations.length > 0 && (
+          <View className="mt-6">
+            <AutoText
+              className={`text-lg font-semibold mb-4 ${
+                isDark ? "text-white" : "text-gray-900"
+              }`}
+            >
+              Välj upphämtningsplats
+            </AutoText>
+            {selectedTrip.pickupLocations.map((pickup: any, index: number) => (
+              <TouchableOpacity
+                key={index}
+                onPress={() => setSelectedPickupLocation(pickup)}
+                className={`p-4 rounded-xl mb-3 ${
+                  selectedPickupLocation === pickup
+                    ? "bg-blue-500"
+                    : isDark
+                      ? "bg-dark-card"
+                      : "bg-gray-100"
+                }`}
+              >
+                <AutoText
+                  className={`font-bold mb-1 ${
+                    selectedPickupLocation === pickup
+                      ? "text-white"
+                      : isDark
+                        ? "text-white"
+                        : "text-gray-900"
+                  }`}
+                >
+                 {pickup.location}
+                </AutoText>
+                <AutoText
+                  className={`text-sm ${
+                    selectedPickupLocation === pickup
+                      ? "text-white"
+                      : isDark
+                        ? "text-gray-400"
+                        : "text-gray-600"
+                  }`}
+                >
+                  {new Date(pickup.pickupDateTime).toLocaleString('sv-SE', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
                 </AutoText>
               </TouchableOpacity>
             ))}

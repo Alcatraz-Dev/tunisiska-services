@@ -4,6 +4,7 @@ import {
   TouchableOpacity,
   ScrollView,
   RefreshControl,
+  Share,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -22,6 +23,7 @@ import { AutoText } from "@/app/components/ui/AutoText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TaxiOrderService } from "@/app/services/taxiOrderService";
 import { MoveOrderService } from "@/app/services/moveOrderService";
+import { ShippingOrderService } from "@/app/services/shippingOrderService";
 import * as Linking from "expo-linking";
 import { showAlert } from "@/app/utils/showAlert";
 
@@ -34,7 +36,7 @@ export default function BookingDetailsScreen() {
   const [booking, setBooking] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [serviceType, setServiceType] = useState<'taxi' | 'move' | null>(null);
+  const [serviceType, setServiceType] = useState<'taxi' | 'move' | 'shipping' | null>(null);
   const progress = useSharedValue(0);
 
   // Handle slug parameter - it might be an array or string
@@ -53,12 +55,18 @@ export default function BookingDetailsScreen() {
 
       // Try to fetch as taxi order first
       let result = await TaxiOrderService.getTaxiOrder(orderId as string);
-      let orderType: 'taxi' | 'move' = 'taxi';
+      let orderType: 'taxi' | 'move' | 'shipping' = 'taxi';
 
       // If taxi order not found, try move order
       if (!result.success || !result.order) {
         result = await MoveOrderService.getMoveOrder(orderId as string);
         orderType = 'move';
+      }
+
+      // If move order not found, try shipping order
+      if (!result.success || !result.order) {
+        result = await ShippingOrderService.getShippingOrder(orderId as string);
+        orderType = 'shipping';
       }
 
       if (result.success && result.order) {
@@ -84,7 +92,7 @@ export default function BookingDetailsScreen() {
             createdAt: order.createdAt,
             scheduledDateTime: order.scheduledDateTime,
           };
-        } else {
+        } else if (orderType === 'move') {
           // Move order
           transformedBooking = {
             id: order._id || "N/A",
@@ -103,6 +111,27 @@ export default function BookingDetailsScreen() {
             paymentMethod: order.paymentMethod || 'cash',
             createdAt: order.createdAt,
             scheduledDateTime: order.scheduledDateTime,
+          };
+        } else {
+          // Shipping order
+          transformedBooking = {
+            id: order._id || "N/A",
+            category: "Frakt",
+            date: order.scheduledDateTime ? new Date(order.scheduledDateTime).toLocaleDateString('sv-SE') : "Datum saknas",
+            pickup: order.pickupAddress || "Plats saknas",
+            dropoff: order.deliveryAddress || "Plats saknas",
+            status: getStatusText(order.status || "unknown"),
+            price: order.totalPrice ? `${order.totalPrice} SEK` : "Pris saknas",
+            passengers: order.packageDetails?.weight || 0,
+            isRoundTrip: false,
+            returnDateTime: null,
+            estimatedDistance: 0,
+            notes: order.notes || "",
+            customerInfo: order.customerInfo || { name: "Namn saknas", phone: "Telefon saknas" },
+            paymentMethod: order.paymentMethod || 'cash',
+            createdAt: order.createdAt,
+            scheduledDateTime: order.scheduledDateTime,
+            packageDetails: order.packageDetails,
           };
         }
 
@@ -165,8 +194,10 @@ export default function BookingDetailsScreen() {
               let result;
               if (serviceType === 'taxi') {
                 result = await TaxiOrderService.cancelTaxiOrder(orderId as string, "Cancelled by user");
-              } else {
+              } else if (serviceType === 'move') {
                 result = await MoveOrderService.cancelMoveOrder(orderId as string, "Cancelled by user");
+              } else {
+                result = await ShippingOrderService.cancelShippingOrder(orderId as string, "Cancelled by user");
               }
 
               if (result.success) {
@@ -175,8 +206,10 @@ export default function BookingDetailsScreen() {
                 let updatedResult;
                 if (serviceType === 'taxi') {
                   updatedResult = await TaxiOrderService.getTaxiOrder(orderId as string);
-                } else {
+                } else if (serviceType === 'move') {
                   updatedResult = await MoveOrderService.getMoveOrder(orderId as string);
+                } else {
+                  updatedResult = await ShippingOrderService.getShippingOrder(orderId as string);
                 }
 
                 if (updatedResult.success && updatedResult.order) {
@@ -202,6 +235,53 @@ export default function BookingDetailsScreen() {
         }
       ]
     );
+  };
+
+  const shareOrderDetails = async () => {
+    try {
+      let shareMessage = '';
+
+      if (serviceType === 'shipping') {
+        shareMessage = `📦 Fraktbeställning från Tunisiska Services
+
+Avsändare: ${booking.customerInfo?.name}
+Telefon: ${booking.customerInfo?.phone}
+
+Mottagare: ${booking.notes?.split('Recipient: ')[1]?.split(' (')[0] || 'N/A'}
+Mottagarens telefon: ${booking.notes?.split('Recipient: ')[1]?.split(' (')[1]?.replace(')', '') || 'N/A'}
+
+Från: ${booking.pickup}
+Till: ${booking.dropoff}
+
+Vikt: ${(booking as any).packageDetails?.weight}kg
+Värde: ${(booking as any).packageDetails?.value} SEK
+
+Datum: ${booking.scheduledDateTime ? new Date(booking.scheduledDateTime).toLocaleString('sv-SE') : 'Datum saknas'}
+Status: ${booking.status}
+
+Total kostnad: ${booking.price}
+
+Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
+      } else {
+        // Default share message for other order types
+        shareMessage = `${booking.category} beställning
+
+Kund: ${booking.customerInfo?.name}
+Datum: ${booking.scheduledDateTime ? new Date(booking.scheduledDateTime).toLocaleString('sv-SE') : 'Datum saknas'}
+Status: ${booking.status}
+Pris: ${booking.price}
+
+Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
+      }
+
+      await Share.share({
+        message: shareMessage,
+        title: 'Beställningsinformation',
+      });
+    } catch (error) {
+      console.error('Error sharing order:', error);
+      showAlert('Fel', 'Kunde inte dela beställningsinformationen');
+    }
   };
 
   const handleContactSupport = () => {
@@ -404,18 +484,26 @@ export default function BookingDetailsScreen() {
                 <View className="items-center">
                   <Ionicons name="people-outline" size={20} color={`${isDark ? "white" :"black"}`} />
                    <AutoText className={`text-xs mt-1 ${isDark ? "text-white" : "text-black"}`}>
-                    {String(booking.passengers || 1)} pass
-                  </AutoText>
+                     {serviceType === 'shipping' ? `${String(booking.passengers || 0)} kg` : `${String(booking.passengers || 1)} ${serviceType === 'taxi' ? 'pass' : 'pers'}`}
+                   </AutoText>
                 </View>
                 <View className="items-center">
                   <Ionicons name="cash-outline" size={20} color={`${isDark ? "white" :"black"}`} />
                    <AutoText className={`text-xs mt-1 ${isDark ? "text-white" : "text-black"}`}>
-                    {String(booking.price || "Pris saknas")}
-                  </AutoText>
-                </View>
-              </View>
-            </View>
-          </View>
+                     {String(booking.price || "Pris saknas")}
+                   </AutoText>
+                 </View>
+                 {serviceType === 'shipping' && booking.packageDetails && (
+                   <View className="items-center">
+                     <Ionicons name="cube-outline" size={20} color={`${isDark ? "white" :"black"}`} />
+                     <AutoText className={`text-xs mt-1 ${isDark ? "text-white" : "text-black"}`}>
+                       {String(booking.packageDetails.description || "Beskrivning saknas")}
+                     </AutoText>
+                   </View>
+                 )}
+               </View>
+             </View>
+           </View>
 
           {/* Modern Service Info Cards */}
           <View className="mb-6" style={{ gap: 16 }}>
@@ -537,16 +625,16 @@ export default function BookingDetailsScreen() {
                   <View className="items-center">
                     <View className={`p-3 rounded-xl mb-3 ${isDark ? "bg-purple-500/20" : "bg-purple-100"}`}>
                       <Ionicons
-                        name={serviceType === 'taxi' ? "people-outline" : "cube-outline"}
+                        name={serviceType === 'taxi' ? "people-outline" : serviceType === 'shipping' ? "cube-outline" : "cube-outline"}
                         size={22}
                         color={isDark ? "#C084FC" : "#8B5CF6"}
                       />
                     </View>
                     <AutoText className={`font-semibold text-base mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>
-                      {serviceType === 'taxi' ? 'Passagerare' : 'Personer'}
+                      {serviceType === 'taxi' ? 'Passagerare' : serviceType === 'shipping' ? 'Vikt' : 'Personer'}
                     </AutoText>
                     <AutoText className={`text-3xl font-bold mb-2 ${isDark ? "text-purple-300" : "text-purple-700"}`}>
-                      {String(booking.passengers || 1)}
+                      {String(booking.passengers || 1)}{serviceType === 'shipping' ? ' kg' : ''}
                     </AutoText>
                     {serviceType === 'taxi' && booking.estimatedDistance && (
                       <AutoText className={`text-sm text-center ${isDark ? "text-gray-400" : "text-gray-600"}`}>
@@ -708,6 +796,27 @@ export default function BookingDetailsScreen() {
           <View className="space-y-4">
 
             <View className="flex-row gap-4" style={{ marginTop: 8 }}>
+              <TouchableOpacity
+                className={`flex-1 py-4 rounded-2xl items-center ${
+                  isDark ? "bg-green-600" : "bg-green-500"
+                }`}
+                style={{
+                  shadowColor: "#10B981",
+                  shadowOpacity: 0.3,
+                  shadowRadius: 8,
+                  shadowOffset: { width: 0, height: 4 },
+                  elevation: 6,
+                }}
+                onPress={shareOrderDetails}
+              >
+                <View className="flex-row items-center">
+                  <Ionicons name="share-outline" size={18} color="white" />
+                  <AutoText className="text-white font-medium ml-2">
+                    Dela kvitto
+                  </AutoText>
+                </View>
+              </TouchableOpacity>
+
               <TouchableOpacity
                 className={`flex-1 py-4 rounded-2xl items-center ${
                   isDark ? "bg-gray-700/80 border border-gray-600" : "bg-gray-100 border border-gray-300"

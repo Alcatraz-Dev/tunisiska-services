@@ -4,6 +4,7 @@ import {
   TouchableOpacity,
   ScrollView,
   RefreshControl,
+  Share,
 } from 'react-native';
 import { useUser } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,10 +12,10 @@ import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { AutoText } from './ui/AutoText';
 import { showAlert } from '@/app/utils/showAlert';
 import { useTheme } from '@/app/context/ThemeContext';
-import { 
-  ServiceOrder, 
-  ServiceType, 
-  OrderStatus 
+import {
+  ServiceOrder,
+  ServiceType,
+  OrderStatus
 } from '@/app/schemas/serviceSchemas';
 import { OrderService } from '@/app/services/orderService';
 
@@ -119,6 +120,54 @@ export default function OrderManager({ onBack }: OrderManagerProps) {
 
   const canCancelOrder = (order: ServiceOrder): boolean => {
     return order.status === OrderStatus.PENDING || order.status === OrderStatus.CONFIRMED;
+  };
+
+  const shareOrderDetails = async (order: ServiceOrder) => {
+    try {
+      let shareMessage = '';
+
+      if (order.serviceType === ServiceType.SHIPPING) {
+        const shippingOrder = order as any;
+        shareMessage = `📦 Fraktbeställning från Tunisiska Services
+
+Avsändare: ${shippingOrder.customerInfo?.name}
+Telefon: ${shippingOrder.customerInfo?.phone}
+
+Mottagare: ${shippingOrder.notes?.split('Recipient: ')[1]?.split(' (')[0] || 'N/A'}
+Mottagarens telefon: ${shippingOrder.notes?.split('Recipient: ')[1]?.split(' (')[1]?.replace(')', '') || 'N/A'}
+
+Från: ${shippingOrder.pickupAddress}
+Till: ${shippingOrder.deliveryAddress}
+
+Vikt: ${shippingOrder.packageDetails?.weight}kg
+Värde: ${shippingOrder.packageDetails?.value} SEK
+
+Datum: ${formatDateTime(shippingOrder.scheduledDateTime)}
+Status: ${getStatusDisplayName(shippingOrder.status)}
+
+Total kostnad: ${shippingOrder.totalPrice} SEK
+
+Bokningsnummer: ${shippingOrder.id?.substring(0, 8) || 'N/A'}`;
+      } else {
+        // Default share message for other order types
+        shareMessage = `${getServiceDisplayName(order.serviceType)} beställning
+
+Kund: ${order.customerInfo?.name}
+Datum: ${formatDateTime(order.scheduledDateTime)}
+Status: ${getStatusDisplayName(order.status)}
+Pris: ${order.totalPrice} SEK
+
+Bokningsnummer: ${order.id?.substring(0, 8) || 'N/A'}`;
+      }
+
+      await Share.share({
+        message: shareMessage,
+        title: 'Beställningsinformation',
+      });
+    } catch (error) {
+      console.error('Error sharing order:', error);
+      showAlert('Fel', 'Kunde inte dela beställningsinformationen');
+    }
   };
 
   const formatDateTime = (dateString: string): string => {
@@ -275,6 +324,23 @@ export default function OrderManager({ onBack }: OrderManagerProps) {
                 </>
               )}
 
+              {order.serviceType === ServiceType.SHIPPING && (
+                <>
+                  <AutoText className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                    📍 Från: {(order as any).pickupAddress}
+                  </AutoText>
+                  <AutoText className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                    📍 Till: {(order as any).deliveryAddress}
+                  </AutoText>
+                  <AutoText className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                    📦 Vikt: {(order as any).packageDetails?.weight}kg
+                  </AutoText>
+                  <AutoText className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                    📋 Kategorier: {(order as any).packageDetails?.description || 'N/A'}
+                  </AutoText>
+                </>
+              )}
+
               {order.serviceType === ServiceType.MOVE_CLEANING && (
                 <>
                   <AutoText className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
@@ -348,7 +414,16 @@ export default function OrderManager({ onBack }: OrderManagerProps) {
                   <AutoText className="text-white font-medium">Avbryt</AutoText>
                 </TouchableOpacity>
               )}
-              
+
+              <TouchableOpacity
+                onPress={() => shareOrderDetails(order)}
+                className={`flex-1 p-3 rounded-lg items-center ${
+                  isDark ? 'bg-green-600' : 'bg-green-500'
+                }`}
+              >
+                <AutoText className="text-white font-medium">Dela</AutoText>
+              </TouchableOpacity>
+
               <TouchableOpacity
                 onPress={() => {
                   // You can add functionality to contact support or view more details

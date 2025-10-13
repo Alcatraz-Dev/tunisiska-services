@@ -8,6 +8,7 @@ import { AutoText } from "@/app/components/ui/AutoText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TaxiOrderService } from "@/app/services/taxiOrderService";
 import { MoveOrderService } from "@/app/services/moveOrderService";
+import { ShippingOrderService } from "@/app/services/shippingOrderService";
 import { useAuth } from "@clerk/clerk-expo";
 
 export default function BookingHistoryScreen() {
@@ -26,10 +27,11 @@ export default function BookingHistoryScreen() {
       }
 
       try {
-        // Fetch both taxi and move orders
-        const [taxiResult, moveResult] = await Promise.all([
+        // Fetch taxi, move, and shipping orders
+        const [taxiResult, moveResult, shippingResult] = await Promise.all([
           TaxiOrderService.getUserTaxiOrders(userId),
-          MoveOrderService.getUserMoveOrders(userId)
+          MoveOrderService.getUserMoveOrders(userId),
+          ShippingOrderService.getUserShippingOrders(userId)
         ]);
 
         const allOrders: any[] = [];
@@ -70,6 +72,25 @@ export default function BookingHistoryScreen() {
             serviceType: 'move'
           }));
           allOrders.push(...transformedMoveOrders);
+        }
+
+        // Transform shipping orders
+        if (shippingResult.success && shippingResult.orders) {
+          const transformedShippingOrders = shippingResult.orders.map((order: any) => ({
+            id: order._id,
+            category: "Frakt",
+            date: new Date(order.scheduledDateTime).toLocaleDateString('sv-SE'),
+            pickup: order.pickupAddress,
+            dropoff: order.deliveryAddress,
+            status: getStatusText(order.status),
+            slug: order._id,
+            price: `${order.totalPrice} SEK`,
+            passengers: order.packageDetails?.weight || 0,
+            isRoundTrip: false,
+            notes: order.notes,
+            serviceType: 'shipping'
+          }));
+          allOrders.push(...transformedShippingOrders);
         }
 
         // Sort by date (newest first)
@@ -186,6 +207,12 @@ export default function BookingHistoryScreen() {
               className={`text-xs ${isDark ? "text-gray-300" : "text-gray-700"}`}
             >
               Passagerare: {item.passengers}
+            </AutoText>
+          ) : item.serviceType === 'shipping' ? (
+            <AutoText
+              className={`text-xs ${isDark ? "text-gray-300" : "text-gray-700"}`}
+            >
+              Vikt: {item.passengers} kg
             </AutoText>
           ) : (
             <AutoText

@@ -61,6 +61,12 @@ export class ShippingOrderService {
       const result = await client.create(order);
       console.log('✅ Shipping order created successfully in Sanity:', result._id);
 
+      // Update shipping schedule capacity
+      if (orderData.scheduledDateTime) {
+        const scheduleDate = new Date(orderData.scheduledDateTime).toISOString().split('T')[0];
+        await this.updateShippingScheduleCapacity(scheduleDate, orderData.packageDetails.weight);
+      }
+
       return { success: true, order: result };
     } catch (error: any) {
       console.error('💥 Error creating shipping order in Sanity:', error);
@@ -68,6 +74,37 @@ export class ShippingOrderService {
         success: false,
         error: error.message || 'Unknown error occurred'
       };
+    }
+  }
+
+  // Update shipping schedule capacity when order is created
+  static async updateShippingScheduleCapacity(scheduleDate: string, weightUsed: number): Promise<void> {
+    try {
+      console.log('📦 Updating shipping schedule capacity for date:', scheduleDate, 'weight used:', weightUsed);
+
+      // Find available schedules for the date
+      const schedules = await client.fetch(
+        `*[_type == "shippingSchedule" && date == $scheduleDate && status == "available"]`,
+        { scheduleDate }
+      );
+
+      if (schedules.length > 0) {
+        // Update the first available schedule's capacity
+        const schedule = schedules[0];
+        const newAvailableCapacity = Math.max(0, (schedule.availableCapacity || schedule.capacity) - weightUsed);
+
+        await client
+          .patch(schedule._id)
+          .set({
+            availableCapacity: newAvailableCapacity,
+            status: newAvailableCapacity <= 0 ? 'full' : 'available'
+          })
+          .commit();
+
+        console.log('✅ Shipping schedule capacity updated');
+      }
+    } catch (error: any) {
+      console.error('💥 Error updating shipping schedule capacity:', error);
     }
   }
 

@@ -6,12 +6,6 @@ export default defineType({
   type: "document",
   fields: [
     defineField({
-      name: "date",
-      title: "Date",
-      type: "date",
-      validation: (Rule) => Rule.required(),
-    }),
-    defineField({
       name: "route",
       title: "Route",
       type: "string",
@@ -23,6 +17,7 @@ export default defineType({
           { title: "Tunis → Stockholm", value: "tunis_stockholm" },
           { title: "Tunis → Göteborg", value: "tunis_goteborg" },
           { title: "Tunis → Malmö", value: "tunis_malmo" },
+          
         ],
       },
       validation: (Rule) => Rule.required(),
@@ -30,14 +25,33 @@ export default defineType({
     defineField({
       name: "departureTime",
       title: "Departure Time",
-      type: "string",
+      type: "datetime",
       validation: (Rule) => Rule.required(),
     }),
     defineField({
-      name: "arrivalTime",
-      title: "Arrival Time (Estimated)",
-      type: "string",
+      name: "pickupLocations",
+      title: "Pickup Locations & Times",
+      type: "array",
+      of: [{
+        type: "object",
+        fields: [
+          defineField({
+            name: "location",
+            title: "Location",
+            type: "string",
+            validation: (Rule) => Rule.required(),
+          }),
+          defineField({
+            name: "pickupDateTime",
+            title: "Pickup Date & Time",
+            type: "datetime",
+            validation: (Rule) => Rule.required(),
+          }),
+        ]
+      }],
+      validation: (Rule) => Rule.required().min(1),
     }),
+ 
     defineField({
       name: "capacity",
       title: "Capacity (kg)",
@@ -89,15 +103,16 @@ export default defineType({
   preview: {
     select: {
       title: "route",
-      subtitle: "date",
       status: "status",
       time: "departureTime",
+      pickupLocations: "pickupLocations",
     },
     prepare(selection) {
-      const { title, subtitle, status, time } = selection;
+      const { title, status, time, pickupLocations } = selection;
+      const pickupCount = pickupLocations ? pickupLocations.length : 0;
       return {
         title: `${title} - ${status}`,
-        subtitle: `${subtitle} ${time}`,
+        subtitle: `${new Date(time).toLocaleDateString()} - ${pickupCount} pickup locations`,
       };
     },
   },
