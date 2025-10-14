@@ -259,9 +259,16 @@ export default function TransferPointsScreen() {
         }
       });
 
-      // Call the Next.js API route for secure points transfer
+      // For Vercel deployment, use the deployed API URL
+      // In development: /api/transfer-points
+      // In production: https://your-app.vercel.app/api/transfer-points
       try {
-        const response = await fetch('/api/transfer-points', {
+        const isDevelopment = __DEV__; // React Native development flag
+        const baseUrl = isDevelopment
+          ? '' // Relative URL for development
+          : 'https://tunisiska-services.vercel.app'; // Production Vercel URL
+
+        const response = await fetch(`${baseUrl}/api/transfer-points`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
