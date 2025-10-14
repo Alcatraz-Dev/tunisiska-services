@@ -157,7 +157,7 @@ export default function AddFriendScreen() {
               isDark ? "text-white" : "text-gray-900"
             }`}
           >
-            Lägg till vän
+            Vänner
           </AutoText>
         </View>
         <AutoText

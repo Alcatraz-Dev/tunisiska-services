@@ -466,6 +466,11 @@ const Profile = () => {
                   text: "Dina bokningar",
                   href: "/profile/booking",
                 },
+                 {
+                  icon: icons.people,
+                  text: " Vänner",
+                  href: "/profile/add-friend",
+                },
 
                 {
                   icon: icons.people,

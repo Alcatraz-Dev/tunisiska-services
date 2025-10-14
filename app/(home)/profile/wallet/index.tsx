@@ -495,7 +495,7 @@ export default function Wallet() {
                       ? "cart"
                       : "cash"
                   }
-                  size={24}
+                  size={20}
                   color={
                     tx.type === "earned"
                       ? "#22c55e"
@@ -503,11 +503,11 @@ export default function Wallet() {
                       ? "#ef4444"
                       : "#f59e0b"
                   }
-                  style={{ marginRight: 8 }}
+                  style={{ marginRight: 6 }}
                 />
-                <View className="flex-1  justify-between gap-1.5">
+                <View className="flex-1  justify-between gap-1">
                   <AutoText
-                    className={`font-semibold mb-1 ${
+                    className={`font-semibold text-sm ${
                       isDark ? "text-white" : "text-gray-900"
                     }`}
                   >
