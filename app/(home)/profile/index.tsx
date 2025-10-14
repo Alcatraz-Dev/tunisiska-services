@@ -473,7 +473,7 @@ const Profile = () => {
                 },
 
                 {
-                  icon: icons.people,
+                  icon: icons.refer,
                   text: "Referera vänner",
                   href: "/profile/referral-users",
                 },
