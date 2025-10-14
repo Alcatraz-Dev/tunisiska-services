@@ -91,6 +91,16 @@ export default function ShippingPage() {
 
   // 🔹 När datum väljs → filtrera trips för det datumet
   const handleDateSelect = (day: any) => {
+    // Prevent selection of past dates
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selectedDate = new Date(day.dateString);
+
+    if (selectedDate < today) {
+      showAlert("Ogiltigt datum", "Du kan inte välja ett datum som redan har passerat.");
+      return;
+    }
+
     setSelectedDate(day.dateString);
     const trips = shippingSchedules.filter((s) => {
       const scheduleDate = new Date(s.departureTime).toISOString().split('T')[0];

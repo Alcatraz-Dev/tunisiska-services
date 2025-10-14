@@ -285,26 +285,28 @@ Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
   };
 
   const handleContactSupport = () => {
-    const whatsappNumber = process.env.EXPO_PUBLIC_SUPPORT_WHATSAPP;
-    if (!whatsappNumber) {
-      showAlert("Fel", "WhatsApp supportnummer är inte konfigurerat.");
+    const supportEmail = process.env.EXPO_PUBLIC_SUPPORT_EMAIL;
+    if (!supportEmail) {
+      showAlert("Fel", "Support e-postadress är inte konfigurerad.");
       return;
     }
 
-    const message = `Hej! Jag behöver hjälp med min bokning (ID: ${String(booking?.id?.slice(-8) || "N/A")}). Kan du hjälpa mig?`;
-    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
+    const subject = `Hjälp med bokning ${String(booking?.id?.slice(-8) || "N/A")}`;
+    const body = `Hej! Jag behöver hjälp med min bokning (ID: ${String(booking?.id?.slice(-8) || "N/A")}).\n\nBokningsdetaljer:\n- Typ: ${booking?.category}\n- Datum: ${booking?.date}\n- Status: ${booking?.status}\n\nBeskriv ditt problem här:`;
 
-    Linking.canOpenURL(whatsappUrl)
+    const emailUrl = `mailto:${supportEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+    Linking.canOpenURL(emailUrl)
       .then((supported) => {
         if (supported) {
-          Linking.openURL(whatsappUrl);
+          Linking.openURL(emailUrl);
         } else {
-          showAlert("Fel", "WhatsApp är inte installerat på denna enhet.");
+          showAlert("Fel", "Ingen e-postapp är installerad på denna enhet.");
         }
       })
       .catch((err) => {
-        console.error('WhatsApp error:', err);
-        showAlert("Fel", "Kunde inte öppna WhatsApp.");
+        console.error('Email error:', err);
+        showAlert("Fel", "Kunde inte öppna e-postappen.");
       });
   };
 
@@ -482,7 +484,7 @@ Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
                   </AutoText>
                 </View>
                 <View className="items-center">
-                  <Ionicons name="people-outline" size={20} color={`${isDark ? "white" :"black"}`} />
+                  <Ionicons name={serviceType === 'shipping' ? "scale-outline" : "people-outline"} size={20} color={`${isDark ? "white" :"black"}`} />
                    <AutoText className={`text-xs mt-1 ${isDark ? "text-white" : "text-black"}`}>
                      {serviceType === 'shipping' ? `${String(booking.passengers || 0)} kg` : `${String(booking.passengers || 1)} ${serviceType === 'taxi' ? 'pass' : 'pers'}`}
                    </AutoText>
@@ -493,15 +495,19 @@ Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
                      {String(booking.price || "Pris saknas")}
                    </AutoText>
                  </View>
-                 {serviceType === 'shipping' && booking.packageDetails && (
+               </View>
+
+               {/* Package Details Row - Below the main info */}
+               {serviceType === 'shipping' && booking.packageDetails && (
+                 <View className="flex-row justify-center items-center mt-3 pt-3 border-t border-white/20">
                    <View className="items-center">
                      <Ionicons name="cube-outline" size={20} color={`${isDark ? "white" :"black"}`} />
                      <AutoText className={`text-xs mt-1 ${isDark ? "text-white" : "text-black"}`}>
                        {String(booking.packageDetails.description || "Beskrivning saknas")}
                      </AutoText>
                    </View>
-                 )}
-               </View>
+                 </View>
+               )}
              </View>
            </View>
 
@@ -625,7 +631,7 @@ Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
                   <View className="items-center">
                     <View className={`p-3 rounded-xl mb-3 ${isDark ? "bg-purple-500/20" : "bg-purple-100"}`}>
                       <Ionicons
-                        name={serviceType === 'taxi' ? "people-outline" : serviceType === 'shipping' ? "cube-outline" : "cube-outline"}
+                        name={serviceType === 'taxi' ? "people-outline" : serviceType === 'shipping' ? "scale-outline" : "cube-outline"}
                         size={22}
                         color={isDark ? "#C084FC" : "#8B5CF6"}
                       />
@@ -809,9 +815,9 @@ Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
                 }}
                 onPress={shareOrderDetails}
               >
-                <View className="flex-row items-center">
-                  <Ionicons name="share-outline" size={18} color="white" />
-                  <AutoText className="text-white font-medium ml-2">
+                <View className="flex-row items-center mx-2">
+                  <Ionicons name="share-outline" size={14} color="white" />
+                  <AutoText className="text-white font-medium ml-2 text-sm">
                     Dela kvitto
                   </AutoText>
                 </View>
@@ -819,29 +825,25 @@ Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
 
               <TouchableOpacity
                 className={`flex-1 py-4 rounded-2xl items-center ${
-                  isDark ? "bg-gray-700/80 border border-gray-600" : "bg-gray-100 border border-gray-300"
+                  isDark ? "bg-blue-600" : "bg-blue-500"
                 }`}
                 style={{
-                  shadowColor: "#000",
-                  shadowOpacity: 0.1,
-                  shadowRadius: 6,
-                  shadowOffset: { width: 0, height: 3 },
-                  elevation: 4,
+                  shadowColor: isDark ? "#2563EB" : "#3B82F6",
+                  shadowOpacity: 0.3,
+                  shadowRadius: 8,
+                  shadowOffset: { width: 0, height: 4 },
+                  elevation: 6,
                 }}
                 onPress={handleContactSupport}
               >
-                <View className="flex-row items-center">
+                <View className="flex-row items-center mx-2">
                   <Ionicons
-                    name="logo-whatsapp"
-                    size={18}
-                    color={isDark ? "#25D366" : "#25D366"}
+                    name="mail-outline"
+                    size={14}
+                    color="white"
                   />
-                  <AutoText
-                    className={`font-medium ml-2 ${
-                      isDark ? "text-gray-300" : "text-gray-700"
-                    }`}
-                  >
-                    WhatsApp
+                  <AutoText className="text-white font-medium ml-2 text-sm">
+                    Support
                   </AutoText>
                 </View>
               </TouchableOpacity>
@@ -860,9 +862,9 @@ Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
                 onPress={handleCancelOrder}
                 disabled={booking?.status === "Avbokad" || booking?.status === "Avslutad"}
               >
-                <View className="flex-row items-center">
-                  <Ionicons name="close-circle-outline" size={18} color="white" />
-                  <AutoText className="text-white font-medium ml-2">
+                <View className="flex-row items-center mx-2">
+                  <Ionicons name="close-circle-outline" size={14} color="white" />
+                  <AutoText className="text-white font-medium ml-2 text-sm">
                     Avboka
                   </AutoText>
                 </View>

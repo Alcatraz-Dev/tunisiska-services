@@ -383,7 +383,7 @@ export default function Wallet() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={() => router.push("/(home)/profile/transfer-points")}
             className={`flex-1 bg-green-500 py-4 px-3 rounded-xl items-center justify-center ${
               isDark ? " bg-yellow-400" : "bg-yellow-500"
             }`}
@@ -391,7 +391,7 @@ export default function Wallet() {
             <AutoText
               className={`font-bold ${isDark ? "text-dark" : " text-dark"}`}
             >
-              Använd poäng
+              Överför poäng
             </AutoText>
           </TouchableOpacity>
         </View>
