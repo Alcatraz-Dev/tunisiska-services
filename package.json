@@ -33,6 +33,7 @@
     "@sanity/icons": "^3.7.4",
     "@sanity/image-url": "^1.2.0",
     "@stripe/stripe-js": "^8.0.0",
+    "@stripe/stripe-react-native": "^0.54.1",
     "color": "^5.0.2",
     "cors": "^2.8.5",
     "curved-bottom-navigation-bar": "^2.0.5",
