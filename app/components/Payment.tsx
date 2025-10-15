@@ -234,6 +234,10 @@ export default function Payment({
         if (onPaymentSuccess) {
           console.log("🎉 Awarding", earnedPoints, "points to user");
           onPaymentSuccess(earnedPoints, amount);
+
+          // Sanity updates are handled by the wallet component's handlePaymentSuccess
+          // This ensures proper user context and avoids hook issues
+          console.log('✅ Payment successful - Sanity updates handled by wallet component');
         }
 
         showAlert(

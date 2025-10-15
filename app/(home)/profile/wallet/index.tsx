@@ -78,17 +78,8 @@ export default function Wallet() {
 
   const loadWalletData = useCallback(async () => {
     if (!user) return;
-    const metadata = user.unsafeMetadata as UserMetadata;
 
-    // Get points from Clerk metadata (this is the single source of truth)
-    const totalPoints = metadata.points ?? 0;
-
-    setPoints(totalPoints);
-    setTransactions(metadata.transactions ?? []);
-    setLastRewardDate(metadata.lastRewardDate ?? null);
-    setStreak(metadata.streak ?? 0);
-
-    // Also sync with Sanity if needed (for consistency)
+    // Get points from Sanity as the source of truth
     try {
       const { client } = await import('@/sanityClient');
       const sanityUser = await client.fetch(
@@ -96,20 +87,33 @@ export default function Wallet() {
         { clerkId: user.id }
       );
 
-      if (sanityUser && sanityUser.points !== totalPoints) {
-        console.log(`🔄 Syncing points: Clerk=${totalPoints}, Sanity=${sanityUser.points}`);
-        // Update Clerk to match Sanity if they differ
+      const metadata = user.unsafeMetadata as UserMetadata;
+      const sanityPoints = sanityUser?.points ?? 0;
+
+      // Use Sanity points as the definitive source
+      setPoints(sanityPoints);
+      setTransactions(metadata.transactions ?? []);
+      setLastRewardDate(metadata.lastRewardDate ?? null);
+      setStreak(metadata.streak ?? 0);
+
+      // Sync Clerk metadata to match Sanity
+      if (metadata.points !== sanityPoints) {
+        console.log(`🔄 Syncing Clerk metadata to match Sanity: ${metadata.points ?? 0} -> ${sanityPoints}`);
         await user.update({
           unsafeMetadata: {
             ...metadata,
-            points: sanityUser.points,
+            points: sanityPoints,
           }
         });
-        setPoints(sanityUser.points);
       }
     } catch (error) {
-      console.error('Error syncing with Sanity:', error);
-      // Continue with Clerk data if Sanity sync fails
+      console.error('Error loading points from Sanity:', error);
+      // Fallback to Clerk metadata if Sanity fails
+      const metadata = user.unsafeMetadata as UserMetadata;
+      setPoints(metadata.points ?? 0);
+      setTransactions(metadata.transactions ?? []);
+      setLastRewardDate(metadata.lastRewardDate ?? null);
+      setStreak(metadata.streak ?? 0);
     }
   }, [user]);
 
@@ -200,30 +204,85 @@ export default function Wallet() {
     // showAlert("🎉 Belöning hämtad!", `Du fick ${rewardPoints} poäng`);
   };
   
-  const handlePaymentSuccess = (purchasedPoints: number, amountPaid: number) => {
+  const handlePaymentSuccess = async (purchasedPoints: number, amountPaid: number) => {
     console.log("💎 [PAYMENT SUCCESS] Adding", purchasedPoints, "points to user");
-    
-    const newPoints = points + purchasedPoints;
-    const newTx: Transaction = {
-      id: Date.now().toString(),
-      type: "earned",
-      points: purchasedPoints,
-      description: `Köp av ${purchasedPoints} poäng för ${amountPaid} SEK 💳`,
-      date: new Date().toISOString(),
-    };
-    
-    // Update user data with new points and transaction
-    updateUserData(newPoints, [newTx, ...transactions]);
-    
-    console.log("✅ [PAYMENT SUCCESS] User now has", newPoints, "total points");
-    
-    // Show success celebration
-    setTimeout(() => {
-      showAlert(
-        "🎉 Poäng tillagda!",
-        `Grattis! Du har nu ${newPoints} poäng i din wallet.\n\nDin senaste transaktion:\n+${purchasedPoints} poäng för ${amountPaid} SEK`
+
+    if (!user) return;
+
+    try {
+      // Get current points from Sanity
+      const { client } = await import('@/sanityClient');
+      const userDoc = await client.fetch(
+        `*[_type == "users" && clerkId == $clerkId][0]`,
+        { clerkId: user.id }
       );
-    }, 500); // Small delay to let the payment success alert show first
+
+      const currentSanityPoints = userDoc?.points ?? 0;
+      const newPoints = currentSanityPoints + purchasedPoints;
+
+      // Update points in Sanity
+      if (userDoc) {
+        await client
+          .patch(userDoc._id)
+          .set({ points: newPoints })
+          .commit();
+      } else {
+        // Create user document if it doesn't exist
+        await client.create({
+          _type: 'users',
+          clerkId: user.id,
+          email: user.primaryEmailAddress?.emailAddress || '',
+          points: newPoints,
+        });
+      }
+
+      // Update Clerk metadata to match
+      const metadata = user.unsafeMetadata as UserMetadata;
+      await user.update({
+        unsafeMetadata: {
+          ...metadata,
+          points: newPoints,
+        }
+      });
+
+      // Add transaction record
+      const newTx: Transaction = {
+        id: Date.now().toString(),
+        type: "earned",
+        points: purchasedPoints,
+        description: `Köp av ${purchasedPoints} poäng för ${amountPaid} SEK 💳`,
+        date: new Date().toISOString(),
+      };
+
+      const updatedTransactions = [newTx, ...(metadata.transactions ?? [])];
+
+      // Update transactions in Clerk metadata
+      await user.update({
+        unsafeMetadata: {
+          ...metadata,
+          points: newPoints,
+          transactions: updatedTransactions,
+        }
+      });
+
+      // Update local state
+      setPoints(newPoints);
+      setTransactions(updatedTransactions);
+
+      console.log("✅ [PAYMENT SUCCESS] User now has", newPoints, "total points");
+
+      // Show success celebration
+      setTimeout(() => {
+        showAlert(
+          "🎉 Poäng tillagda!",
+          `Grattis! Du har nu ${newPoints} poäng i din wallet.\n\nDin senaste transaktion:\n+${purchasedPoints} poäng för ${amountPaid} SEK`
+        );
+      }, 500); // Small delay to let the payment success alert show first
+
+    } catch (error) {
+      console.error('❌ Error updating points after payment:', error);
+      showAlert("Fel", "Poängen kunde inte uppdateras. Kontakta support.");
+    }
   };
   const topUps = [
     { amount: 49, points: 500 },

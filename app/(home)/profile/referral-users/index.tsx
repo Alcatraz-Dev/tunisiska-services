@@ -100,12 +100,37 @@ export default function ReferralUsers() {
       setReferralCode(code);
       const metadata = user.unsafeMetadata as UserMetadata;
       setUsedReferralCode(metadata?.referralBy || "");
+
+      // Get points from Sanity as source of truth
+      let totalPoints = metadata?.points ?? 0;
+      try {
+        const { client } = await import('@/sanityClient');
+        const userDoc = await client.fetch(
+          `*[_type == "users" && clerkId == $clerkId][0]`,
+          { clerkId: user.id }
+        );
+        if (userDoc?.points !== undefined) {
+          totalPoints = userDoc.points;
+          // Sync Clerk metadata with Sanity
+          if (metadata?.points !== totalPoints) {
+            await user.update({
+              unsafeMetadata: {
+                ...metadata,
+                points: totalPoints,
+              }
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error loading points from Sanity:', error);
+      }
+
       const currentReferrals = Array.isArray(metadata?.referrals)
         ? metadata.referrals
         : [];
       setReferrals(currentReferrals);
       setStats({
-        totalPoints: metadata?.points ?? 0,
+        totalPoints: totalPoints,
         referralPoints: currentReferrals.reduce(
           (sum, r) => sum + (r.pointsEarned || 0),
           0
