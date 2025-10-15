@@ -37,12 +37,11 @@ interface FriendRequest {
   id: string;
   fromUserId: string;
   fromUserName: string;
+  fromUserImageUrl?: string;
+  fromUserPoints?: number;
   toUserId: string;
   status: "pending" | "accepted" | "rejected";
   createdAt: string;
-  senderPointsTransfer?: number;
-  senderImageUrl?: string;
-  senderPoints?: number;
 }
 
 interface UserMetadata {
@@ -63,12 +62,50 @@ export default function AddFriendScreen() {
   const { client } = useClerk();
 
   const [activeTab, setActiveTab] = useState<"friends" | "requests">("friends");
+  const [refreshKey, setRefreshKey] = useState(0);
   const [friendClerkId, setFriendClerkId] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const pulse = useSharedValue(1);
 
   const currentUserFriends = (user?.unsafeMetadata as UserMetadata)?.friends || [];
   const currentFriendRequests = (user?.unsafeMetadata as UserMetadata)?.friendRequests || [];
+
+  // Get points from Sanity as the source of truth
+  const [currentUserPoints, setCurrentUserPoints] = useState(0);
+
+  // Load user's current points from Sanity on component mount
+  React.useEffect(() => {
+    const loadUserPoints = async () => {
+      if (user?.id) {
+        try {
+          const { client } = await import('@/sanityClient');
+          const userDoc = await client.fetch(
+            `*[_type == "users" && clerkId == $clerkId][0]`,
+            { clerkId: user.id }
+          );
+          const sanityPoints = userDoc?.points || 0;
+          setCurrentUserPoints(sanityPoints);
+
+          // Sync Clerk metadata with Sanity points
+          const metadataPoints = (user.unsafeMetadata as any)?.points || 0;
+          if (metadataPoints !== sanityPoints) {
+            await user.update({
+              unsafeMetadata: {
+                ...(user.unsafeMetadata as any),
+                points: sanityPoints,
+              }
+            });
+          }
+        } catch (error) {
+          console.error('Error loading user points from Sanity:', error);
+          // Fallback to metadata
+          setCurrentUserPoints((user?.unsafeMetadata as any)?.points || 0);
+        }
+      }
+    };
+
+    loadUserPoints();
+  }, [user?.id]);
 
   // Filter incoming requests (requests sent TO current user)
   const incomingRequests = currentFriendRequests.filter(
@@ -77,8 +114,10 @@ export default function AddFriendScreen() {
 
   // Filter outgoing requests (requests sent BY current user)
   const outgoingRequests = currentFriendRequests.filter(
-    (request: FriendRequest) => request.fromUserId === user?.id
+    (request: FriendRequest) => request.fromUserId === user?.id && request.status === "pending"
   );
+
+  
 
   // Load friend requests from Sanity
   const loadFriendRequestsFromSanity = async () => {
@@ -89,34 +128,90 @@ export default function AddFriendScreen() {
         { userId: user?.id }
       );
 
-      // Update user's metadata with latest requests
-      if (requests.length > 0) {
-        // Get sender information for each request
-        const requestsWithSenderInfo = await Promise.all(
-          requests.map(async (req: any) => {
-            return {
-              id: req._id,
-              fromUserId: req.fromUserId,
-              fromUserName: req.fromUserName,
-              toUserId: req.toUserId,
-              status: req.status,
-              createdAt: req.createdAt,
-              senderPointsTransfer: req.senderPointsTransfer,
-              senderImageUrl: req.fromUserImageUrl || null,
-              senderPoints: req.fromUserPoints || 0,
-            };
-          })
-        );
+      // Update user's metadata with latest requests (limit to prevent size issues)
+    if (requests.length > 0) {
+      // Limit to last 50 requests to prevent metadata size issues
+      const recentRequests = requests.slice(0, 50);
 
-        await user?.update({
-          unsafeMetadata: {
-            ...(user?.unsafeMetadata as any),
-            friendRequests: requestsWithSenderInfo,
-          }
-        });
-      }
+      // Get sender and receiver information for each request
+      const requestsWithInfo = await Promise.all(
+        recentRequests.map(async (req: any) => {
+          // Use data from Sanity, with fallbacks for missing info
+          let senderName = req.fromUserName || `User ${req.fromUserId.slice(-8)}`;
+          let senderImageUrl = req.fromUserImageUrl;
+          let senderPoints = req.fromUserPoints || 0;
+
+          let receiverName = req.toUserName || `User ${req.toUserId.slice(-8)}`;
+          let receiverImageUrl = req.toUserImageUrl;
+
+          return {
+            id: req._id,
+            fromUserId: req.fromUserId,
+            fromUserName: senderName,
+            fromUserImageUrl: senderImageUrl,
+            fromUserPoints: senderPoints,
+            toUserId: req.toUserId,
+            toUserName: receiverName,
+            toUserImageUrl: receiverImageUrl,
+            pointsToTransfer: req.pointsToTransfer || 0,
+            status: req.status,
+            createdAt: req.createdAt,
+          };
+        })
+      );
+
+      await user?.update({
+        unsafeMetadata: {
+          ...(user?.unsafeMetadata as any),
+          friendRequests: requestsWithInfo,
+        }
+      });
+    }
     } catch (error) {
       console.error('Error loading friend requests from Sanity:', error);
+    }
+  };
+
+  // Load friends from Sanity
+  const loadFriendsFromSanity = async () => {
+    try {
+      const { client } = await import('@/sanityClient');
+
+      // Find all accepted friend requests where current user is involved
+      const friendRequests = await client.fetch(
+        `*[_type == "friendRequest" && status == "accepted" && (fromUserId == $userId || toUserId == $userId)]`,
+        { userId: user?.id }
+      );
+
+      // Extract friend information from accepted requests
+      const friends = await Promise.all(friendRequests.map(async (req: any) => {
+        const isFromUser = req.fromUserId === user?.id;
+        const friendClerkId = isFromUser ? req.toUserId : req.fromUserId;
+        const friendName = isFromUser ? req.toUserName : req.fromUserName;
+        const friendImageUrl = isFromUser ? req.toUserImageUrl : req.fromUserImageUrl;
+
+        return {
+          id: `friend_${req._id}`,
+          clerkId: friendClerkId,
+          name: friendName || `User ${friendClerkId.slice(-8)}`,
+          imageUrl: friendImageUrl,
+          addedAt: req.updatedAt || req.createdAt,
+          status: "active"
+        };
+      }));
+
+      // Update user's friends list in metadata (limit to prevent size issues)
+      const limitedFriends = friends.slice(0, 100); // Limit to 100 friends
+
+      await user?.update({
+        unsafeMetadata: {
+          ...(user?.unsafeMetadata as any),
+          friends: limitedFriends,
+        }
+      });
+
+    } catch (error) {
+      console.error('Error loading friends from Sanity:', error);
     }
   };
 
@@ -135,51 +230,6 @@ export default function AddFriendScreen() {
       return () => clearInterval(interval);
     }
   }, [user?.id]);
-
-  // Load friends from Sanity (for cross-user friendships)
-  const loadFriendsFromSanity = async () => {
-    try {
-      const { client } = await import('@/sanityClient');
-
-      // Find all accepted friend requests where current user is involved
-      const friendRequests = await client.fetch(
-        `*[_type == "friendRequest" && status == "accepted" && (fromUserId == $userId || toUserId == $userId)]`,
-        { userId: user?.id }
-      );
-
-      // Extract friend information from accepted requests
-      const friends = await Promise.all(friendRequests.map(async (req: any) => {
-        const isFromUser = req.fromUserId === user?.id;
-        const friendClerkId = isFromUser ? req.toUserId : req.fromUserId;
-
-        // Get friend's profile data from Sanity
-        const friendData = await client.fetch(
-          `*[_type == "users" && clerkId == $friendClerkId][0]`,
-          { friendClerkId }
-        );
-
-        return {
-          id: `friend_${req._id}`,
-          clerkId: friendClerkId,
-          name: isFromUser ? req.toUserName || `User ${req.toUserId.slice(-8)}` : req.fromUserName,
-          imageUrl: isFromUser ? req.toUserImageUrl : req.fromUserImageUrl,
-          addedAt: req.updatedAt || req.createdAt,
-          status: "active"
-        };
-      }));
-
-      // Update user's friends list in metadata
-      await user?.update({
-        unsafeMetadata: {
-          ...(user?.unsafeMetadata as any),
-          friends: friends,
-        }
-      });
-
-    } catch (error) {
-      console.error('Error loading friends from Sanity:', error);
-    }
-  };
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulse.value }],
@@ -209,6 +259,16 @@ export default function AddFriendScreen() {
       return;
     }
 
+    // Check if request already sent
+    const existingRequest = currentFriendRequests.find(
+      req => req.fromUserId === user?.id && req.toUserId === friendValue && req.status === "pending"
+    );
+
+    if (existingRequest) {
+      showAlert("Info", "Du har redan skickat en vänförfrågan till denna person!");
+      return;
+    }
+
     // Prevent adding yourself
     if (friendValue === user?.id) {
       showAlert("Fel", "Du kan inte lägga till dig själv som vän");
@@ -230,33 +290,38 @@ export default function AddFriendScreen() {
         fromUserImageUrl: user?.imageUrl || null,
         fromUserPoints: (user?.unsafeMetadata as any)?.points || 0,
         toUserId: friendValue,
+        pointsToTransfer: 0, // Will be set when sending points
         status: 'pending',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        senderPointsTransfer: (user?.unsafeMetadata as any)?.points || 0,
       };
 
       const result = await client.create(friendRequestData);
       console.log('✅ Friend request created in Sanity:', result._id);
 
-      // Also add to sender's metadata for tracking
+      // Update local metadata with the new request
       const friendRequest: FriendRequest = {
         id: result._id,
         fromUserId: user?.id || '',
         fromUserName: user?.fullName || user?.firstName || `User ${user?.id?.slice(-8)}`,
+        fromUserImageUrl: user?.imageUrl || undefined,
+        fromUserPoints: currentUserPoints,
         toUserId: friendValue,
         status: "pending",
         createdAt: new Date().toISOString(),
       };
 
-      // Add to sender's outgoing requests
+      // Add to sender's outgoing requests in metadata (limit size)
       const existingRequests = (user?.unsafeMetadata as any)?.friendRequests || [];
       const updatedRequests = [...existingRequests, friendRequest];
+
+      // Keep only the most recent 50 requests to prevent size issues
+      const limitedRequests = updatedRequests.slice(-50);
 
       await user?.update({
         unsafeMetadata: {
           ...(user?.unsafeMetadata as any),
-          friendRequests: updatedRequests,
+          friendRequests: limitedRequests,
         }
       });
 
@@ -269,7 +334,7 @@ export default function AddFriendScreen() {
 
       // Clear form and trigger re-render
       setFriendClerkId("");
-      setFriendClerkId(prev => prev); // Force re-render
+      setRefreshKey(prev => prev + 1);
 
     } catch (error: any) {
       console.error("Send friend request error:", error);
@@ -287,64 +352,98 @@ export default function AddFriendScreen() {
     try {
       const { client } = await import('@/sanityClient');
 
-      // Get the friend request details first
-      const requestData = await client.getDocument(request.id);
-      if (!requestData) {
-        showAlert("Fel", "Vänförfrågan hittades inte.");
-        return;
-      }
-
       // Update friend request status in Sanity
       await client
         .patch(request.id)
         .set({
           status: 'accepted',
+          toUserName: user?.fullName || user?.firstName || `User ${user?.id?.slice(-8)}`,
+          toUserImageUrl: user?.imageUrl || null,
           updatedAt: new Date().toISOString(),
-          pointsClaimed: true,
         })
         .commit();
 
-      // Award points to the user who accepted the friend request
-      const senderPointsTransfer = requestData.senderPointsTransfer || 0;
+      // Award points based on pointsToTransfer field
+      const pointsToAward = request.pointsToTransfer || 0;
 
-      // Get current points from Clerk metadata
-      const currentPoints = (user?.unsafeMetadata as any)?.points || 0;
+      if (pointsToAward > 0) {
+        // Get current points from Sanity (source of truth)
+        const currentPoints = currentUserPoints;
 
-      // Add the sender's points transfer to current points
-      const newPoints = currentPoints + senderPointsTransfer;
+        // Add the points to transfer to user's points
+        const newPoints = currentPoints + pointsToAward;
 
-      // Update Clerk metadata with new total points
-      await user?.update({
-        unsafeMetadata: {
-          ...(user?.unsafeMetadata as any),
-          points: newPoints,
+        // Update Clerk metadata with new total points
+        await user?.update({
+          unsafeMetadata: {
+            ...(user?.unsafeMetadata as any),
+            points: newPoints,
+          }
+        });
+  
+        // Update points in Sanity
+        const userDoc = await client.fetch(
+          `*[_type == "users" && clerkId == $clerkId][0]`,
+          { clerkId: user.id }
+        );
+  
+        if (userDoc) {
+          await client
+            .patch(userDoc._id)
+            .set({ points: newPoints })
+            .commit();
         }
-      });
 
-      console.log(`✅ Points updated in Clerk: ${currentPoints} -> ${newPoints} (+${senderPointsTransfer} from ${request.fromUserName})`);
+        // Update points in Sanity for the user
+        const userData = await client.fetch(
+          `*[_type == "users" && clerkId == $userClerkId][0]`,
+          { userClerkId: user.id }
+        );
 
-      // Add transaction record
-      const transactions = (user?.unsafeMetadata as any)?.transactions || [];
-      transactions.unshift({
-        id: `friend_reward_${Date.now()}`,
-        type: "earned",
-        points: senderPointsTransfer,
-        description: `Belöning för att acceptera vänförfrågan från ${request.fromUserName}`,
-        date: new Date().toISOString(),
-      });
-
-      await user?.update({
-        unsafeMetadata: {
-          ...(user?.unsafeMetadata as any),
-          transactions: transactions,
+        if (userData) {
+          await client
+            .patch(userData._id)
+            .set({ points: newPoints })
+            .commit();
+        } else {
+          // Create user document in Sanity if it doesn't exist
+          await client.create({
+            _type: 'users',
+            clerkId: user.id,
+            email: user.primaryEmailAddress?.emailAddress || '',
+            points: newPoints,
+          });
         }
-      });
+
+        console.log(`✅ Points updated: ${currentPoints} -> ${newPoints} (+${pointsToAward} from ${request.fromUserName})`);
+
+        // Add transaction record (limit transactions to prevent size issues)
+        const transactions = (user?.unsafeMetadata as any)?.transactions || [];
+        transactions.unshift({
+          id: `friend_points_${Date.now()}`,
+          type: "earned",
+          points: pointsToAward,
+          description: `Mottagit poäng från ${request.fromUserName}`,
+          date: new Date().toISOString(),
+        });
+
+        // Keep only the last 50 transactions
+        const limitedTransactions = transactions.slice(0, 50);
+
+        await user?.update({
+          unsafeMetadata: {
+            ...(user?.unsafeMetadata as any),
+            transactions: limitedTransactions,
+          }
+        });
+      }
 
       // Add friend to user's friends list
       const newFriend = {
         id: `friend_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         clerkId: request.fromUserId,
         name: request.fromUserName,
+        imageUrl: request.fromUserImageUrl,
         addedAt: new Date().toISOString(),
         status: "active"
       };
@@ -357,21 +456,23 @@ export default function AddFriendScreen() {
         req.id === request.id ? { ...req, status: "accepted" } : req
       );
 
+      // Keep only the most recent 50 requests and 100 friends
+      const limitedRequests = updatedRequests.slice(-50);
+      const limitedFriends = updatedFriends.slice(0, 100);
+
       await user.update({
         unsafeMetadata: {
           ...(user.unsafeMetadata as any),
-          friends: updatedFriends,
-          friendRequests: updatedRequests,
+          friends: limitedFriends,
+          friendRequests: limitedRequests,
         },
       });
 
-      showAlert("Vänförfrågan accepterad!", `Du har fått ${senderPointsTransfer} poäng från ${request.fromUserName}! Du och ${request.fromUserName} är nu vänner!`);
-
-      // Immediately load updated friends list
-      await loadFriendsFromSanity();
+      const pointsMessage = pointsToAward > 0 ? `Du har fått ${pointsToAward} poäng från ${request.fromUserName}! ` : '';
+      showAlert("Vänförfrågan accepterad!", `${pointsMessage}Du och ${request.fromUserName} är nu vänner!`);
 
       // Trigger re-render to update counts
-      setFriendClerkId(prev => prev);
+      setRefreshKey(prev => prev + 1);
 
     } catch (error: any) {
       console.error("Accept request error:", error);
@@ -390,22 +491,25 @@ export default function AddFriendScreen() {
       // Delete friend request from Sanity when rejected
       await client.delete(request.id);
 
-      // Remove friend request from metadata
+      // Remove friend request from metadata (limit size)
       const updatedRequests = currentFriendRequests.filter((req: FriendRequest) =>
         req.id !== request.id
       );
 
+      // Keep only the most recent 50 requests
+      const limitedRequests = updatedRequests.slice(-50);
+
       await user.update({
         unsafeMetadata: {
           ...(user.unsafeMetadata as any),
-          friendRequests: updatedRequests,
+          friendRequests: limitedRequests,
         },
       });
 
       showAlert("Vänförfrågan avvisad", `Du har avvisat vänförfrågan från ${request.fromUserName}`);
 
       // Trigger re-render to update counts
-      setFriendClerkId(prev => prev);
+      setRefreshKey(prev => prev + 1);
 
     } catch (error: any) {
       console.error("Reject request error:", error);
@@ -417,7 +521,12 @@ export default function AddFriendScreen() {
     id: string;
     fromUserId: string;
     fromUserName: string;
+    fromUserImageUrl?: string;
+    fromUserPoints?: number;
     toUserId: string;
+    toUserName?: string;
+    toUserImageUrl?: string;
+    pointsToTransfer?: number;
     status: "pending" | "accepted" | "rejected";
     createdAt: string;
   }
@@ -702,7 +811,7 @@ export default function AddFriendScreen() {
                           onPress={() => {
                             showAlert(
                               "Ta bort vän",
-                              `Är du säker på att du vill ta bort ${friend.name} från dina vänner?`,
+                              `Är du säker på att du vill ta bort ${friend.name} från dina vänner? Detta kommer också att ta bort vänförhållandet från databasen.`,
                               [
                                 { text: "Avbryt", style: "cancel" },
                                 {
@@ -710,6 +819,19 @@ export default function AddFriendScreen() {
                                   style: "destructive",
                                   onPress: async () => {
                                     try {
+                                      const { client } = await import('@/sanityClient');
+
+                                      // Find and delete the friend request from Sanity
+                                      const friendRequest = await client.fetch(
+                                        `*[_type == "friendRequest" && status == "accepted" && ((fromUserId == $userId && toUserId == $friendId) || (fromUserId == $friendId && toUserId == $userId))][0]`,
+                                        { userId: user?.id, friendId: friend.clerkId }
+                                      );
+
+                                      if (friendRequest) {
+                                        await client.delete(friendRequest._id);
+                                      }
+
+                                      // Remove friend from local metadata
                                       const updatedFriends = currentUserFriends.filter(f => f.id !== friend.id);
                                       await user?.update({
                                         unsafeMetadata: {
@@ -717,7 +839,9 @@ export default function AddFriendScreen() {
                                           friends: updatedFriends,
                                         }
                                       });
+
                                       console.log(`✅ Friend removed: ${friend.name}`);
+                                      showAlert("Vän borttagen", `${friend.name} har tagits bort från dina vänner.`);
                                     } catch (error) {
                                       console.error('❌ Failed to remove friend:', error);
                                       showAlert("Fel", "Kunde inte ta bort vännen");
@@ -772,7 +896,7 @@ export default function AddFriendScreen() {
 
         {/* Requests Tab */}
         {activeTab === "requests" && (
-          <>
+          <View key={refreshKey}>
             {/* Friend Requests Section */}
             {incomingRequests.length > 0 && (
               <Animated.View entering={FadeInUp.delay(500)} className="mt-6">
@@ -793,9 +917,9 @@ export default function AddFriendScreen() {
                     <View className="flex-row items-center justify-between mb-3">
                       <View className="flex-row items-center flex-1">
                         <View className="w-12 h-12 rounded-full bg-gray-300 mr-3 overflow-hidden">
-                          {request.senderImageUrl ? (
+                          {request.fromUserImageUrl ? (
                             <Image
-                              source={{ uri: request.senderImageUrl }}
+                              source={{ uri: request.fromUserImageUrl }}
                               style={{ width: '100%', height: '100%' }}
                               resizeMode="cover"
                             />
@@ -829,24 +953,17 @@ export default function AddFriendScreen() {
                           >
                             {new Date(request.createdAt).toLocaleDateString("sv-SE")}
                           </AutoText>
-                          {request.senderPoints !== undefined && (
+                          {request.fromUserPoints !== undefined && (
                             <AutoText
                               className={`text-xs mt-1 ${
                                 isDark ? "text-blue-300" : "text-blue-600"
                               }`}
                             >
-                              {request.senderPoints} poäng
+                              {request.fromUserPoints} poäng
                             </AutoText>
                           )}
                         </View>
                       </View>
-                      {request.senderPointsTransfer && request.senderPointsTransfer > 0 && (
-                        <View className="bg-yellow-100 px-2 py-1 rounded-full">
-                          <AutoText className="text-yellow-700 text-xs font-medium">
-                            +{request.senderPointsTransfer} poäng
-                          </AutoText>
-                        </View>
-                      )}
                     </View>
 
                     <View className="flex-row gap-3">
@@ -964,7 +1081,7 @@ export default function AddFriendScreen() {
                 </View>
               </Animated.View>
             )}
-          </>
+          </View>
         )}
 
       </ScrollView>

@@ -1,0 +1,6 @@
+[dotenv@17.2.2] injecting env (14) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+🔄 Starting Stripe Payment Server...
+🌐 Available local IP addresses for real device testing:
+   http://192.168.8.116:3000
+💡 For real devices, use one of these IPs instead of localhost
+✅ Stripe initialized

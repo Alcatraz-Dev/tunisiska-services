@@ -76,7 +76,7 @@ export default function Wallet() {
   const [globalDisable, setGlobalDisable] = useState(false);
   const pulse = useSharedValue(1);
 
-  const loadWalletData = useCallback(() => {
+  const loadWalletData = useCallback(async () => {
     if (!user) return;
     const metadata = user.unsafeMetadata as UserMetadata;
 
@@ -87,6 +87,30 @@ export default function Wallet() {
     setTransactions(metadata.transactions ?? []);
     setLastRewardDate(metadata.lastRewardDate ?? null);
     setStreak(metadata.streak ?? 0);
+
+    // Also sync with Sanity if needed (for consistency)
+    try {
+      const { client } = await import('@/sanityClient');
+      const sanityUser = await client.fetch(
+        `*[_type == "users" && clerkId == $clerkId][0]`,
+        { clerkId: user.id }
+      );
+
+      if (sanityUser && sanityUser.points !== totalPoints) {
+        console.log(`🔄 Syncing points: Clerk=${totalPoints}, Sanity=${sanityUser.points}`);
+        // Update Clerk to match Sanity if they differ
+        await user.update({
+          unsafeMetadata: {
+            ...metadata,
+            points: sanityUser.points,
+          }
+        });
+        setPoints(sanityUser.points);
+      }
+    } catch (error) {
+      console.error('Error syncing with Sanity:', error);
+      // Continue with Clerk data if Sanity sync fails
+    }
   }, [user]);
 
   useEffect(() => {
@@ -127,7 +151,7 @@ export default function Wallet() {
     });
   };
 
-  const handleDailyReward = () => {
+  const handleDailyReward = async () => {
     const today = new Date().toISOString().split("T")[0];
     if (lastRewardDate === today) {
       return showAlert("Redan hämtad", "Du har redan hämtat dagens belöning!");
@@ -145,6 +169,34 @@ export default function Wallet() {
       date: new Date().toISOString(),
     };
     updateUserData(newPoints, [newTx, ...transactions], today, newStreak);
+
+    // Also update points in Sanity database
+    try {
+      const { client } = await import('@/sanityClient');
+      const userDoc = await client.fetch(
+        `*[_type == "users" && clerkId == $clerkId][0]`,
+        { clerkId: user?.id }
+      );
+
+      if (userDoc) {
+        await client
+          .patch(userDoc._id)
+          .set({ points: newPoints })
+          .commit();
+      } else {
+        await client.create({
+          _type: 'users',
+          clerkId: user?.id,
+          email: user?.primaryEmailAddress?.emailAddress || '',
+          points: newPoints,
+        });
+      }
+
+      console.log(`✅ Updated Sanity points after daily reward: ${newPoints}`);
+    } catch (error) {
+      console.error('❌ Error updating Sanity points after daily reward:', error);
+    }
+
     // showAlert("🎉 Belöning hämtad!", `Du fick ${rewardPoints} poäng`);
   };
   

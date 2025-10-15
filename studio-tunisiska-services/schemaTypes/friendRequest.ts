@@ -35,6 +35,13 @@ export default defineType({
       validation: (Rule) => Rule.required(),
     }),
     defineField({
+      name: "pointsToTransfer",
+      title: "Points to Transfer",
+      type: "number",
+      initialValue: 0,
+      validation: (Rule) => Rule.min(0),
+    }),
+    defineField({
       name: "status",
       title: "Status",
       type: "string",
@@ -59,13 +66,6 @@ export default defineType({
       title: "Updated At",
       type: "datetime",
       validation: (Rule) => Rule.required(),
-    }),
-    defineField({
-      name: "senderPointsTransfer",
-      title: "Sender Points Transfer",
-      type: "number",
-      initialValue: 0,
-      validation: (Rule) => Rule.min(0),
     }),
   ],
   preview: {

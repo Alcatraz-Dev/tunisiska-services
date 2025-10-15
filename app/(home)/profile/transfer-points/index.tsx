@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../../context/ThemeContext";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useUser } from "@clerk/clerk-expo";
+import { useUser, useClerk } from "@clerk/clerk-expo";
 import { AutoText } from "@/app/components/ui/AutoText";
 import Input from "@/app/components/ui/Input";
 import { showAlert } from "@/app/utils/showAlert";
@@ -13,8 +13,6 @@ import { getPremiumGradient } from "@/app/utils/getPremiumGradient";
 import { LinearGradient } from "expo-linear-gradient";
 import { nativeNotifyAPI } from "@/app/services/nativeNotifyApi";
 import Animated, {
-  FadeIn,
-  FadeInDown,
   FadeInUp,
   ZoomIn,
   useAnimatedStyle,
@@ -65,13 +63,49 @@ export default function TransferPointsScreen() {
   const isDark = resolvedTheme === "dark";
   const router = useRouter();
   const { user } = useUser();
+  const { client } = useClerk();
   const [recipientClerkId, setRecipientClerkId] = useState("");
   const [pointsToTransfer, setPointsToTransfer] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const pulse = useSharedValue(1);
 
-  const currentUserPoints = (user?.unsafeMetadata as any)?.points || 0;
+  // Get points from Sanity as the source of truth, fallback to metadata
+  const [currentUserPoints, setCurrentUserPoints] = useState(0);
+
+  // Load user's current points from Sanity on component mount
+  React.useEffect(() => {
+    const loadUserPoints = async () => {
+      if (user?.id) {
+        try {
+          const { client } = await import('@/sanityClient');
+          const userDoc = await client.fetch(
+            `*[_type == "users" && clerkId == $clerkId][0]`,
+            { clerkId: user.id }
+          );
+          const sanityPoints = userDoc?.points || 0;
+          setCurrentUserPoints(sanityPoints);
+
+          // Sync Clerk metadata with Sanity points
+          const metadataPoints = (user.unsafeMetadata as any)?.points || 0;
+          if (metadataPoints !== sanityPoints) {
+            await user.update({
+              unsafeMetadata: {
+                ...(user.unsafeMetadata as any),
+                points: sanityPoints,
+              }
+            });
+          }
+        } catch (error) {
+          console.error('Error loading user points from Sanity:', error);
+          // Fallback to metadata
+          setCurrentUserPoints((user?.unsafeMetadata as any)?.points || 0);
+        }
+      }
+    };
+
+    loadUserPoints();
+  }, [user?.id]);
   const currentUserFriends =
     (user?.unsafeMetadata as UserMetadata)?.friends || [];
 
@@ -123,7 +157,7 @@ const handleTransfer = async () => {
     return;
   }
 
-  const senderPoints = (user.unsafeMetadata as any)?.points || 0;
+  const senderPoints = currentUserPoints;
   if (senderPoints < amount) {
     showAlert("Otillräckliga poäng", "Du har inte tillräckligt med poäng");
     return;
@@ -150,30 +184,120 @@ const handleTransfer = async () => {
       }
     });
 
-    // Create transaction record for sender
-    const transactionId = `transfer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const senderTransactions = (user.unsafeMetadata as any)?.transactions || [];
-    senderTransactions.unshift({
-      id: transactionId,
-      type: "spent",
-      points: amount,
-      description: `Överfört till ${friendData.name}`,
-      date: new Date().toISOString(),
+    // Update fromUserPoints in friend request metadata to reflect current points
+    const updatedFriendRequests = (user.unsafeMetadata as any)?.friendRequests || [];
+    const updatedRequests = updatedFriendRequests.map((req: any) => {
+      if (req.fromUserId === user.id) {
+        return {
+          ...req,
+          fromUserPoints: senderNewPoints, // Update with current points after transfer
+        };
+      }
+      return req;
     });
 
     await user.update({
       unsafeMetadata: {
         ...(user.unsafeMetadata as any),
-        transactions: senderTransactions,
+        friendRequests: updatedRequests.slice(-50), // Keep only recent 50
       }
     });
 
-    console.log('Transaction recorded for sender');
 
-    // For now, we'll simulate the recipient update since we don't have a server running
-    // In production, this would call an API route to update the recipient
-    console.log(`📝 Would update recipient ${receiverId} with +${amount} points`);
-    console.log(`📝 Would send notification to recipient about receiving ${amount} points`);
+    // Transaction records are now handled in the recipient update section
+
+    // Update recipient's points directly in Sanity
+    try {
+      console.log(`📝 Updating recipient ${receiverId} with +${amount} points via Sanity`);
+
+      const { client } = await import('@/sanityClient');
+
+      // Get recipient's current points from Sanity
+      const recipientDoc = await client.fetch(
+        `*[_type == "users" && clerkId == $clerkId][0]`,
+        { clerkId: receiverId }
+      );
+
+      const recipientCurrentPoints = recipientDoc?.points || 0;
+      const recipientNewPoints = recipientCurrentPoints + amount;
+
+      // Update recipient's points in Sanity
+      if (recipientDoc) {
+        await client
+          .patch(recipientDoc._id)
+          .set({ points: recipientNewPoints })
+          .commit();
+      } else {
+        // Create user document if it doesn't exist
+        await client.create({
+          _type: 'users',
+          clerkId: receiverId,
+          email: '', // Will be updated later
+          points: recipientNewPoints,
+        });
+      }
+
+      // For now, just update the recipient's points in Sanity
+      // Clerk metadata updates for other users require server-side implementation
+      console.log(`✅ Updated recipient ${receiverId} points in Sanity: ${recipientCurrentPoints} -> ${recipientNewPoints}`);
+
+      // Update sender's points in Sanity
+      const senderDoc = await client.fetch(
+        `*[_type == "users" && clerkId == $clerkId][0]`,
+        { clerkId: user?.id }
+      );
+
+      if (senderDoc) {
+        await client
+          .patch(senderDoc._id)
+          .set({ points: senderNewPoints })
+          .commit();
+      } else {
+        // Create user document if it doesn't exist
+        await client.create({
+          _type: 'users',
+          clerkId: user?.id,
+          email: user?.primaryEmailAddress?.emailAddress || '',
+          points: senderNewPoints,
+        });
+      }
+
+      // Update local state
+      setCurrentUserPoints(senderNewPoints);
+
+      // Add transaction record for sender (points already deducted above)
+      const senderTransactions = (user.unsafeMetadata as any)?.transactions || [];
+      senderTransactions.unshift({
+        id: `transfer_sent_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        type: "spent",
+        points: amount,
+        description: `Överfört ${amount} poäng till ${friendData.name}`,
+        date: new Date().toISOString(),
+      });
+
+      // Keep only the last 50 transactions for sender
+      const limitedSenderTransactions = senderTransactions.slice(0, 50);
+
+      await user.update({
+        unsafeMetadata: {
+          ...(user.unsafeMetadata as any),
+          transactions: limitedSenderTransactions,
+        }
+      });
+
+      console.log('✅ Transfer completed for both sender and recipient');
+
+    } catch (error) {
+      console.error('❌ Failed to update recipient points:', error);
+      // Revert sender's points if recipient update failed
+      await user.update({
+        unsafeMetadata: {
+          ...(user.unsafeMetadata as any),
+          points: senderPoints,
+        }
+      });
+      throw new Error('Failed to complete transfer - recipient could not be updated');
+    }
 
     // Send notification to recipient (this works in the current setup)
     const notificationPayload = {
@@ -190,10 +314,6 @@ const handleTransfer = async () => {
     await nativeNotifyAPI.sendNotification(notificationPayload);
 
     console.log('✅ Notification sent to recipient');
-
-    // For demo purposes, show that the recipient would receive the points
-    // In a real app, the recipient's device would receive this notification
-    // and their points would be updated via the API route
 
     showAlert(
       "Överföring lyckades! 🎉",
