@@ -75,7 +75,7 @@ export default function Wallet() {
     if (!user) return;
     const metadata = user.unsafeMetadata as UserMetadata;
 
-    // If metadata.points already contains referral points:
+    // Get points from Clerk metadata (this is the single source of truth)
     const totalPoints = metadata.points ?? 0;
 
     setPoints(totalPoints);
@@ -85,7 +85,9 @@ export default function Wallet() {
   }, [user]);
 
   useEffect(() => {
-    if (isLoaded && user) loadWalletData();
+    if (isLoaded && user) {
+      loadWalletData();
+    }
   }, [isLoaded, user, loadWalletData]);
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import {FaUsers, FaBell, FaFileContract, FaShieldAlt, FaTaxi, FaTruck, FaBroom, FaShippingFast} from 'react-icons/fa'
+import {FaUsers, FaBell, FaFileContract, FaShieldAlt, FaTaxi, FaTruck, FaBroom, FaShippingFast, FaUserFriends} from 'react-icons/fa'
 import {CgMediaLive} from 'react-icons/cg'
 import {MdOutlinePermMedia} from 'react-icons/md'
 import {MdWeb} from 'react-icons/md'
@@ -11,6 +11,11 @@ export const Structure = (S: any) =>
         .title(' Users')
         .icon(FaUsers)
         .child(S.documentList().title('All Users').filter('_type == "users"')),
+
+      S.listItem()
+        .title(' Friend Requests')
+        .icon(FaUserFriends)
+        .child(S.documentList().title('All Friend Requests').filter('_type == "friendRequest"')),
 
       S.listItem()
         .title(' Taxi Orders')
