@@ -486,7 +486,7 @@ export default function Wallet() {
 
         {/* Transaction History */}
         <AutoText
-          className={`text-lg font-semibold mt-8 mb-3 ${
+          className={`text-lg font-semibold mt-8 mb-4 ${
             isDark ? "text-white" : "text-gray-900"
           }`}
         >
@@ -501,7 +501,7 @@ export default function Wallet() {
             <Animated.View
               key={tx.id}
               entering={ZoomIn.duration(300)}
-              className="flex-row justify-between items-center mb-2 "
+              className="flex-row justify-between items-center mb-3 "
             >
               <View
                 className={`flex-1 flex-row items-center p-4 rounded-xl  ${
@@ -517,23 +517,39 @@ export default function Wallet() {
               >
                 <Ionicons
                   name={
-                    tx.type === "earned"
-                      ? "arrow-up-circle"
+                    tx.description.includes("Dag") || tx.description.includes("belöning")
+                      ? "gift"
+                      : tx.description.includes("Köp") || tx.description.includes("poäng för")
+                      ? "card"
+                      : tx.description.includes("Överfört") || tx.description.includes("till mottagare")
+                      ? "swap-horizontal"
+                      : tx.description.includes("Mottagit") || tx.description.includes("från")
+                      ? "arrow-down-circle"
+                      : tx.type === "earned"
+                      ? "trending-up"
                       : tx.type === "spent"
                       ? "cart"
-                      : "cash"
+                      : "wallet"
                   }
-                  size={20}
+                  size={18}
                   color={
-                    tx.type === "earned"
+                    tx.description.includes("Dag") || tx.description.includes("belöning")
+                      ? "#f59e0b" // Yellow for daily rewards
+                      : tx.description.includes("Köp") || tx.description.includes("poäng för")
+                      ? "#3b82f6" // Blue for purchases
+                      : tx.description.includes("Överfört") || tx.description.includes("till mottagare")
+                      ? "#ef4444" // Red for sent transfers
+                      : tx.description.includes("Mottagit") || tx.description.includes("från")
+                      ? "#22c55e" // Green for received transfers
+                      : tx.type === "earned"
                       ? "#22c55e"
                       : tx.type === "spent"
                       ? "#ef4444"
                       : "#f59e0b"
                   }
-                  style={{ marginRight: 6 }}
+                  style={{ marginRight: 8 }}
                 />
-                <View className="flex-1  justify-between gap-1">
+                <View className="flex-1 justify-between gap-2">
                   <AutoText
                     className={`font-semibold text-sm ${
                       isDark ? "text-white" : "text-gray-900"
