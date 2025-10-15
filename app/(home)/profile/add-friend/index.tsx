@@ -40,7 +40,7 @@ interface FriendRequest {
   toUserId: string;
   status: "pending" | "accepted" | "rejected";
   createdAt: string;
-  pointsOffered?: number;
+  senderPointsTransfer?: number;
   senderImageUrl?: string;
   senderPoints?: number;
 }
@@ -101,7 +101,7 @@ export default function AddFriendScreen() {
               toUserId: req.toUserId,
               status: req.status,
               createdAt: req.createdAt,
-              pointsOffered: req.pointsReward,
+              senderPointsTransfer: req.senderPointsTransfer,
               senderImageUrl: req.fromUserImageUrl || null,
               senderPoints: req.fromUserPoints || 0,
             };
@@ -162,7 +162,7 @@ export default function AddFriendScreen() {
           id: `friend_${req._id}`,
           clerkId: friendClerkId,
           name: isFromUser ? req.toUserName || `User ${req.toUserId.slice(-8)}` : req.fromUserName,
-          imageUrl: friendData?.imageUrl,
+          imageUrl: isFromUser ? req.toUserImageUrl : req.fromUserImageUrl,
           addedAt: req.updatedAt || req.createdAt,
           status: "active"
         };
@@ -233,8 +233,7 @@ export default function AddFriendScreen() {
         status: 'pending',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        pointsReward: 50,
-        pointsClaimed: false,
+        senderPointsTransfer: (user?.unsafeMetadata as any)?.points || 0,
       };
 
       const result = await client.create(friendRequestData);
@@ -305,43 +304,31 @@ export default function AddFriendScreen() {
         })
         .commit();
 
-      // Calculate total points from all accepted friend requests
-      const sanityClient = await import('@/sanityClient');
+      // Award points to the user who accepted the friend request
+      const senderPointsTransfer = requestData.senderPointsTransfer || 0;
 
-      // Get all accepted friend requests for this user
-      const allAcceptedRequests = await sanityClient.client.fetch(
-        `*[_type == "friendRequest" && toUserId == $userId && status == "accepted" && pointsClaimed == true]`,
-        { userId: user?.id }
-      );
+      // Get current points from Clerk metadata
+      const currentPoints = (user?.unsafeMetadata as any)?.points || 0;
 
-      // Calculate total points from all accepted friend requests
-      const totalFriendPoints = allAcceptedRequests.reduce((total: number, req: any) => {
-        return total + (req.pointsReward || 50);
-      }, 0);
+      // Add the sender's points transfer to current points
+      const newPoints = currentPoints + senderPointsTransfer;
 
-      // Get current points from Clerk metadata (other points like daily rewards, purchases)
-      const clerkPoints = (user?.unsafeMetadata as any)?.points || 0;
-
-      // Calculate new total points (friend request points + other points)
-      const newClerkPoints = totalFriendPoints + clerkPoints;
-
-      // Update Clerk metadata with total points
+      // Update Clerk metadata with new total points
       await user?.update({
         unsafeMetadata: {
           ...(user?.unsafeMetadata as any),
-          points: newClerkPoints,
+          points: newPoints,
         }
       });
 
-      console.log(`✅ Total points updated in Clerk: ${newClerkPoints} (${totalFriendPoints} from friends + ${clerkPoints} from other sources)`);
+      console.log(`✅ Points updated in Clerk: ${currentPoints} -> ${newPoints} (+${senderPointsTransfer} from ${request.fromUserName})`);
 
       // Add transaction record
-      const pointsReward = requestData.pointsReward || 50;
       const transactions = (user?.unsafeMetadata as any)?.transactions || [];
       transactions.unshift({
         id: `friend_reward_${Date.now()}`,
         type: "earned",
-        points: pointsReward,
+        points: senderPointsTransfer,
         description: `Belöning för att acceptera vänförfrågan från ${request.fromUserName}`,
         date: new Date().toISOString(),
       });
@@ -378,7 +365,7 @@ export default function AddFriendScreen() {
         },
       });
 
-      showAlert("Vänförfrågan accepterad!", `Du har fått ${pointsReward} poäng som belöning! Du och ${request.fromUserName} är nu vänner!`);
+      showAlert("Vänförfrågan accepterad!", `Du har fått ${senderPointsTransfer} poäng från ${request.fromUserName}! Du och ${request.fromUserName} är nu vänner!`);
 
       // Immediately load updated friends list
       await loadFriendsFromSanity();
@@ -400,18 +387,12 @@ export default function AddFriendScreen() {
     try {
       const { client } = await import('@/sanityClient');
 
-      // Update friend request status in Sanity
-      await client
-        .patch(request.id)
-        .set({
-          status: 'rejected',
-          updatedAt: new Date().toISOString()
-        })
-        .commit();
+      // Delete friend request from Sanity when rejected
+      await client.delete(request.id);
 
-      // Update friend request status in metadata
-      const updatedRequests = currentFriendRequests.map((req: FriendRequest) =>
-        req.id === request.id ? { ...req, status: "rejected" } : req
+      // Remove friend request from metadata
+      const updatedRequests = currentFriendRequests.filter((req: FriendRequest) =>
+        req.id !== request.id
       );
 
       await user.update({
@@ -859,10 +840,10 @@ export default function AddFriendScreen() {
                           )}
                         </View>
                       </View>
-                      {request.pointsOffered && (
+                      {request.senderPointsTransfer && request.senderPointsTransfer > 0 && (
                         <View className="bg-yellow-100 px-2 py-1 rounded-full">
                           <AutoText className="text-yellow-700 text-xs font-medium">
-                            +{request.pointsOffered} poäng
+                            +{request.senderPointsTransfer} poäng
                           </AutoText>
                         </View>
                       )}

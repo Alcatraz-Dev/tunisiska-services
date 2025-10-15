@@ -119,7 +119,7 @@ export default function WaveTabBar() {
           resizeMode="contain"
         />
       ),
-      renderTitle: ({ focused, title }) => (
+      renderTitle: ({ focused }) => (
         <Text
           style={{
             color: focused ? ACTIVE_COLOR : INACTIVE_COLOR,
@@ -128,7 +128,7 @@ export default function WaveTabBar() {
             marginTop: 2, // Space between icon and title
           }}
         >
-       {getTitle("Booking")}
+        {getTitle("Booking")}
         </Text>
       ),
     },

@@ -61,17 +61,11 @@ export default defineType({
       validation: (Rule) => Rule.required(),
     }),
     defineField({
-      name: "pointsReward",
-      title: "Points Reward",
+      name: "senderPointsTransfer",
+      title: "Sender Points Transfer",
       type: "number",
-      initialValue: 50,
+      initialValue: 0,
       validation: (Rule) => Rule.min(0),
-    }),
-    defineField({
-      name: "pointsClaimed",
-      title: "Points Claimed",
-      type: "boolean",
-      initialValue: false,
     }),
   ],
   preview: {
