@@ -11,8 +11,8 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { NotificationProvider } from "./context/NotificationContext";
 import usePushNotifications from "@/app/hooks/usePushNotifications";
 import registerNNPushToken from "native-notify";
-import { StripeProvider } from "@stripe/stripe-react-native";
 import Constants from "expo-constants";
+import { Platform } from "react-native";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -55,12 +55,31 @@ export default function RootLayout() {
     ? 'pk_test_51234567890abcdefghijklmnopqrstuvwxyz' 
     : stripePublishableKey;
 
+  const StripeWrapper = ({ children }: { children: React.ReactNode }) => {
+    if (Platform.OS === 'web') {
+      return <>{children}</>;
+    }
+
+    try {
+      const { StripeProvider } = require('@stripe/stripe-react-native');
+      console.log('StripeProvider loaded successfully');
+      return (
+        <StripeProvider
+          publishableKey={finalStripeKey}
+          merchantIdentifier="merchant.com.tunisiska.services" // Required for iOS Apple Pay
+        >
+          {children}
+        </StripeProvider>
+      );
+    } catch (error) {
+      console.warn('Stripe not available on this platform:', error);
+      return <>{children}</>;
+    }
+  };
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <StripeProvider 
-        publishableKey={finalStripeKey}
-        merchantIdentifier="merchant.com.tunisiska.services" // Required for iOS Apple Pay
-      >
+      <StripeWrapper>
         <ClerkProvider
           tokenCache={tokenCache}
           publishableKey={clerkPublishableKey}
@@ -76,7 +95,7 @@ export default function RootLayout() {
             </NotificationProvider>
           </ThemeProvider>
         </ClerkProvider>
-      </StripeProvider>
+      </StripeWrapper>
     </GestureHandlerRootView>
   );
 }

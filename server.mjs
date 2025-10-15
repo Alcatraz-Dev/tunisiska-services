@@ -57,7 +57,7 @@ try {
   console.error("⚠️ Stripe init error:", error.message);
 }
 
-// Payment sheet endpoint
+// Payment sheet endpoint (for native apps)
 app.post("/payment-sheet", async (req, res) => {
   try {
     const { amount, currency } = req.body;
@@ -104,6 +104,47 @@ app.post("/payment-sheet", async (req, res) => {
     });
   } catch (err) {
     console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Checkout session endpoint (for web)
+app.post("/create-checkout-session", async (req, res) => {
+  try {
+    const { amount, currency, successUrl, cancelUrl } = req.body;
+
+    if (!amount) return res.status(400).json({ error: "Amount is required" });
+
+    const usedCurrency = currency || "sek";
+    const stripeAmount = usedCurrency === "sek" ? amount * 100 : amount;
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      line_items: [
+        {
+          price_data: {
+            currency: usedCurrency,
+            product_data: {
+              name: "Tunisiska Services Payment",
+              description: `Payment of ${amount} ${usedCurrency.toUpperCase()}`,
+            },
+            unit_amount: stripeAmount,
+          },
+          quantity: 1,
+        },
+      ],
+      mode: "payment",
+      success_url: successUrl || `${req.protocol}://${req.get('host')}/success`,
+      cancel_url: cancelUrl || `${req.protocol}://${req.get('host')}/cancel`,
+      metadata: { integration: "web_checkout" }
+    });
+
+    res.json({
+      sessionId: session.id,
+      url: session.url
+    });
+  } catch (err) {
+    console.error("Checkout session error:", err);
     res.status(500).json({ error: err.message });
   }
 });

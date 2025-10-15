@@ -1,9 +1,11 @@
-import { useStripe } from "@stripe/stripe-react-native";
+import { Platform } from 'react-native';
 import { AutoText } from "@/app/components/ui/AutoText";
 import icons from "@/app/constants/icons";
 import { useTheme } from "@/app/context/ThemeContext";
 import { getPremiumGradient } from "@/app/utils/getPremiumGradient";
 import { showAlert } from "@/app/utils/showAlert";
+
+// No Stripe imports needed - using universal implementation
 
 import { useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
@@ -63,6 +65,9 @@ export default function Wallet() {
   const isDark = resolvedTheme === "dark";
   const { user, isLoaded } = useUser();
   const router = useRouter();
+
+  // Stripe is available on both web and native platforms
+  const stripeAvailable = true;
 
   const [points, setPoints] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -197,39 +202,9 @@ export default function Wallet() {
       </SafeAreaView>
     );
   }
-  const { handleURLCallback } = useStripe();
+  // No Stripe URL callback handling needed for universal implementation
 
-  const handleDeepLink = useCallback(
-    async (url: string | null) => {
-      if (url) {
-        const stripeHandled = await handleURLCallback(url);
-        if (stripeHandled) {
-          // This was a Stripe URL - you can return or add extra handling here as you see fit
-        } else {
-          // This was NOT a Stripe URL – handle as you normally would
-        }
-      }
-    },
-    [handleURLCallback]
-  );
-
-  useEffect(() => {
-    const getUrlAsync = async () => {
-      const initialUrl = await Linking.getInitialURL();
-      handleDeepLink(initialUrl);
-    };
-
-    getUrlAsync();
-
-    const deepLinkListener = Linking.addEventListener(
-      "url",
-      (event: { url: string }) => {
-        handleDeepLink(event.url);
-      }
-    );
-
-    return () => deepLinkListener.remove();
-  }, [handleDeepLink]);
+  // No deep link handling needed for universal Stripe implementation
 
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
@@ -451,7 +426,6 @@ export default function Wallet() {
                   onPaymentSuccess={handlePaymentSuccess}
                   disableAll={globalDisable}
                   setDisableAll={setGlobalDisable}
-     
                 />
               </Animated.View>
             );

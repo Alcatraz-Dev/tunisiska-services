@@ -18,7 +18,8 @@ import Input from "@/app/components/ui/Input";
 import { showAlert } from "@/app/utils/showAlert";
 import { useUser } from "@clerk/clerk-expo";
 import { MoveCleaningOrderService } from "@/app/services/moveCleaningOrderService";
-import Payment from "@/app/components/Payment";
+
+// Stripe is conditionally imported in the payment function
 
 export default function MoveCleaning() {
   const { resolvedTheme } = useTheme();
@@ -229,58 +230,121 @@ export default function MoveCleaning() {
     }
 
     if (method === 'stripe') {
+      if (Platform.OS === 'web') {
+        showAlert("Fel", "Kortbetalning är inte tillgänglig på web. Välj en annan betalningsmetod.");
+        return false;
+      }
+
       // Stripe payment - use existing Payment component logic
       try {
-        const { initPaymentSheet, presentPaymentSheet } = await import('@stripe/stripe-react-native');
+        if (typeof window !== 'undefined' && window.document) {
+          // Web Stripe implementation
+          const { loadStripe } = require('@stripe/stripe-js');
+          const stripe = await loadStripe(process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || "pk_test_placeholder");
 
-        // Get server URL
-        const { getBestServerURL } = await import('@/app/config/stripe');
-        const serverUrl = await getBestServerURL();
+          if (!stripe) {
+            showAlert("Fel", "Stripe är inte tillgängligt på web");
+            return false;
+          }
 
-        // Fetch payment sheet params
-        const response = await fetch(`${serverUrl}/payment-sheet`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ amount, currency: 'sek' }),
-        });
+          const { getBestServerURL } = await import('@/app/config/stripe');
+          const serverUrl = await getBestServerURL();
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Server error response:', errorText);
-          throw new Error(`Server error: ${response.status} - ${errorText}`);
+          const response = await fetch(`${serverUrl}/create-checkout-session`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              amount,
+              currency: 'sek',
+              successUrl: window.location.origin + '/success',
+              cancelUrl: window.location.origin + '/cancel'
+            }),
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Server error response:', errorText);
+            throw new Error(`Server error: ${response.status} - ${errorText}`);
+          }
+
+          const data = await response.json();
+          console.log('Checkout session created:', data);
+
+          const { error } = await stripe.redirectToCheckout({
+            sessionId: data.sessionId,
+          });
+
+          if (error) {
+            console.error('Stripe redirect error:', error);
+            showAlert("Betalning misslyckades", error.message);
+            return false;
+          }
+
+          console.log('Stripe web payment successful');
+          return true;
+        } else {
+          // Native Stripe implementation
+          let initPaymentSheet: any = null;
+          let presentPaymentSheet: any = null;
+
+          try {
+            const stripeModule = require('@stripe/stripe-react-native');
+            initPaymentSheet = stripeModule.initPaymentSheet;
+            presentPaymentSheet = stripeModule.presentPaymentSheet;
+          } catch (error) {
+            console.warn('Stripe not available on this platform');
+            showAlert("Fel", "Stripe är inte tillgängligt på denna plattform");
+            return false;
+          }
+
+          const { getBestServerURL } = await import('@/app/config/stripe');
+          const serverUrl = await getBestServerURL();
+
+          const response = await fetch(`${serverUrl}/payment-sheet`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ amount, currency: 'sek' }),
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Server error response:', errorText);
+            throw new Error(`Server error: ${response.status} - ${errorText}`);
+          }
+
+          const data = await response.json();
+          console.log('Payment sheet data received:', Object.keys(data));
+
+          const { error: initError } = await initPaymentSheet({
+            merchantDisplayName: 'Tunisiska Services',
+            customerId: data.customer.id || data.customer,
+            customerEphemeralKeySecret: data.ephemeralKey,
+            paymentIntentClientSecret: data.paymentIntent,
+            returnURL: 'tunisiska-services://stripe-redirect',
+          });
+
+          if (initError) {
+            console.error('Stripe init error:', initError);
+            throw new Error(initError.message || 'Failed to initialize payment');
+          }
+
+          console.log('Payment sheet initialized, presenting...');
+
+          // Present payment sheet
+          const { error: presentError } = await presentPaymentSheet();
+
+          if (presentError) {
+            console.error('Stripe present error:', presentError);
+            throw new Error(presentError.message || 'Payment failed');
+          }
+
+          console.log('Stripe payment successful');
+          return true;
         }
-
-        const data = await response.json();
-        console.log('Payment sheet data received:', Object.keys(data));
-
-        // Initialize payment sheet
-        const { error: initError } = await initPaymentSheet({
-          merchantDisplayName: 'Tunisiska Services',
-          customerId: data.customer.id || data.customer,
-          customerEphemeralKeySecret: data.ephemeralKey,
-          paymentIntentClientSecret: data.paymentIntent,
-          returnURL: 'tunisiska-services://stripe-redirect',
-        });
-
-        if (initError) {
-          console.error('Stripe init error:', initError);
-          throw new Error(initError.message || 'Failed to initialize payment');
-        }
-
-        console.log('Payment sheet initialized, presenting...');
-
-        // Present payment sheet
-        const { error: presentError } = await presentPaymentSheet();
-
-        if (presentError) {
-          console.error('Stripe present error:', presentError);
-          throw new Error(presentError.message || 'Payment failed');
-        }
-
-        console.log('Stripe payment successful');
-        return true;
       } catch (error: any) {
         console.error('Stripe payment error:', error);
         return false;
@@ -1098,61 +1162,74 @@ export default function MoveCleaning() {
 
             {/* Payment Component */}
             <View className="mb-6">
-              <Payment
-                amount={getFinalPrice()}
-                isDark={isDark}
-                onPaymentSuccess={async () => {
-                  setShowPayment(false);
-                  // Create order after successful payment
-                  try {
-                    const scheduledDateTime = new Date(
-                      date.getFullYear(),
-                      date.getMonth(),
-                      date.getDate(),
-                      time.getHours(),
-                      time.getMinutes()
-                    ).toISOString();
+              {Platform.OS === 'web' ? (
+                <View className={`p-4 rounded-xl ${isDark ? "bg-dark-card" : "bg-light-card"}`}>
+                  <AutoText className={`text-center ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                    Kortbetalning är inte tillgänglig på web. Välj en annan betalningsmetod.
+                  </AutoText>
+                </View>
+              ) : (
+                (() => {
+                  const PaymentComponent = require("@/app/components/Payment").default;
+                  return (
+                    <PaymentComponent
+                      amount={getFinalPrice()}
+                      isDark={isDark}
+                      onPaymentSuccess={async () => {
+                        setShowPayment(false);
+                        // Create order after successful payment
+                        try {
+                          const scheduledDateTime = new Date(
+                            date.getFullYear(),
+                            date.getMonth(),
+                            date.getDate(),
+                            time.getHours(),
+                            time.getMinutes()
+                          ).toISOString();
 
-                    const orderData = {
-                      userId: user?.id!,
-                      customerInfo: {
-                        name: customerName,
-                        phone: customerPhone,
-                        email: customerEmail,
-                      },
-                      pickupAddress: pickup,
-                      deliveryAddress: dropoff,
-                      scheduledDateTime,
-                      numberOfItems: parseInt(numItems),
-                      numberOfPersons: parseInt(numPersons),
-                      hasElevator,
-                      itemCategories: selectedCategories,
-                      cleaningAreas,
-                      cleaningIntensity,
-                      cleaningSupplies,
-                      totalPrice: estimatedPrice,
-                      pointsUsed: pointsToUse,
-                      paymentMethod,
-                      notes,
-                      specialRequirements: notes,
-                    };
+                          const orderData = {
+                            userId: user?.id!,
+                            customerInfo: {
+                              name: customerName,
+                              phone: customerPhone,
+                              email: customerEmail,
+                            },
+                            pickupAddress: pickup,
+                            deliveryAddress: dropoff,
+                            scheduledDateTime,
+                            numberOfItems: parseInt(numItems),
+                            numberOfPersons: parseInt(numPersons),
+                            hasElevator,
+                            itemCategories: selectedCategories,
+                            cleaningAreas,
+                            cleaningIntensity,
+                            cleaningSupplies,
+                            totalPrice: estimatedPrice,
+                            pointsUsed: pointsToUse,
+                            paymentMethod,
+                            notes,
+                            specialRequirements: notes,
+                          };
 
-                    const result = await MoveCleaningOrderService.createMoveCleaningOrder(orderData);
-                    if (result.success) {
-                      // Send notification after successful order creation
-                      await MoveCleaningOrderService.sendOrderConfirmationNotification(orderData.userId, orderData);
-                      showAlert(
-                        'Beställning skapad! 🎉',
-                        `Din flytt & städning har beställts.\\n\\nBeställningsnummer: ${result.order._id}\\nTotalt: ${estimatedPrice} SEK\\nPoäng använda: ${pointsToUse}`
-                      );
-                      router.back();
-                    }
-                  } catch (error) {
-                    console.error('Error creating order after payment:', error);
-                    showAlert('Fel', 'Betalningen lyckades men beställningen kunde inte skapas. Kontakta support.');
-                  }
-                }}
-              />
+                          const result = await MoveCleaningOrderService.createMoveCleaningOrder(orderData);
+                          if (result.success) {
+                            // Send notification after successful order creation
+                            await MoveCleaningOrderService.sendOrderConfirmationNotification(orderData.userId, orderData);
+                            showAlert(
+                              'Beställning skapad! 🎉',
+                              `Din flytt & städning har beställts.\\n\\nBeställningsnummer: ${result.order._id}\\nTotalt: ${estimatedPrice} SEK\\nPoäng använda: ${pointsToUse}`
+                            );
+                            router.back();
+                          }
+                        } catch (error) {
+                          console.error('Error creating order after payment:', error);
+                          showAlert('Fel', 'Betalningen lyckades men beställningen kunde inte skapas. Kontakta support.');
+                        }
+                      }}
+                    />
+                  );
+                })()
+              )}
             </View>
 
             {/* Cancel Button */}

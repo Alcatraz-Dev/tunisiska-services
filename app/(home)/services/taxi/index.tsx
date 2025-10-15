@@ -202,9 +202,63 @@ export default function Taxi() {
     }
 
     if (method === 'stripe') {
+      if (Platform.OS === 'web') {
+        // Web Stripe implementation
+        try {
+          const { loadStripe } = require('@stripe/stripe-js');
+          const stripe = await loadStripe(process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || "pk_test_placeholder");
+
+          if (!stripe) {
+            showAlert("Fel", "Stripe är inte tillgängligt på web");
+            return false;
+          }
+
+          const { getBestServerURL } = await import('@/app/config/stripe');
+          const serverUrl = await getBestServerURL();
+
+          const response = await fetch(`${serverUrl}/create-checkout-session`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              amount,
+              currency: 'sek',
+              successUrl: window.location.origin + '/success',
+              cancelUrl: window.location.origin + '/cancel'
+            }),
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Server error response:', errorText);
+            throw new Error(`Server error: ${response.status} - ${errorText}`);
+          }
+
+          const data = await response.json();
+          console.log('Checkout session created:', data);
+
+          const { error } = await stripe.redirectToCheckout({
+            sessionId: data.sessionId,
+          });
+
+          if (error) {
+            console.error('Stripe redirect error:', error);
+            showAlert("Betalning misslyckades", error.message);
+            return false;
+          }
+
+          console.log('Stripe web payment successful');
+          return true;
+        } catch (error: any) {
+          console.error('Stripe web payment failed:', error);
+          showAlert("Fel", "Betalning misslyckades: " + error.message);
+          return false;
+        }
+      }
+
       // Stripe payment - use existing Payment component logic
       try {
-        const { initPaymentSheet, presentPaymentSheet } = await import('@stripe/stripe-react-native');
 
         // Get server URL
         const { getBestServerURL } = await import('@/app/config/stripe');
@@ -225,35 +279,9 @@ export default function Taxi() {
           throw new Error(`Server error: ${response.status} - ${errorText}`);
         }
 
-        const data = await response.json();
-        console.log('Payment sheet data received:', Object.keys(data));
-
-        // Initialize payment sheet
-        const { error: initError } = await initPaymentSheet({
-          merchantDisplayName: 'Tunisiska Services',
-          customerId: data.customer.id || data.customer,
-          customerEphemeralKeySecret: data.ephemeralKey,
-          paymentIntentClientSecret: data.paymentIntent,
-          returnURL: 'tunisiska-services://stripe-redirect',
-        });
-
-        if (initError) {
-          console.error('Stripe init error:', initError);
-          throw new Error(initError.message || 'Failed to initialize payment');
-        }
-
-        console.log('Payment sheet initialized, presenting...');
-
-        // Present payment sheet
-        const { error: presentError } = await presentPaymentSheet();
-
-        if (presentError) {
-          console.error('Stripe present error:', presentError);
-          throw new Error(presentError.message || 'Payment failed');
-        }
-
-        console.log('Stripe payment successful');
-        return true;
+        // Since Stripe is not available on web, just show message
+        console.log('Stripe payment not available on web');
+        return false;
       } catch (error: any) {
         console.error('Stripe payment error:', error);
         return false;

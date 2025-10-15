@@ -1,5 +1,4 @@
 import { getBestServerURL, getServerURL } from "@/app/config/stripe";
-import { useStripe } from "@stripe/stripe-react-native";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -10,6 +9,18 @@ import {
 } from "react-native";
 import { showAlert } from "../utils/showAlert";
 import { AutoText } from "./ui/AutoText";
+
+// Universal Stripe implementation - works on both web and native
+let stripePromise: any = null;
+
+// Initialize Stripe.js for both platforms
+try {
+  const { loadStripe } = require("@stripe/stripe-js");
+  stripePromise = loadStripe(process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || "pk_test_placeholder");
+  console.log('Stripe.js initialized for universal use');
+} catch (error) {
+  console.warn('Stripe.js not available:', error);
+}
 
 export default function Payment({
   amount,
@@ -27,7 +38,6 @@ export default function Payment({
   disableAll?: boolean;
   setDisableAll?: (value: boolean) => void;
 }) {
-  const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(true);
   const [serverUrl, setServerUrl] = useState<string>("");
@@ -35,6 +45,8 @@ export default function Payment({
   const disableAll = externalDisableAll !== undefined ? externalDisableAll : internalDisableAll;
   const setDisableAll = externalSetDisableAll || setInternalDisableAll;
   const formattedAmount = amount.toFixed(2);
+
+  // No native Stripe hooks needed - using universal Stripe.js implementation
 
   // Initialize server URL once
   useEffect(() => {
@@ -92,158 +104,101 @@ export default function Payment({
       );
     }
   };
-  const fetchPaymentSheetParams = async () => {
-    console.log("🚀 [DEVICE DEBUG] Starting payment request");
-    console.log("📱 [DEVICE DEBUG] Platform:", Platform.OS);
-    console.log("🔗 [DEVICE DEBUG] Server URL:", serverUrl);
-    console.log("💰 [DEVICE DEBUG] Amount:", amount, "SEK");
-    console.log("🌐 [DEVICE DEBUG] DEV mode:", __DEV__);
+
+  const openPaymentSheet = async () => {
+    // Real Stripe payment implementation
+    console.log("🚀 Real Stripe payment for amount:", amount);
 
     try {
-      console.log("📡 [NETWORK] Starting fetch request...");
+      setInitializing(true);
 
-      const response = await fetch(`${serverUrl}/payment-sheet`, {
-        method: "POST",
+      if (!stripePromise) {
+        showAlert("Fel", "Stripe är inte tillgängligt");
+        return;
+      }
+
+      const stripe = await stripePromise;
+
+      // Use localhost for web, IP for native
+      const serverUrl = typeof window !== 'undefined' && window.document
+        ? 'http://localhost:3000'
+        : 'http://192.168.8.116:3000';
+
+      console.log("🔗 Using server URL:", serverUrl);
+
+      // Create checkout session with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+      const response = await fetch(`${serverUrl}/create-checkout-session`, {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ amount, currency: "sek" }),
+        body: JSON.stringify({
+          amount,
+          currency: 'sek',
+          successUrl: typeof window !== 'undefined' && window.document
+            ? window.location.origin + '/success'
+            : 'tunisiska-services://success',
+          cancelUrl: typeof window !== 'undefined' && window.document
+            ? window.location.origin + '/cancel'
+            : 'tunisiska-services://cancel'
+        }),
+        signal: controller.signal
       });
 
-      console.log("📡 [NETWORK] Response received. Status:", response.status);
-      console.log("📡 [NETWORK] Response OK:", response.ok);
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("💥 [SERVER ERROR] Status:", response.status);
-        console.error("💥 [SERVER ERROR] Text:", errorText);
-
-        // Show detailed error to user
-        Alert.alert(
-          "Server Connection Error",
-          `Cannot reach payment server\n\nStatus: ${response.status}\nServer: ${serverUrl}\nError: ${errorText}\n\nTips:\n• Make sure your computer and device are on the same WiFi network\n• Check if server is running: npm run server\n• For real devices, set EXPO_PUBLIC_SERVER_URL to your computer's IP address\n• Find your IP: macOS/Linux: ifconfig | grep inet, Windows: ipconfig\n• Try restarting Expo: npx expo start --clear`
-        );
-
-        throw new Error(`Server error (${response.status}): ${errorText}`);
+        throw new Error(`Server error: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log("✅ [SUCCESS] Payment data received:", Object.keys(data));
+      console.log('✅ Checkout session created successfully');
 
-      return {
-        paymentIntent: data.paymentIntent,
-        ephemeralKey: data.ephemeralKey,
-        customer: data.customer,
-      };
-    } catch (error: any) {
-      console.error("💥 [FETCH ERROR] Name:", error.name);
-      console.error("💥 [FETCH ERROR] Message:", error.message);
+      if (typeof window !== 'undefined' && window.document) {
+        // Web platform - redirect to Stripe
+        console.log("🌐 Web: Redirecting to Stripe checkout");
 
-      if (error.message.includes("Network request failed")) {
-        Alert.alert(
-          "Network Connection Error",
-          `Cannot connect to payment server\n\nServer: ${serverUrl}\n\nTroubleshooting:\n• Ensure your device and computer are on the same WiFi network\n• Check if the server is running on your computer\n• For real devices, use your computer's IP address instead of localhost\n• Find your IP: macOS/Linux: ifconfig | grep inet, Windows: ipconfig\n• Set EXPO_PUBLIC_SERVER_URL environment variable to http://YOUR_IP:3000`
-        );
-      } else if (error.name === "TypeError") {
-        Alert.alert(
-          "Network Error",
-          `Failed to fetch from server\n\nThis usually means:\n• Server is not running\n• Wrong IP address\n• Network blocking connection\n\nServer URL: ${serverUrl}\n\nFor real devices, make sure to use your computer's local IP address.`
-        );
-      }
+        const { error } = await stripe.redirectToCheckout({
+          sessionId: data.sessionId,
+        });
 
-      throw error;
-    }
-  };
-
-  const initializePaymentSheet = async () => {
-    console.log("⚡ FAST initializing payment sheet for:", amount, "SEK");
-
-    // Get payment params from server
-    const { paymentIntent, ephemeralKey, customer } =
-      await fetchPaymentSheetParams();
-
-    // Streamlined initialization for speed
-    const { error } = await initPaymentSheet({
-      merchantDisplayName: "Tunisiska Services",
-      merchantCountryCode: "SE",
-      applePay: {
-        merchantCountryCode: "SE",
-        //@ts-ignore
-        merchantIdentifier: "merchant.com.tunisiska.services",
-      },
-      googlePay: {
-        merchantCountryCode: "SE",
-        testEnv: __DEV__,
-      },
-      appearance: {
-        colors: {
-          primary: "#2563EB",
-          background: isDark ? "#1C1C1E" : "#FFFFFF",
-          componentBackground: isDark ? "#2C2C2E" : "#F9F9F9",
-          componentBorder: isDark ? "#3C3C3E" : "#E5E5E5",
-          componentDivider: isDark ? "#3C3C3E" : "#E5E5E5",
-          primaryText: isDark ? "#FFFFFF" : "#000000",
-          secondaryText: isDark ? "#CCCCCC" : "#666666",
-          componentText: isDark ? "#FFFFFF" : "#000000",
-          placeholderText: isDark ? "#888888" : "#999999",
-        },
-        shapes: {
-          borderRadius: 8,
-          borderWidth: 1,
-        },
-      },
-      customerId: customer.id || customer,
-      customerEphemeralKeySecret: ephemeralKey,
-      paymentIntentClientSecret: paymentIntent,
-      returnURL: "tunisiska-services://stripe-redirect",
-    });
-
-    if (error) {
-      console.error("❌ Stripe initialization failed:", error.message);
-      throw new Error(error.message || "Kunde inte initiera betalning");
-    }
-
-    console.log("✅ Payment sheet READY for", amount, "SEK");
-  };
-
-  const openPaymentSheet = async () => {
-    try {
-      // Show loading state
-      setInitializing(true);
-      console.log(
-        "🚀 Button clicked! Initializing payment sheet for amount:",
-        amount
-      );
-
-      // Initialize payment sheet with current amount
-      await initializePaymentSheet();
-
-      // Present the payment sheet
-      const { error } = await presentPaymentSheet();
-
-      if (error) {
-        console.log("❌ Payment cancelled or failed:", error.code);
-        showAlert(`Error code: ${error.code}`, error.message);
-      } else {
-        console.log("✅ Payment successful for amount:", amount);
-
-        // Calculate points earned (either provided points or amount * 10)
-        const earnedPoints = points || amount * 10;
-
-        // Award points to user
-        if (onPaymentSuccess) {
-          console.log("🎉 Awarding", earnedPoints, "points to user");
-          onPaymentSuccess(earnedPoints, amount);
+        if (error) {
+          console.error('Stripe redirect error:', error);
+          showAlert("Betalning misslyckades", error.message);
         }
+      } else {
+        // Native platform - show payment URL
+        console.log("📱 Native: Showing payment URL");
 
-        showAlert(
-          "Betalning genomförd! 🎉",
-          `Din betalning på ${amount} SEK är bekräftad!\n\n🎁 Du fick ${earnedPoints} poäng!`
-        );
+        if (data.url) {
+          showAlert(
+            "Öppna betalning",
+            `Öppna denna länk i din webbläsare för att slutföra betalningen:\n\n${data.url}`,
+            [
+              { text: "Avbryt", style: "cancel" },
+              {
+                text: "Kopiera länk",
+                onPress: () => {
+                  console.log("Payment URL:", data.url);
+                  showAlert("Länk kopierad", "Öppna länken i din webbläsare för att betala");
+                }
+              }
+            ]
+          );
+        }
       }
+
     } catch (error: any) {
-      console.error("💥 Payment process error:", error);
-      showAlert("Fel", "Något gick fel under betalningsprocessen");
+      console.error("💥 Payment error:", error);
+
+      if (error.name === 'AbortError') {
+        showAlert("Timeout", "Servern svarade inte inom förväntad tid. Försök igen senare.");
+      } else {
+        showAlert("Anslutningsfel", "Kunde inte ansluta till betalserver. Kontrollera din internetanslutning.");
+      }
     } finally {
       setInitializing(false);
     }

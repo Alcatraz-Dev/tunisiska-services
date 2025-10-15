@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, TouchableOpacity, ScrollView, Alert } from "react-native";
+import { View, TouchableOpacity, ScrollView, Alert, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Calendar } from "react-native-calendars";
@@ -281,8 +281,65 @@ export default function ShippingPage() {
     }
 
     if (method === 'stripe') {
+      if (Platform.OS === 'web') {
+        // Web Stripe implementation
+        try {
+          const { loadStripe } = require('@stripe/stripe-js');
+          const stripe = await loadStripe(process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || "pk_test_placeholder");
+
+          if (!stripe) {
+            showAlert("Fel", "Stripe är inte tillgängligt på web");
+            return false;
+          }
+
+          const { getBestServerURL } = await import('@/app/config/stripe');
+          const serverUrl = await getBestServerURL();
+
+          const response = await fetch(`${serverUrl}/create-checkout-session`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              amount,
+              currency: 'sek',
+              successUrl: window.location.origin + '/success',
+              cancelUrl: window.location.origin + '/cancel'
+            }),
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Server error response:', errorText);
+            throw new Error(`Server error: ${response.status} - ${errorText}`);
+          }
+
+          const data = await response.json();
+          console.log('Checkout session created:', data);
+
+          const { error } = await stripe.redirectToCheckout({
+            sessionId: data.sessionId,
+          });
+
+          if (error) {
+            console.error('Stripe redirect error:', error);
+            showAlert("Betalning misslyckades", error.message);
+            return false;
+          }
+
+          console.log('Stripe web payment successful');
+          return true;
+        } catch (error: any) {
+          console.error('Stripe web payment failed:', error);
+          showAlert("Fel", "Betalning misslyckades: " + error.message);
+          return false;
+        }
+      }
+
+      // Native Stripe implementation
       try {
-        const { initPaymentSheet, presentPaymentSheet } = await import('@stripe/stripe-react-native');
+        const stripeModule = require('@stripe/stripe-react-native');
+        const { initPaymentSheet, presentPaymentSheet } = stripeModule;
 
         const { getBestServerURL } = await import('@/app/config/stripe');
         const serverUrl = await getBestServerURL();
