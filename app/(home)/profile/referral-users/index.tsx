@@ -18,6 +18,7 @@ import { getPremiumGradient } from "@/app/utils/getPremiumGradient";
 import { AutoText } from "@/app/components/ui/AutoText";
 import Input from "@/app/components/ui/Input";
 import { showAlert } from "@/app/utils/showAlert";
+import { nativeNotifyAPI } from "@/app/services/nativeNotifyApi";
 
 interface Referral {
   id: string;
@@ -77,6 +78,7 @@ export default function ReferralUsers() {
   const [referralCode, setReferralCode] = useState("");
   const [usedReferralCode, setUsedReferralCode] = useState("");
   const [inputReferralCode, setInputReferralCode] = useState("");
+  const [isProcessingReferral, setIsProcessingReferral] = useState(false);
 
   // generate referral code
   const generateReferralCode = (userId: string) => `${userId}`;
@@ -86,9 +88,36 @@ export default function ReferralUsers() {
     const metadata = user.unsafeMetadata as UserMetadata;
     if (metadata?.referralCode) return metadata.referralCode;
     const newCode = generateReferralCode(user.id);
+
+    // Update Clerk metadata
     await user.update({
       unsafeMetadata: { ...metadata, referralCode: newCode },
     });
+
+    // Also update Sanity with the referral code
+    try {
+      const { client } = await import('@/sanityClient');
+      const userDoc = await client.fetch(
+        `*[_type == "users" && clerkId == $clerkId][0]`,
+        { clerkId: user.id }
+      );
+
+      if (userDoc) {
+        await client.patch(userDoc._id).set({ referralCode: newCode }).commit();
+      } else {
+        // Create user document if it doesn't exist
+        await client.create({
+          _type: 'users',
+          clerkId: user.id,
+          email: user.primaryEmailAddress?.emailAddress || '',
+          referralCode: newCode,
+          points: 0,
+        });
+      }
+    } catch (error) {
+      console.error('Error updating referral code in Sanity:', error);
+    }
+
     return newCode;
   };
 
@@ -101,8 +130,11 @@ export default function ReferralUsers() {
       const metadata = user.unsafeMetadata as UserMetadata;
       setUsedReferralCode(metadata?.referralBy || "");
 
-      // Get points from Sanity as source of truth
+      // Get points and referrals from Sanity as source of truth
       let totalPoints = metadata?.points ?? 0;
+      let currentReferrals = Array.isArray(metadata?.referrals)
+        ? metadata.referrals
+        : [];
       try {
         const { client } = await import('@/sanityClient');
         const userDoc = await client.fetch(
@@ -121,13 +153,22 @@ export default function ReferralUsers() {
             });
           }
         }
+        if (userDoc?.referrals && Array.isArray(userDoc.referrals)) {
+          // Sync referrals with Sanity
+          const sanityReferrals = userDoc.referrals;
+          if (JSON.stringify(currentReferrals) !== JSON.stringify(sanityReferrals)) {
+            await user.update({
+              unsafeMetadata: {
+                ...metadata,
+                referrals: sanityReferrals,
+              }
+            });
+            currentReferrals = sanityReferrals;
+          }
+        }
       } catch (error) {
-        console.error('Error loading points from Sanity:', error);
+        console.error('Error loading data from Sanity:', error);
       }
-
-      const currentReferrals = Array.isArray(metadata?.referrals)
-        ? metadata.referrals
-        : [];
       setReferrals(currentReferrals);
       setStats({
         totalPoints: totalPoints,
@@ -156,12 +197,209 @@ export default function ReferralUsers() {
 
   const handleShare = async () => {
     try {
-      const message = `Hej! Använd min referral-kod ${referralCode} och få bonuspoäng 🎁\n\nLadda ner appen här: https://expo.dev/@your-app-link`;
+      const message = `Hej! Använd min referral-kod ${referralCode} och få bonuspoäng 🎁\n\nLadda ner appen här: https://expo.dev/preview/update?message=fix+the+friends+screen+ui&updateRuntimeVersion=1.0.0&createdAt=2025-10-16T17%3A57%3A51.829Z&slug=exp&projectId=c7b65ce0-2aa6-4b42-b6d7-4f04277bc839&group=7ad1bc83-fc2a-4400-be52-ade3c54939a0`;
       await Share.share({
         message,
       });
     } catch (error) {
       showAlert("Fel", "Kunde inte dela koden.");
+    }
+  };
+
+  const handleAddReferralCode = async () => {
+    const code = inputReferralCode.trim();
+
+    if (!code) {
+      showAlert("Fel", "Vänligen ange en referral-kod");
+      return;
+    }
+
+    if (code === referralCode) {
+      showAlert("Fel", "Du kan inte använda din egen referral-kod");
+      return;
+    }
+
+    if (usedReferralCode) {
+      showAlert("Info", "Du har redan använt en referral-kod");
+      return;
+    }
+
+    setIsProcessingReferral(true);
+
+    try {
+      // Check if the referral code exists and belongs to another user
+      const { client } = await import('@/sanityClient');
+
+      // Find the user with this referral code (check both referralCode and clerkId as fallback)
+      let referrerUser = await client.fetch(
+        `*[_type == "users" && referralCode == $code][0]`,
+        { code }
+      );
+
+      // If not found by referralCode, try searching by clerkId
+      if (!referrerUser) {
+        referrerUser = await client.fetch(
+          `*[_type == "users" && clerkId == $code][0]`,
+          { code }
+        );
+      }
+
+      if (!referrerUser) {
+        showAlert("Fel", "Ogiltig referral-kod - kunde inte hitta användaren");
+        return;
+      }
+
+      if (referrerUser.clerkId === user?.id) {
+        showAlert("Fel", "Du kan inte använda din egen referral-kod");
+        return;
+      }
+
+      // Check if user already has referrals from this referrer
+      const existingReferral = referrals.find(r => r.clerkId === referrerUser.clerkId);
+      if (existingReferral) {
+        showAlert("Info", "Du har redan använt denna referral-kod");
+        return;
+      }
+
+      // Check if referrer has reached their maximum referral limit (10)
+      const referrerReferrals = referrerUser.referrals || [];
+      if (referrerReferrals.length >= 10) {
+        showAlert("Info", "Denna användare har redan nått maxgränsen för referrals (10 användare)");
+        return;
+      }
+
+      // Check if current user has reached their maximum referral limit (10)
+      if (referrals.length >= 10) {
+        showAlert("Info", "Du kan endast använda upp till 10 referral-koder");
+        return;
+      }
+
+      // Award points to both users
+      const referralBonus = 50; // 50 points bonus
+
+      // Update current user's points
+      const currentUserPoints = stats.totalPoints;
+      const newUserPoints = currentUserPoints + referralBonus;
+
+      // Update referrer's points
+      const referrerPoints = referrerUser.points || 0;
+      const newReferrerPoints = referrerPoints + referralBonus;
+
+      // Update current user in Sanity
+      const currentUserDoc = await client.fetch(
+        `*[_type == "users" && clerkId == $clerkId][0]`,
+        { clerkId: user?.id }
+      );
+
+      if (currentUserDoc) {
+        await client.patch(currentUserDoc._id).set({ points: newUserPoints }).commit();
+      }
+
+      // Update referrer in Sanity
+      await client.patch(referrerUser._id).set({ points: newReferrerPoints }).commit();
+
+      // Update current user's metadata
+      const newReferral = {
+        id: `referral_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        clerkId: referrerUser.clerkId,
+        name: referrerUser.name || referrerUser.firstName || `User ${referrerUser.clerkId.slice(-8)}`,
+        joinedAt: new Date().toISOString(),
+        status: "active" as const,
+        pointsEarned: referralBonus,
+      };
+
+      const updatedReferrals = [...referrals, newReferral];
+      const updatedStats = {
+        ...stats,
+        totalPoints: newUserPoints,
+        referralPoints: stats.referralPoints + referralBonus,
+        totalReferrals: updatedReferrals.length,
+        completedReferrals: stats.completedReferrals + 1,
+      };
+
+      await user?.update({
+        unsafeMetadata: {
+          ...user.unsafeMetadata,
+          points: newUserPoints,
+          referrals: updatedReferrals,
+          referralBy: code,
+        }
+      });
+
+      // Update referrer's metadata (add referral record)
+      // Note: This would require server-side implementation for other users
+      // For now, we'll just update their points in Sanity
+
+      // Add referral record to referrer's metadata (if we can access it)
+      // This is a simplified version - in production you'd want server-side logic
+      const referrerReferralRecord = {
+        id: `referral_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        clerkId: user?.id || '',
+        name: user?.fullName || user?.firstName || `User ${user?.id?.slice(-8)}`,
+        joinedAt: new Date().toISOString(),
+        status: "completed" as const,
+        pointsEarned: referralBonus,
+      };
+
+      // Update referrer's referrals in Sanity
+      const referrerCurrentReferrals = referrerUser.referrals || [];
+      const updatedReferrerReferrals = [...referrerCurrentReferrals, referrerReferralRecord];
+
+      await client.patch(referrerUser._id).set({
+        referrals: updatedReferrerReferrals.slice(0, 100), // Limit to 100
+        points: newReferrerPoints
+      }).commit();
+
+      // Add transaction record for current user
+      const transactions = (user?.unsafeMetadata as any)?.transactions || [];
+      transactions.unshift({
+        id: `referral_bonus_${Date.now()}`,
+        type: "earned",
+        points: referralBonus,
+        description: `Referral bonus från ${newReferral.name}`,
+        date: new Date().toISOString(),
+      });
+
+      // Keep only the last 50 transactions
+      const limitedTransactions = transactions.slice(0, 50);
+
+      await user?.update({
+        unsafeMetadata: {
+          ...user.unsafeMetadata,
+          transactions: limitedTransactions,
+        }
+      });
+
+      // Update local state
+      setReferrals(updatedReferrals);
+      setStats(updatedStats);
+      setUsedReferralCode(code);
+      setInputReferralCode("");
+
+      showAlert(
+        "Referral lyckades! 🎉",
+        `Du har fått ${referralBonus} bonuspoäng! ${newReferral.name} har också fått ${referralBonus} poäng.`
+      );
+
+      // Send notification to referrer
+      const notificationPayload = {
+        title: "Referral bonus! 🎉",
+        message: `${user?.fullName || user?.firstName || 'En användare'} använde din referral-kod och du fick ${referralBonus} bonuspoäng!`,
+        subID: referrerUser.clerkId,
+        pushData: {
+          type: "referral_bonus",
+          amount: referralBonus,
+          fromUser: user?.fullName || user?.firstName || 'En användare',
+        },
+      };
+
+      await nativeNotifyAPI.sendNotification(notificationPayload);
+
+    } catch (error: any) {
+      console.error("Referral error:", error);
+      showAlert("Fel", error.message || "Kunde inte använda referral-koden");
+    } finally {
+      setIsProcessingReferral(false);
     }
   };
 
@@ -222,7 +460,14 @@ export default function ReferralUsers() {
             isDark ? "text-gray-300" : "text-gray-600"
           }`}
         >
-          Få bonuspoäng genom att bjuda in dina vänner
+          Få bonuspoäng genom att bjuda in dina vänner 
+        </AutoText>
+        <AutoText
+          className={`text-xs text-center mb-4 mt-1 ${
+            isDark ? "text-gray-400" : "text-gray-500"
+          }`}
+        >
+          ⚠️ Varje användare kan endast referera upp till 10 andra användare (max 10 användare).
         </AutoText>
       </Animated.View>
 
@@ -323,7 +568,7 @@ export default function ReferralUsers() {
           >
             <AutoText className="text-sm text-gray-400 mb-2">Aktiva</AutoText>
             <AutoText className={`text-2xl font-bold text-green-500`}>
-              {stats.activeReferrals}
+              {stats.activeReferrals || stats.completedReferrals}
             </AutoText>
           </View>
 
@@ -510,87 +755,101 @@ export default function ReferralUsers() {
                   className="mb-4"
                 >
                   <View
-                    className={`p-5 rounded-2xl shadow-md mb-6 ${
+                    className={`p-4 rounded-xl mb-3 ${
                       isDark ? "bg-dark-card" : "bg-light-card"
                     }`}
                   >
-                    {/* Name + Status Badge */}
-                    <View className="flex-row items-center justify-between mb-2">
-                      <AutoText
-                        className={`font-semibold text-lg ${
-                          isDark ? "text-white" : "text-gray-900"
-                        }`}
-                      >
-                        {ref.name}
-                      </AutoText>
-                      <View
-                        className={`px-3 py-1 rounded-full ${
-                          ref.status === "active"
-                            ? "bg-green-100"
-                            : ref.status === "pending"
-                            ? "bg-yellow-100"
-                            : "bg-blue-100"
-                        }`}
-                      >
-                        <AutoText
-                          className={`text-xs font-medium ${
-                            ref.status === "active"
-                              ? "text-green-700"
-                              : ref.status === "pending"
-                              ? "text-yellow-700"
-                              : "text-blue-700"
-                          }`}
-                        >
-                          {ref.status === "active"
-                            ? "Aktiv"
-                            : ref.status === "pending"
-                            ? "Väntar"
-                            : "Genomförd"}
-                        </AutoText>
+                    <View className="flex-row items-center justify-between">
+                      <View className="flex-row items-center flex-1">
+                        <View className="w-12 h-12 rounded-full bg-gray-300 mr-3 overflow-hidden">
+                          <View className="w-full h-full bg-gray-400 items-center justify-center">
+                            <AutoText className="text-white font-bold text-lg">
+                              {ref.name.charAt(0).toUpperCase()}
+                            </AutoText>
+                          </View>
+                        </View>
+                        <View className="flex-1">
+                          <View className="flex flex-row justify-between items-center my-1">
+                            <AutoText
+                              className={`font-semibold ${
+                                isDark ? "text-white" : "text-gray-900"
+                              }`}
+                            >
+                              {ref.name}
+                            </AutoText>
+                            <View className="flex-row items-center gap-2">
+                              <View
+                                className={`px-2 py-1 rounded-full ${
+                                  ref.status === "active" || ref.status === "completed"
+                                    ? "bg-green-100"
+                                    : ref.status === "pending"
+                                    ? "bg-yellow-100"
+                                    : "bg-blue-100"
+                                }`}
+                              >
+                                <AutoText
+                                  className={`text-xs font-medium ${
+                                    ref.status === "active" || ref.status === "completed"
+                                      ? "text-green-700"
+                                      : ref.status === "pending"
+                                      ? "text-yellow-700"
+                                      : "text-blue-700"
+                                  }`}
+                                >
+                                  {ref.status === "active"
+                                    ? "Genomförd & Aktiv"
+                                    : ref.status === "pending"
+                                    ? "Väntar"
+                                    : "Genomförd & Aktiv"}
+                                </AutoText>
+                              </View>
+                              {ref.status === "active" && (
+                                <View className="flex-row items-center gap-1">
+                                  <Ionicons name="checkmark-circle" size={14} color="#22c55e" />
+                                  <AutoText className="text-xs text-green-600 font-medium">
+                                    Bonus mottagen
+                                  </AutoText>
+                                </View>
+                              )}
+                            </View>
+                          </View>
+
+                          <AutoText
+                            className={`text-sm mt-2 ${
+                              isDark ? "text-gray-400" : "text-gray-600"
+                            }`}
+                          >
+                            {ref.clerkId}
+                          </AutoText>
+
+                          <View className="flex-row items-center justify-between mt-2">
+                            <AutoText
+                              className={`text-xs ${
+                                isDark ? "text-gray-500" : "text-gray-500"
+                              }`}
+                            >
+                              Anslöt: {new Date(ref.joinedAt).toLocaleDateString("sv-SE")}
+                            </AutoText>
+
+                            <View className="flex-row items-center gap-1 mt-2">
+                              <Ionicons
+                                name="trophy-outline"
+                                size={12}
+                                color={ref.pointsEarned > 0 ? "#22c55e" : "#9ca3af"}
+                              />
+                              <AutoText
+                                className={`text-xs font-semibold ${
+                                  ref.pointsEarned > 0
+                                    ? "text-green-500"
+                                    : "text-gray-400"
+                                }`}
+                              >
+                                +{ref.pointsEarned} poäng
+                              </AutoText>
+                            </View>
+                          </View>
+                        </View>
                       </View>
-                    </View>
-
-                    {/* ID */}
-                    <AutoText
-                      className={`text-sm ${
-                        isDark ? "text-gray-300" : "text-gray-700"
-                      }`}
-                    >
-                      {ref.id}
-                    </AutoText>
-
-                    {/* Joined date */}
-                    <AutoText
-                      className={`text-xs mt-2 ${
-                        isDark ? "text-gray-500" : "text-gray-500"
-                      }`}
-                    >
-                      Anslöt:{" "}
-                      {new Date(ref.joinedAt).toLocaleDateString("sv-SE")}
-                    </AutoText>
-
-                    {/* Points earned */}
-                    <View className="flex-row items-center gap-2 mt-3">
-                      <Ionicons
-                        name={
-                          ref.pointsEarned > 0
-                            ? "trophy-outline"
-                            : "time-outline"
-                        }
-                        size={12}
-                        color={ref.pointsEarned > 0 ? "#22c55e" : "#9ca3af"}
-                      />
-                      <AutoText
-                        className={`text-sm font-semibold ${
-                          ref.pointsEarned > 0
-                            ? "text-green-500"
-                            : "text-gray-400"
-                        }`}
-                      >
-                        {ref.pointsEarned > 0
-                          ? `+${ref.pointsEarned} poäng tjänade`
-                          : "Inga poäng ännu"}
-                      </AutoText>
                     </View>
                   </View>
                 </Animated.View>
@@ -619,7 +878,7 @@ export default function ReferralUsers() {
               }`}
             >
               <Input
-                placeholder=" referral-koden"
+                placeholder="Ange referral-koden"
                 value={inputReferralCode}
                 onChangeText={setInputReferralCode}
                 placeholderTextColor={isDark ? "#9ca3af" : "#6b7280"}
@@ -629,9 +888,17 @@ export default function ReferralUsers() {
                     : "bg-light/50 text-black border-gray-100"
                 }`}
               />
-              <TouchableOpacity className="bg-blue-500 p-3 rounded-xl items-center">
+              <TouchableOpacity
+                onPress={handleAddReferralCode}
+                disabled={isProcessingReferral || !inputReferralCode.trim()}
+                className={`p-3 rounded-xl items-center ${
+                  isProcessingReferral || !inputReferralCode.trim()
+                    ? "bg-gray-500"
+                    : "bg-blue-500"
+                }`}
+              >
                 <AutoText className="text-white font-bold">
-                  Lägg till vän
+                  {isProcessingReferral ? "Bearbetar..." : "Använd referral-kod"}
                 </AutoText>
               </TouchableOpacity>
             </View>

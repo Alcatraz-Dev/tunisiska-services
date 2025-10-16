@@ -21,7 +21,7 @@ import icons from "../constants/icons";
 import { AutoText } from "./ui/AutoText";
 import { showAlert } from "../utils/showAlert";
 
-const EXPO_DEV_URL = process.env.EXPO_PUBLIC_DEV_URL!;
+const EXPO_DEV_URL = "https://expo.dev/preview/update?message=fix+the+friends+screen+ui&updateRuntimeVersion=1.0.0&createdAt=2025-10-16T17%3A57%3A51.829Z&slug=exp&projectId=c7b65ce0-2aa6-4b42-b6d7-4f04277bc839&group=7ad1bc83-fc2a-4400-be52-ade3c54939a0";
 
 export default function ShareScreen() {
   const { resolvedTheme } = useTheme();
