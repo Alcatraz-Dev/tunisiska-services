@@ -19,6 +19,7 @@ import { TaxiOrderService, TaxiOrderData } from "@/app/services/taxiOrderService
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import * as Linking from "expo-linking";
 import { nativeNotifyAPI } from "@/app/services/nativeNotifyApi";
+import PaymentStripeJS from "@/app/components/PaymentStripeJS";
 
 export default function Taxi() {
   const { resolvedTheme } = useTheme();
@@ -1036,15 +1037,35 @@ export default function Taxi() {
         </View>
 
         {/* Confirm Booking */}
-        <TouchableOpacity
-          className={`p-4 rounded-xl items-center ${isLoading ? "bg-gray-500" : "bg-blue-500"}`}
-          onPress={handleConfirmBooking}
-          disabled={isLoading}
-        >
-          <AutoText className="text-white font-semibold">
-            {isLoading ? "Skapar bokning..." : "Boka Taxi"}
-          </AutoText>
-        </TouchableOpacity>
+        {paymentMethod === 'stripe' ? (
+          <PaymentStripeJS
+            amount={getFinalPrice()}
+            points={getFinalPrice() * 10}
+            isDark={isDark}
+            customText={`Betala ${getFinalPrice()} SEK för Taxi`}
+            customClassName={`w-full rounded-xl p-4 items-center ${
+              isDark ? "bg-dark-card" : "bg-light-card"
+            }`}
+            customStyle={{
+              backgroundColor: isDark ? "#1e1e1e" : "#ffffff",
+              borderWidth: 1,
+              borderColor: isDark ? "#3C3C3E" : "#E5E5E5",
+            }}
+            onPaymentSuccess={async (purchasedPoints: number, amountPaid: number) => {
+              await handleConfirmBooking();
+            }}
+          />
+        ) : (
+          <TouchableOpacity
+            className={`p-4 rounded-xl items-center ${isLoading ? "bg-gray-500" : "bg-blue-500"}`}
+            onPress={handleConfirmBooking}
+            disabled={isLoading}
+          >
+            <AutoText className="text-white font-semibold">
+              {isLoading ? "Skapar bokning..." : 'Boka Taxi'}
+            </AutoText>
+          </TouchableOpacity>
+        )}
       </ScrollView>
       <StatusBar style={isDark ? "light" : "dark"} />
     </SafeAreaView>

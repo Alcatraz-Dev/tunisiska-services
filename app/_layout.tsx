@@ -46,56 +46,24 @@ export default function RootLayout() {
       "Missing Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env"
     );
   }
-  // Use environment variable if available, otherwise use config
-  const stripePublishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || 'pk_test_51234567890abcdefghijklmnopqrstuvwxyz';
-  
-  // For Expo Go, we'll use a fallback key if the real one isn't available
-  const isExpoGo = Constants.appOwnership === 'expo';
-  const finalStripeKey = isExpoGo && !process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY 
-    ? 'pk_test_51234567890abcdefghijklmnopqrstuvwxyz' 
-    : stripePublishableKey;
-
-  const StripeWrapper = ({ children }: { children: React.ReactNode }) => {
-    if (Platform.OS === 'web') {
-      return <>{children}</>;
-    }
-
-    try {
-      const { StripeProvider } = require('@stripe/stripe-react-native');
-      console.log('StripeProvider loaded successfully');
-      return (
-        <StripeProvider
-          publishableKey={finalStripeKey}
-          merchantIdentifier="merchant.com.tunisiska.services" // Required for iOS Apple Pay
-        >
-          {children}
-        </StripeProvider>
-      );
-    } catch (error) {
-      console.warn('Stripe not available on this platform:', error);
-      return <>{children}</>;
-    }
-  };
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <StripeWrapper>
-        <ClerkProvider
-          tokenCache={tokenCache}
-          publishableKey={clerkPublishableKey}
-          // @ts-ignore: telemetry prop exists in Clerk SDK; ignore if types lag behind
-          telemetry={{ disabled: true }}
-        >
-          <ThemeProvider>
-            <NotificationProvider>
-              <SafeAreaProvider>
-                <PushBootstrap />
-                <Slot screenOptions={{ headerShown: false }} />
-              </SafeAreaProvider>
-            </NotificationProvider>
-          </ThemeProvider>
-        </ClerkProvider>
-      </StripeWrapper>
+      <ClerkProvider
+        tokenCache={tokenCache}
+        publishableKey={clerkPublishableKey}
+        // @ts-ignore: telemetry prop exists in Clerk SDK; ignore if types lag behind
+        telemetry={{ disabled: true }}
+      >
+        <ThemeProvider>
+          <NotificationProvider>
+            <SafeAreaProvider>
+              <PushBootstrap />
+              <Slot screenOptions={{ headerShown: false }} />
+            </SafeAreaProvider>
+          </NotificationProvider>
+        </ThemeProvider>
+      </ClerkProvider>
     </GestureHandlerRootView>
   );
 }

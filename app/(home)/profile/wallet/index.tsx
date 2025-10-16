@@ -33,7 +33,7 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Payment from "@/app/components/Payment";
+import PaymentStripeJS from "@/app/components/PaymentStripeJS";
 
 interface Referral {
   id: string;
@@ -530,13 +530,14 @@ export default function Wallet() {
                   </View>
                 )}
 
-                <Payment
-                  amount={topUp.amount }
+                <PaymentStripeJS
+                  amount={topUp.amount}
                   points={topUp.points}
                   isDark={isDark}
                   onPaymentSuccess={handlePaymentSuccess}
                   disableAll={globalDisable}
                   setDisableAll={setGlobalDisable}
+                  isWallet={true}
                 />
               </Animated.View>
             );
@@ -610,7 +611,7 @@ export default function Wallet() {
                 />
                 <View className="flex-1 justify-between gap-2">
                   <AutoText
-                    className={`font-semibold text-sm ${
+                    className={`font-semibold text-xs ${
                       isDark ? "text-white" : "text-gray-900"
                     }`}
                   >
@@ -619,13 +620,13 @@ export default function Wallet() {
                   <AutoText
                     className={`${
                       isDark ? "text-gray-400" : "text-gray-500"
-                    } text-xs`}
+                    } text-[9px]`}
                   >
                     {new Date(tx.date).toLocaleDateString("sv-SE")}
                   </AutoText>
                 </View>
                 <AutoText
-                  className={`ml-2 font-bold ${
+                  className={`ml-2 font-bold text-xs ${
                     tx.type === "earned"
                       ? "text-green-500"
                       : tx.type === "spent"

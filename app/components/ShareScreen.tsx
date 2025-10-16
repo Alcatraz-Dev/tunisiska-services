@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -22,33 +22,45 @@ import { AutoText } from "./ui/AutoText";
 import { showAlert } from "../utils/showAlert";
 import Constants from "expo-constants";
 
-const getExpoDevUrl = () => {
-  const projectId = Constants.expoConfig?.extra?.eas?.projectId || 'c7b65ce0-2aa6-4b42-b6d7-4f04277bc839';
-  const runtimeVersion = Constants.expoConfig?.version || '1.0.0';
-  return `https://expo.dev/preview/update?message=share+app&updateRuntimeVersion=${runtimeVersion}&createdAt=${encodeURIComponent(new Date().toISOString())}&slug=exp&projectId=${projectId}&group=latest`;
-};
+const projectId =
+  Constants.expoConfig?.extra?.eas?.projectId ||
+  "c7b65ce0-2aa6-4b42-b6d7-4f04277bc839";
 
-const EXPO_DEV_URL = getExpoDevUrl();
+// Use the EXPO_PUBLIC_DEV_URL from environment variables
+const getExpoDevUrl = () => {
+  return process.env.EXPO_PUBLIC_DEV_URL || `https://expo.dev/preview/update?projectId=${projectId}&group=latest`;
+};
 
 export default function ShareScreen() {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
   const router = useRouter();
+  const [expoDevUrl, setExpoDevUrl] = useState<string>(
+    `https://expo.dev/preview/update?projectId=${projectId}&group=latest`
+  );
+
+  useEffect(() => {
+    // Generate a fresh URL each time to ensure latest group
+    const url = getExpoDevUrl();
+    setExpoDevUrl(url);
+  }, []);
 
   const copyLink = async () => {
-    await fetch(EXPO_DEV_URL).then(
-      (res) => res.ok && Clipboard.setString(EXPO_DEV_URL)
+    if (!expoDevUrl) return;
+    await fetch(expoDevUrl).then(
+      (res) => res.ok && Clipboard.setString(expoDevUrl)
     );
     showAlert("Kopierad", "Länken har kopierats till urklipp!");
   };
 
   const openLink = async () => {
+    if (!expoDevUrl) return;
     try {
-      const supported = await fetch(EXPO_DEV_URL).then(
-        (res) => res.ok && Linking.canOpenURL(EXPO_DEV_URL)
+      const supported = await fetch(expoDevUrl).then(
+        (res) => res.ok && Linking.canOpenURL(expoDevUrl)
       );
       if (supported) {
-        await Linking.openURL(EXPO_DEV_URL);
+        await Linking.openURL(expoDevUrl);
       } else {
         showAlert("Fel", "Kunde inte öppna Expo Dev-länken.");
       }
@@ -58,7 +70,8 @@ export default function ShareScreen() {
   };
 
   const shareAppLink = async () => {
-    const url = await fetch(EXPO_DEV_URL).then((res) => res.ok && EXPO_DEV_URL);
+    if (!expoDevUrl) return;
+    const url = await fetch(expoDevUrl).then((res) => res.ok && expoDevUrl);
     try {
       await Share.share(
         {
@@ -74,12 +87,13 @@ export default function ShareScreen() {
   };
 
   const updateApp = async () => {
+    if (!expoDevUrl) return;
     try {
-      const supported = await fetch(EXPO_DEV_URL).then(
-        (res) => res.ok && Linking.canOpenURL(EXPO_DEV_URL)
+      const supported = await fetch(expoDevUrl).then(
+        (res) => res.ok && Linking.canOpenURL(expoDevUrl)
       );
       if (supported) {
-        await Linking.openURL(EXPO_DEV_URL);
+        await Linking.openURL(expoDevUrl);
       } else {
         showAlert("Fel", "Kunde inte öppna Expo Dev-länken.");
       }
@@ -138,7 +152,7 @@ export default function ShareScreen() {
           }}
         >
           <QRCode
-            value={EXPO_DEV_URL}
+            value={expoDevUrl}
             size={200}
             color={isDark ? "#fff" : "#000"}
             backgroundColor={isDark ? "#1c1c1e" : "#fff"}
@@ -168,7 +182,7 @@ export default function ShareScreen() {
               numberOfLines={1}
               ellipsizeMode="middle"
             >
-              {EXPO_DEV_URL}
+              {expoDevUrl}
             </AutoText>
             <View className="flex-row ml-2">
               <TouchableOpacity onPress={copyLink} className="px-2">

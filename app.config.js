@@ -9,7 +9,6 @@ module.exports = {
     version: '1.0.0',
     orientation: 'portrait',
     icon: './app/assets/icons/adaptive-icon.png',
-    scheme: 'tunisiska-services',
     userInterfaceStyle: 'automatic',
     splash: {
       image: './app/assets/icons/splash-icon.png',
@@ -34,7 +33,13 @@ module.exports = {
         NSUserNotificationsUsageDescription: 'This app uses notifications to keep you updated on your service bookings and important announcements.',
         // Enable badge updates
         'com.apple.developer.usernotifications.communication': true,
-        'ITSAppUsesNonExemptEncryption': false
+        'ITSAppUsesNonExemptEncryption': false,
+        // Add URL schemes for Stripe redirect
+        CFBundleURLTypes: [
+          {
+            CFBundleURLSchemes: ['tunisiska-services']
+          }
+        ]
       }
     },
     android: {
@@ -51,13 +56,25 @@ module.exports = {
         'RECEIVE_BOOT_COMPLETED',
         'VIBRATE',
         'WAKE_LOCK'
+      ],
+      intentFilters: [
+        {
+          action: 'VIEW',
+          data: [
+            {
+              scheme: 'tunisiska-services'
+            }
+          ],
+          category: ['BROWSABLE', 'DEFAULT']
+        }
       ]
     },
     web: {
       bundler: 'metro',
-      output: 'server',
+      output: 'static',
       favicon: './app/assets/icons/adaptive-icon.png'
     },
+    scheme: 'tunisiska-services',
     plugins: [
       [
         'expo-router',

@@ -198,9 +198,10 @@ export default function ReferralUsers() {
 
   const handleShare = async () => {
     try {
-      const projectId = Constants.expoConfig?.extra?.eas?.projectId || 'c7b65ce0-2aa6-4b42-b6d7-4f04277bc839';
-      const runtimeVersion = Constants.expoConfig?.version || '1.0.0';
-      const message = `Hej! Använd min referral-kod ${referralCode} och få bonuspoäng 🎁\n\nLadda ner appen här: https://expo.dev/preview/update?message=referral+bonus&updateRuntimeVersion=${runtimeVersion}&createdAt=${encodeURIComponent(new Date().toISOString())}&slug=exp&projectId=${projectId}&group=latest`;
+      // Use the EXPO_PUBLIC_DEV_URL from environment variables
+      const previewUrl = process.env.EXPO_PUBLIC_DEV_URL || `https://expo.dev/preview/update?projectId=${Constants.expoConfig?.extra?.eas?.projectId || 'c7b65ce0-2aa6-4b42-b6d7-4f04277bc839'}&group=latest`;
+
+      const message = `Hej! Använd min referral-kod ${referralCode} och få bonuspoäng 🎁\n\nLadda ner appen här: ${previewUrl}`;
       await Share.share({
         message,
       });

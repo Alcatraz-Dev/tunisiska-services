@@ -12,6 +12,7 @@ import { AutoText } from "@/app/components/ui/AutoText";
 import Input from "@/app/components/ui/Input";
 import { showAlert } from "@/app/utils/showAlert";
 import { ShippingOrderService } from "@/app/services/shippingOrderService";
+import PaymentStripeJS from "@/app/components/PaymentStripeJS";
 
 // 🔹 Fetch shipping schedules from Sanity
 const fetchShippingSchedules = async () => {
@@ -282,114 +283,12 @@ export default function ShippingPage() {
 
     if (method === 'stripe') {
       if (Platform.OS === 'web') {
-        // Web Stripe implementation
-        try {
-          const { loadStripe } = require('@stripe/stripe-js');
-          const stripe = await loadStripe(process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || "pk_test_placeholder");
-
-          if (!stripe) {
-            showAlert("Fel", "Stripe är inte tillgängligt på web");
-            return false;
-          }
-
-          const { getBestServerURL } = await import('@/app/config/stripe');
-          const serverUrl = await getBestServerURL();
-
-          const response = await fetch(`${serverUrl}/create-checkout-session`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              amount,
-              currency: 'sek',
-              successUrl: window.location.origin + '/success',
-              cancelUrl: window.location.origin + '/cancel'
-            }),
-          });
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Server error response:', errorText);
-            throw new Error(`Server error: ${response.status} - ${errorText}`);
-          }
-
-          const data = await response.json();
-          console.log('Checkout session created:', data);
-
-          const { error } = await stripe.redirectToCheckout({
-            sessionId: data.sessionId,
-          });
-
-          if (error) {
-            console.error('Stripe redirect error:', error);
-            showAlert("Betalning misslyckades", error.message);
-            return false;
-          }
-
-          console.log('Stripe web payment successful');
-          return true;
-        } catch (error: any) {
-          console.error('Stripe web payment failed:', error);
-          showAlert("Fel", "Betalning misslyckades: " + error.message);
-          return false;
-        }
-      }
-
-      // Native Stripe implementation
-      try {
-        const stripeModule = require('@stripe/stripe-react-native');
-        const { initPaymentSheet, presentPaymentSheet } = stripeModule;
-
-        const { getBestServerURL } = await import('@/app/config/stripe');
-        const serverUrl = await getBestServerURL();
-
-        const response = await fetch(`${serverUrl}/payment-sheet`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ amount, currency: 'sek' }),
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Server error response:', errorText);
-          throw new Error(`Server error: ${response.status} - ${errorText}`);
-        }
-
-        const data = await response.json();
-        console.log('Payment sheet data received:', Object.keys(data));
-
-        const { error: initError } = await initPaymentSheet({
-          merchantDisplayName: 'Tunisiska Services',
-          customerId: data.customer.id || data.customer,
-          customerEphemeralKeySecret: data.ephemeralKey,
-          paymentIntentClientSecret: data.paymentIntent,
-          returnURL: 'tunisiska-services://stripe-redirect',
-        });
-
-        if (initError) {
-          console.error('Payment sheet initialization error:', initError);
-          showAlert("Fel", "Kunde inte initiera betalning");
-          return false;
-        }
-
-        const { error: paymentError } = await presentPaymentSheet();
-
-        if (paymentError) {
-          console.error('Payment error:', paymentError);
-          showAlert("Betalning misslyckades", paymentError.message);
-          return false;
-        }
-
-        console.log('Stripe payment successful');
-        return true;
-      } catch (error: any) {
-        console.error('Stripe payment failed:', error);
-        showAlert("Fel", "Betalning misslyckades: " + error.message);
+        console.log('Stripe payment not available on web');
         return false;
       }
+      // Stripe removed - simulate payment success for native
+      console.log('Stripe payment simulated for amount:', amount);
+      return true;
     }
 
     return false;
@@ -919,14 +818,34 @@ export default function ShippingPage() {
             </View>
 
             {/* Bokningsknapp */}
-            <TouchableOpacity
-              onPress={handleBooking}
-              className="bg-blue-500 rounded-xl p-4 items-center"
-            >
-              <AutoText className="text-white font-semibold">
-                Bekräfta bokning
-              </AutoText>
-            </TouchableOpacity>
+            {paymentMethod === 'stripe' ? (
+              <PaymentStripeJS
+                amount={calculateTotal()}
+                points={calculateTotal() * 10}
+                isDark={isDark}
+                customText={`Betala ${calculateTotal()} SEK för Frakt`}
+                customClassName={`w-full rounded-xl p-4 items-center ${
+                  isDark ? "bg-dark-card" : "bg-light-card"
+                }`}
+                customStyle={{
+                  backgroundColor: isDark ? "#1e1e1e" : "#ffffff",
+                  borderWidth: 1,
+                  borderColor: isDark ? "#3C3C3E" : "#E5E5E5",
+                }}
+                onPaymentSuccess={async (purchasedPoints: number, amountPaid: number) => {
+                  await handleBooking();
+                }}
+              />
+            ) : (
+              <TouchableOpacity
+                onPress={handleBooking}
+                className="bg-blue-500 rounded-xl p-4 items-center"
+              >
+                <AutoText className="text-white font-semibold">
+                  Bekräfta bokning
+                </AutoText>
+              </TouchableOpacity>
+            )}
           </>
         )}
       </ScrollView>

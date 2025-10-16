@@ -19,7 +19,8 @@ import Input from "@/app/components/ui/Input";
 import { showAlert } from "@/app/utils/showAlert";
 import { useUser } from "@clerk/clerk-expo";
 import { MoveOrderService } from "@/app/services/moveOrderService";
-import Payment from "@/app/components/Payment";
+import PaymentStripeJS from "@/app/components/PaymentStripeJS";
+// Payment component removed - Stripe dependency eliminated
 
 export default function Move() {
   const { resolvedTheme } = useTheme();
@@ -678,17 +679,35 @@ export default function Move() {
 
         {/* Confirm Booking */}
         <View className="mb-8">
-          <TouchableOpacity
-            className={`p-4 rounded-xl items-center ${
-              isLoading ? 'bg-gray-400' : 'bg-blue-500'
-            }`}
-            onPress={createMoveOrder}
-            disabled={isLoading}
-          >
-            <AutoText className="text-white font-semibold text-lg">
-              {isLoading ? 'Skapar beställning...' : 'Bekräfta flyttbokning'}
-            </AutoText>
-          </TouchableOpacity>
+          {paymentMethod === 'stripe' ? (
+            <PaymentStripeJS
+              amount={getFinalPrice()}
+              points={getFinalPrice() * 10}
+              isDark={isDark}
+              customText={`Betala ${getFinalPrice()} SEK för Flytt`}
+              customClassName={`w-full rounded-xl p-4 items-center ${
+                isDark ? "bg-dark-card" : "bg-light-card"
+              }`}
+              customStyle={{
+                backgroundColor: isDark ? "#1e1e1e" : "#ffffff",
+                borderWidth: 1,
+                borderColor: isDark ? "#3C3C3E" : "#E5E5E5",
+              }}
+              onPaymentSuccess={async (purchasedPoints: number, amountPaid: number) => {
+                await createMoveOrder();
+              }}
+            />
+          ) : (
+            <TouchableOpacity
+              className={`p-4 rounded-xl items-center ${isLoading ? "bg-gray-500" : "bg-blue-500"}`}
+              onPress={createMoveOrder}
+              disabled={isLoading}
+            >
+              <AutoText className="text-white font-semibold text-lg">
+                {isLoading ? "Skapar beställning..." : 'Bekräfta flyttbokning'}
+              </AutoText>
+            </TouchableOpacity>
+          )}
 
           <View className="flex-row items-center justify-center mt-4">
             <Ionicons
@@ -732,14 +751,13 @@ export default function Move() {
                 </AutoText>
               </View>
 
-              {/* Payment Component */}
+              {/* Payment Component - Stripe removed, simulate success */}
               <View className="mb-6">
-                <Payment
-                  amount={getFinalPrice()}
-                  isDark={isDark}
-                  onPaymentSuccess={async () => {
+                <TouchableOpacity
+                  className={`p-4 rounded-xl items-center ${isDark ? 'bg-blue-500' : 'bg-blue-600'}`}
+                  onPress={async () => {
                     setShowPayment(false);
-                    // Create order after successful payment
+                    // Simulate successful payment and create order
                     try {
                       const scheduledDateTime = new Date(
                         date.getFullYear(),
@@ -785,7 +803,11 @@ export default function Move() {
                       showAlert('Fel', 'Betalningen lyckades men beställningen kunde inte skapas. Kontakta support.');
                     }
                   }}
-                />
+                >
+                  <AutoText className="text-white font-semibold">
+                    Bekräfta betalning ({getFinalPrice()} SEK)
+                  </AutoText>
+                </TouchableOpacity>
               </View>
 
               {/* Cancel Button */}

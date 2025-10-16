@@ -237,12 +237,16 @@ app.post("/payment-sheet", async (req, res) => {
 // Checkout session endpoint (for web)
 app.post("/create-checkout-session", async (req, res) => {
   try {
-    const { amount, currency, successUrl, cancelUrl } = req.body;
+    const { amount, currency, successUrl, cancelUrl, points } = req.body;
 
     if (!amount) return res.status(400).json({ error: "Amount is required" });
 
     const usedCurrency = currency || "sek";
-    const stripeAmount = usedCurrency === "sek" ? amount * 100 : amount;
+    // Amount is already in cents from the client
+    const stripeAmount = amount;
+
+    const displayAmount = (amount / 100).toFixed(2);
+    const displayPoints = points || Math.round(amount / 100 * 10);
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
@@ -251,8 +255,8 @@ app.post("/create-checkout-session", async (req, res) => {
           price_data: {
             currency: usedCurrency,
             product_data: {
-              name: "Tunisiska Services Payment",
-              description: `Payment of ${amount} ${usedCurrency.toUpperCase()}`,
+              name: `${displayPoints} Poäng - Tunisiska Services`,
+              description: `Köp ${displayPoints} poäng för ${displayAmount} ${usedCurrency.toUpperCase()}`,
             },
             unit_amount: stripeAmount,
           },
@@ -260,9 +264,13 @@ app.post("/create-checkout-session", async (req, res) => {
         },
       ],
       mode: "payment",
-      success_url: successUrl || `${req.protocol}://${req.get('host')}/success`,
-      cancel_url: cancelUrl || `${req.protocol}://${req.get('host')}/cancel`,
-      metadata: { integration: "web_checkout" }
+      success_url: successUrl || `tunisiska-services://success?session_id={CHECKOUT_SESSION_ID}&points=${displayPoints}&amount=${displayAmount}`,
+      cancel_url: cancelUrl || `tunisiska-services://cancel`,
+      metadata: {
+        integration: "web_checkout",
+        points: displayPoints.toString(),
+        amount_sek: displayAmount
+      }
     });
 
     res.json({

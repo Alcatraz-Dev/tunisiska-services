@@ -11,7 +11,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { AutoText } from './ui/AutoText';
 import Input from './ui/Input';
-import Payment from './Payment';
+// Payment component removed - Stripe dependency eliminated
 import { showAlert } from '@/app/utils/showAlert';
 import { useTheme } from '@/app/context/ThemeContext';
 import { 
@@ -407,15 +407,18 @@ export default function ServiceBooking({ serviceType, onOrderCreated, onBack }: 
         <AutoText className={`text-center text-lg font-bold mb-4 ${isDark ? 'text-white' : 'text-black'}`}>
           Slutför betalning
         </AutoText>
-        <Payment
-          amount={finalPrice}
-          isDark={isDark}
-          onPaymentSuccess={() => {
-            // Handle successful payment
+        <TouchableOpacity
+          className={`p-4 rounded-xl items-center ${isDark ? 'bg-blue-500' : 'bg-blue-600'}`}
+          onPress={() => {
+            // Simulate successful payment
             setShowPayment(false);
             // You might want to complete the order here
           }}
-        />
+        >
+          <AutoText className="text-white font-semibold">
+            Bekräfta betalning ({finalPrice} SEK)
+          </AutoText>
+        </TouchableOpacity>
         <TouchableOpacity
           onPress={() => setShowPayment(false)}
           className="mt-4 p-4 bg-gray-500 rounded-xl items-center"
