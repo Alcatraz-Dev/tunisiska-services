@@ -35,8 +35,9 @@ export default function PaymentStripeJS({
   customText,
   customClassName,
   customStyle,
-  isWallet = false, 
-}: PaymentStripeJSProps) {
+  isWallet = false,
+  disabled = false,
+}: PaymentStripeJSProps & { disabled?: boolean }) {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [checkoutUrl, setCheckoutUrl] = useState<string>("");
@@ -53,23 +54,29 @@ export default function PaymentStripeJS({
       // Create checkout session on your server
       const serverUrl =
         process.env.EXPO_PUBLIC_SERVER_URL || "http://localhost:3000";
+      console.log("🔗 [PAYMENT] Using server URL:", serverUrl);
+      console.log("💰 [PAYMENT] Sending amount:", amount, "points:", points || amount);
       const response = await fetch(`${serverUrl}/create-checkout-session`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          amount: amount , // Convert to cents
+          amount: Math.round(amount * 100) , // Convert SEK to öre (cents)
           currency: "sek",
-          points: points || amount ,
+          points: points || Math.round(amount * 10) ,
         }),
       });
 
       if (!response.ok) {
-        throw new Error("Failed to create checkout session");
+        console.error("❌ [PAYMENT] Server response not OK:", response.status, response.statusText);
+        const errorText = await response.text();
+        console.error("❌ [PAYMENT] Server error details:", errorText);
+        throw new Error(`Failed to create checkout session: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
+      console.log("✅ [PAYMENT] Server response:", data);
 
       // For web platform, open in external browser instead of WebView
       if (Platform.OS === "web") {
@@ -94,8 +101,8 @@ export default function PaymentStripeJS({
         }
       }
     } catch (error) {
-      console.error("Error creating checkout session:", error);
-      showAlert("Fel", "Kunde inte skapa betalningssession");
+      console.error("❌ [PAYMENT] Error creating checkout session:", error);
+      showAlert("Fel", `Kunde inte skapa betalningssession: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -174,9 +181,9 @@ export default function PaymentStripeJS({
 
       <TouchableOpacity
         testID="checkout-button-stripe-js"
-        disabled={disableAll || loading}
+        disabled={disableAll || loading || disabled}
         onPress={createCheckoutSession}
-        activeOpacity={disableAll ? 1 : 0.7}
+        activeOpacity={disableAll || disabled ? 1 : 0.7}
         className={customClassName || ""}
         style={[
           {
@@ -187,15 +194,19 @@ export default function PaymentStripeJS({
             shadowRadius: 8,
             shadowOffset: { width: 0, height: 10 },
             elevation: loading ? 6 : 3,
-            backgroundColor: loading
+            backgroundColor: loading || disabled
               ? isDark
                 ? "#1e1e1e"
                 : "#f3f4f6"
-              : isWallet
+              : disabled
                 ? isDark
-                  ? "#2563EB" // Blue for wallet dark mode
-                  : "#3B82F6" // Blue for wallet light mode
-                : "#d1d5db", // Gray for services
+                  ? "#374151" // Dark gray when disabled
+                  : "#9CA3AF" // Light gray when disabled
+                : isWallet
+                  ? isDark
+                    ? "#2563EB" // Blue for wallet dark mode
+                    : "#3B82F6" // Blue for wallet light mode
+                  : "#d1d5db", // Gray for services
           },
           customStyle,
         ]}
@@ -226,7 +237,7 @@ export default function PaymentStripeJS({
               color={isWallet ? "#fff" : isDark ? "#fff" : "#0ea5e9"}
             />
             <AutoText
-              className={`text-xs font-medium text-center mt-2 ${
+              className={`text-[9px] font-medium text-center mt-2 ${
                 isWallet ? "text-white" : isDark ? "text-white" : "text-black"
               }`}
               style={{ letterSpacing: 0.5 }}

@@ -797,28 +797,27 @@ export default function ShippingPage() {
               </TouchableOpacity>
             </View>
 
-            {/* Pris */}
-            <View className="mb-6">
-              <AutoText
-                className={`text-lg font-bold ${
-                  isDark ? "text-white" : "text-gray-900"
-                }`}
-              >
-                Totalpris: {kg ? calculateTotal() : 0} kr
+            {/* Price Summary */}
+            <View className={`border rounded-lg p-4 mb-6 ${isDark ? 'bg-dark-card' : 'bg-light-card'}`}>
+              <AutoText className={`text-lg font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                Prissammanfattning
               </AutoText>
-              {kg && (
-                <AutoText
-                  className={`text-sm ${
-                    isDark ? "text-gray-400" : "text-gray-600"
-                  }`}
-                >
-                  {kg} kg × 50 kr/kg = {parseFloat(kg) * 50} kr (minimum 100 kr)
-                </AutoText>
-              )}
+              <View className="flex-row justify-between mb-2">
+                <AutoText className={isDark ? 'text-gray-400' : 'text-gray-600'}>Grundpris:</AutoText>
+                <AutoText className={isDark ? 'text-white' : 'text-black'}>{kg ? calculateTotal() : 0} SEK</AutoText>
+              </View>
+              <View className="border-t border-gray-300 pt-2 mt-2">
+                <View className="flex-row justify-between">
+                  <AutoText className={`font-bold ${isDark ? 'text-white' : 'text-black'}`}>Att betala:</AutoText>
+                  <AutoText className={`font-bold ${isDark ? 'text-white' : 'text-black'}`}>
+                    {kg ? calculateTotal() : 0} SEK
+                  </AutoText>
+                </View>
+              </View>
             </View>
 
             {/* Bokningsknapp */}
-            {paymentMethod === 'stripe' ? (
+            {paymentMethod === 'stripe' || (paymentMethod === 'combined' && calculateTotal() > 0) ? (
               <PaymentStripeJS
                 amount={calculateTotal()}
                 points={calculateTotal() * 10}
@@ -832,6 +831,7 @@ export default function ShippingPage() {
                   borderWidth: 1,
                   borderColor: isDark ? "#3C3C3E" : "#E5E5E5",
                 }}
+                disabled={!selectedTrip || selectedCategories.length === 0 || !kg || !customerName.trim() || !customerPhone.trim() || !recipientName.trim() || !recipientPhone.trim()}
                 onPaymentSuccess={async (purchasedPoints: number, amountPaid: number) => {
                   await handleBooking();
                 }}
@@ -840,6 +840,7 @@ export default function ShippingPage() {
               <TouchableOpacity
                 onPress={handleBooking}
                 className="bg-blue-500 rounded-xl p-4 items-center"
+                disabled={!selectedTrip || selectedCategories.length === 0 || !kg || !customerName.trim() || !customerPhone.trim() || !recipientName.trim() || !recipientPhone.trim()}
               >
                 <AutoText className="text-white font-semibold">
                   Bekräfta bokning

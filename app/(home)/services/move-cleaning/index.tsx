@@ -959,31 +959,6 @@ export default function MoveCleaning() {
             <AutoText className={isDark ? 'text-gray-400' : 'text-gray-600'}>Grundpris:</AutoText>
             <AutoText className={isDark ? 'text-white' : 'text-black'}>{estimatedPrice} SEK</AutoText>
           </View>
-          {userPoints > 0 && paymentMethod !== 'cash' && paymentMethod !== 'stripe' && (
-            <>
-              <View className="flex-row justify-between items-center mb-2">
-                <AutoText className={isDark ? 'text-gray-400' : 'text-gray-600'}>Använd poäng:</AutoText>
-                <Input
-                  placeholder="0"
-                  keyboardType="numeric"
-                  value={pointsToUse.toString()}
-                  onChangeText={handlePointsChange}
-                  className={`border rounded p-2 w-20 text-center ${
-                    isDark ? 'bg-gray-700 text-white' : 'bg-white text-black'
-                  }`}
-                />
-              </View>
-              <AutoText className={`text-xs mb-2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                Du har {userPoints} poäng tillgängliga
-              </AutoText>
-              {pointsToUse > 0 && (
-                <View className="flex-row justify-between mb-2">
-                  <AutoText className={isDark ? 'text-gray-400' : 'text-gray-600'}>Poängrabatt:</AutoText>
-                  <AutoText className="text-green-500">-{(pointsToUse / 10).toFixed(0)} SEK</AutoText>
-                </View>
-              )}
-            </>
-          )}
           <View className="border-t border-gray-300 pt-2 mt-2">
             <View className="flex-row justify-between">
               <AutoText className={`font-bold ${isDark ? 'text-white' : 'text-black'}`}>Att betala:</AutoText>
@@ -996,7 +971,7 @@ export default function MoveCleaning() {
 
         {/* Confirm Booking */}
         <View className="mb-8">
-          {paymentMethod === 'stripe' ? (
+          {paymentMethod === 'stripe' || (paymentMethod === 'combined' && getFinalPrice() > 0) ? (
             <PaymentStripeJS
               amount={getFinalPrice()}
               points={getFinalPrice() * 10}
@@ -1010,6 +985,7 @@ export default function MoveCleaning() {
                 borderWidth: 1,
                 borderColor: isDark ? "#3C3C3E" : "#E5E5E5",
               }}
+              disabled={!customerName.trim() || !customerPhone.trim() || !pickup.trim() || !dropoff.trim() || !numPersons.trim() || parseInt(numPersons) < 1 || !numItems.trim() || parseInt(numItems) < 1 || selectedCategories.length === 0 || cleaningAreas.length === 0}
               onPaymentSuccess={async (purchasedPoints: number, amountPaid: number) => {
                 await createMoveCleaningOrder();
               }}
@@ -1018,7 +994,7 @@ export default function MoveCleaning() {
             <TouchableOpacity
               className={`p-4 rounded-xl items-center ${isLoading ? "bg-gray-500" : "bg-blue-500"}`}
               onPress={createMoveCleaningOrder}
-              disabled={isLoading}
+              disabled={isLoading || !customerName.trim() || !customerPhone.trim() || !pickup.trim() || !dropoff.trim() || !numPersons.trim() || parseInt(numPersons) < 1 || !numItems.trim() || parseInt(numItems) < 1 || selectedCategories.length === 0 || cleaningAreas.length === 0}
             >
               <AutoText className="text-white font-semibold text-lg">
                 {isLoading ? "Skapar beställning..." : 'Bekräfta flytt & städning'}

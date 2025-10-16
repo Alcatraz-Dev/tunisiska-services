@@ -533,8 +533,8 @@ export default function Move() {
               paymentMethod === 'points'
                 ? "bg-blue-500 border-blue-500"
                 : isDark
-                ? "bg-dark-card border-gray-600"
-                : "bg-light-card border-gray-300"
+                  ? "bg-dark-card border-gray-600"
+                  : "bg-light-card border-gray-300"
             }`}
             onPress={() => setPaymentMethod('points')}
             activeOpacity={0.8}
@@ -546,8 +546,8 @@ export default function Move() {
                     paymentMethod === 'points'
                       ? "bg-white border-white"
                       : isDark
-                      ? "border-gray-400"
-                      : "border-gray-500"
+                        ? "border-gray-400"
+                        : "border-gray-500"
                   }`}
                 >
                   {paymentMethod === 'points' && (
@@ -559,8 +559,8 @@ export default function Move() {
                     paymentMethod === 'points'
                       ? "text-white font-semibold"
                       : isDark
-                      ? "text-white"
-                      : "text-black"
+                        ? "text-white"
+                        : "text-black"
                   }
                 >
                   Poäng (förbetald)
@@ -571,13 +571,32 @@ export default function Move() {
                   paymentMethod === 'points'
                     ? "text-white"
                     : isDark
-                    ? "text-gray-400"
-                    : "text-gray-600"
+                      ? "text-gray-400"
+                      : "text-gray-600"
                 }`}
               >
                 {userPoints} poäng
               </AutoText>
             </View>
+            {paymentMethod === 'points' && (
+              <View className="mt-3 pt-3 border-t border-white/20">
+                <View className="flex-row items-center justify-between">
+                  <AutoText className="text-white text-sm">Använd poäng:</AutoText>
+                  <Input
+                    placeholder="0"
+                    keyboardType="numeric"
+                    value={pointsToUse.toString()}
+                    onChangeText={handlePointsChange}
+                    className={`border rounded p-2 w-20 text-center ${
+                      isDark ? 'bg-gray-700 text-white' : 'bg-white text-black'
+                    }`}
+                  />
+                </View>
+                <AutoText className="text-white/80 text-xs mt-1">
+                  Du har {userPoints} poäng tillgängliga
+                </AutoText>
+              </View>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -585,8 +604,8 @@ export default function Move() {
               paymentMethod === 'combined'
                 ? "bg-blue-500 border-blue-500"
                 : isDark
-                ? "bg-dark-card border-gray-600"
-                : "bg-light-card border-gray-300"
+                  ? "bg-dark-card border-gray-600"
+                  : "bg-light-card border-gray-300"
             }`}
             onPress={() => setPaymentMethod('combined')}
             activeOpacity={0.8}
@@ -598,8 +617,8 @@ export default function Move() {
                     paymentMethod === 'combined'
                       ? "bg-white border-white"
                       : isDark
-                      ? "border-gray-400"
-                      : "border-gray-500"
+                        ? "border-gray-400"
+                        : "border-gray-500"
                   }`}
                 >
                   {paymentMethod === 'combined' && (
@@ -611,8 +630,8 @@ export default function Move() {
                     paymentMethod === 'combined'
                       ? "text-white font-semibold"
                       : isDark
-                      ? "text-white"
-                      : "text-black"
+                        ? "text-white"
+                        : "text-black"
                   }
                 >
                   Kombinerat (kort + poäng)
@@ -623,13 +642,32 @@ export default function Move() {
                   paymentMethod === 'combined'
                     ? "text-white"
                     : isDark
-                    ? "text-gray-400"
-                    : "text-gray-600"
+                      ? "text-gray-400"
+                      : "text-gray-600"
                 }`}
               >
                 {userPoints} poäng
               </AutoText>
             </View>
+            {paymentMethod === 'combined' && (
+              <View className="mt-3 pt-3 border-t border-white/20">
+                <View className="flex-row items-center justify-between">
+                  <AutoText className="text-white text-sm">Använd poäng:</AutoText>
+                  <Input
+                    placeholder="0"
+                    keyboardType="numeric"
+                    value={pointsToUse.toString()}
+                    onChangeText={handlePointsChange}
+                    className={`border rounded p-2 w-20 text-center ${
+                      isDark ? 'bg-gray-700 text-white' : 'bg-white text-black'
+                    }`}
+                  />
+                </View>
+                <AutoText className="text-white/80 text-xs mt-1">
+                  Du har {userPoints} poäng tillgängliga
+                </AutoText>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -642,31 +680,6 @@ export default function Move() {
             <AutoText className={isDark ? 'text-gray-400' : 'text-gray-600'}>Grundpris:</AutoText>
             <AutoText className={isDark ? 'text-white' : 'text-black'}>{estimatedPrice} SEK</AutoText>
           </View>
-          {userPoints > 0 && paymentMethod !== 'cash' && (
-            <>
-              <View className="flex-row justify-between items-center mb-2">
-                <AutoText className={isDark ? 'text-gray-400' : 'text-gray-600'}>Använd poäng:</AutoText>
-                <Input
-                  placeholder="0"
-                  keyboardType="numeric"
-                  value={pointsToUse.toString()}
-                  onChangeText={handlePointsChange}
-                  className={`border rounded p-2 w-20 text-center ${
-                    isDark ? 'bg-gray-700 text-white' : 'bg-white text-black'
-                  }`}
-                />
-              </View>
-              <AutoText className={`text-xs mb-2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                Du har {userPoints} poäng tillgängliga
-              </AutoText>
-              {pointsToUse > 0 && (
-                <View className="flex-row justify-between mb-2">
-                  <AutoText className={isDark ? 'text-gray-400' : 'text-gray-600'}>Poängrabatt:</AutoText>
-                  <AutoText className="text-green-500">-{(pointsToUse / 10).toFixed(0)} SEK</AutoText>
-                </View>
-              )}
-            </>
-          )}
           <View className="border-t border-gray-300 pt-2 mt-2">
             <View className="flex-row justify-between">
               <AutoText className={`font-bold ${isDark ? 'text-white' : 'text-black'}`}>Att betala:</AutoText>
@@ -679,7 +692,7 @@ export default function Move() {
 
         {/* Confirm Booking */}
         <View className="mb-8">
-          {paymentMethod === 'stripe' ? (
+          {paymentMethod === 'stripe' || (paymentMethod === 'combined' && getFinalPrice() > 0) ? (
             <PaymentStripeJS
               amount={getFinalPrice()}
               points={getFinalPrice() * 10}
@@ -693,6 +706,7 @@ export default function Move() {
                 borderWidth: 1,
                 borderColor: isDark ? "#3C3C3E" : "#E5E5E5",
               }}
+              disabled={!customerName.trim() || !customerPhone.trim() || !pickup.trim() || !dropoff.trim() || !numPersons.trim() || parseInt(numPersons) < 1 || !numItems.trim() || parseInt(numItems) < 1 || selectedCategories.length === 0}
               onPaymentSuccess={async (purchasedPoints: number, amountPaid: number) => {
                 await createMoveOrder();
               }}
@@ -701,7 +715,7 @@ export default function Move() {
             <TouchableOpacity
               className={`p-4 rounded-xl items-center ${isLoading ? "bg-gray-500" : "bg-blue-500"}`}
               onPress={createMoveOrder}
-              disabled={isLoading}
+              disabled={isLoading || !customerName.trim() || !customerPhone.trim() || !pickup.trim() || !dropoff.trim() || !numPersons.trim() || parseInt(numPersons) < 1 || !numItems.trim() || parseInt(numItems) < 1 || selectedCategories.length === 0}
             >
               <AutoText className="text-white font-semibold text-lg">
                 {isLoading ? "Skapar beställning..." : 'Bekräfta flyttbokning'}

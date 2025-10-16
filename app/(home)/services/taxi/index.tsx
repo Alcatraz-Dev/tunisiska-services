@@ -1001,31 +1001,6 @@ export default function Taxi() {
             <AutoText className={isDark ? 'text-gray-400' : 'text-gray-600'}>Grundpris:</AutoText>
             <AutoText className={isDark ? 'text-white' : 'text-black'}>{estimatedPrice} SEK</AutoText>
           </View>
-          {currentUserPoints > 0 && paymentMethod !== 'cash' && paymentMethod !== 'stripe' && (
-            <>
-              <View className="flex-row justify-between items-center mb-2">
-                <AutoText className={isDark ? 'text-gray-400' : 'text-gray-600'}>Använd poäng:</AutoText>
-                <Input
-                  placeholder="0"
-                  keyboardType="numeric"
-                  value={pointsToUse.toString()}
-                  onChangeText={handlePointsChange}
-                  className={`border rounded p-2 w-20 text-center ${
-                    isDark ? 'bg-gray-700 text-white' : 'bg-white text-black'
-                  }`}
-                />
-              </View>
-              <AutoText className={`text-xs mb-2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                Du har {currentUserPoints} poäng tillgängliga
-              </AutoText>
-              {pointsToUse > 0 && (
-                <View className="flex-row justify-between mb-2">
-                  <AutoText className={isDark ? 'text-gray-400' : 'text-gray-600'}>Poängrabatt:</AutoText>
-                  <AutoText className="text-green-500">-{(pointsToUse / 10).toFixed(0)} SEK</AutoText>
-                </View>
-              )}
-            </>
-          )}
           <View className="border-t border-gray-300 pt-2 mt-2">
             <View className="flex-row justify-between">
               <AutoText className={`font-bold ${isDark ? 'text-white' : 'text-black'}`}>Att betala:</AutoText>
@@ -1037,7 +1012,7 @@ export default function Taxi() {
         </View>
 
         {/* Confirm Booking */}
-        {paymentMethod === 'stripe' ? (
+        {paymentMethod === 'stripe' || (paymentMethod === 'combined' && getFinalPrice() > 0) ? (
           <PaymentStripeJS
             amount={getFinalPrice()}
             points={getFinalPrice() * 10}
@@ -1051,6 +1026,7 @@ export default function Taxi() {
               borderWidth: 1,
               borderColor: isDark ? "#3C3C3E" : "#E5E5E5",
             }}
+            disabled={!pickup.trim() || !dropoff.trim() || !passengerName.trim() || !phone.trim() || !passengers.trim() || parseInt(passengers) < 1 || parseInt(passengers) > 4}
             onPaymentSuccess={async (purchasedPoints: number, amountPaid: number) => {
               await handleConfirmBooking();
             }}
@@ -1059,7 +1035,7 @@ export default function Taxi() {
           <TouchableOpacity
             className={`p-4 rounded-xl items-center ${isLoading ? "bg-gray-500" : "bg-blue-500"}`}
             onPress={handleConfirmBooking}
-            disabled={isLoading}
+            disabled={isLoading || !pickup.trim() || !dropoff.trim() || !passengerName.trim() || !phone.trim() || !passengers.trim() || parseInt(passengers) < 1 || parseInt(passengers) > 4}
           >
             <AutoText className="text-white font-semibold">
               {isLoading ? "Skapar bokning..." : 'Boka Taxi'}
