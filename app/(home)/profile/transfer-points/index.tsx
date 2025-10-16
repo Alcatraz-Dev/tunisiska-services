@@ -1,5 +1,12 @@
 import React, { useState } from "react";
-import { View, TouchableOpacity, ScrollView, Alert, Image } from "react-native";
+import {
+  View,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
+  Image,
+  FlatList,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../../context/ThemeContext";
@@ -78,7 +85,7 @@ export default function TransferPointsScreen() {
     const loadUserPoints = async () => {
       if (user?.id) {
         try {
-          const { client } = await import('@/sanityClient');
+          const { client } = await import("@/sanityClient");
           const userDoc = await client.fetch(
             `*[_type == "users" && clerkId == $clerkId][0]`,
             { clerkId: user.id }
@@ -93,11 +100,11 @@ export default function TransferPointsScreen() {
               unsafeMetadata: {
                 ...(user.unsafeMetadata as any),
                 points: sanityPoints,
-              }
+              },
             });
           }
         } catch (error) {
-          console.error('Error loading user points from Sanity:', error);
+          console.error("Error loading user points from Sanity:", error);
           // Fallback to metadata
           setCurrentUserPoints((user?.unsafeMetadata as any)?.points || 0);
         }
@@ -108,7 +115,6 @@ export default function TransferPointsScreen() {
   }, [user?.id]);
   const currentUserFriends =
     (user?.unsafeMetadata as UserMetadata)?.friends || [];
-
 
   // Refresh friends list when component mounts or when refreshTrigger changes
   React.useEffect(() => {
@@ -133,209 +139,219 @@ export default function TransferPointsScreen() {
     );
   }, []);
 
-const handleTransfer = async () => {
-  const receiverId = recipientClerkId.trim();
-  const amount = parseInt(pointsToTransfer);
+  const handleTransfer = async () => {
+    const receiverId = recipientClerkId.trim();
+    const amount = parseInt(pointsToTransfer);
 
-  if (!receiverId) {
-    showAlert("Fel", "Vänligen välj en vän att överföra till");
-    return;
-  }
-
-  if (!amount || amount <= 0) {
-    showAlert("Fel", "Vänligen ange ett giltigt antal poäng");
-    return;
-  }
-
-  if (amount < 10) {
-    showAlert("Fel", "Minsta överföringsbelopp är 10 poäng");
-    return;
-  }
-
-  if (!user) {
-    showAlert("Fel", "Du är inte inloggad");
-    return;
-  }
-
-  const senderPoints = currentUserPoints;
-  if (senderPoints < amount) {
-    showAlert("Otillräckliga poäng", "Du har inte tillräckligt med poäng");
-    return;
-  }
-
-  // Check if recipient is in user's friends list
-  const friendData = currentUserFriends.find(friend => friend.clerkId === receiverId);
-  if (!friendData) {
-    showAlert("Fel", "Du kan endast överföra poäng till dina vänner. Lägg till personen som vän först.");
-    return;
-  }
-
-  setIsLoading(true);
-
-  try {
-    console.log('Starting transfer to:', receiverId);
-
-    // Update sender's points
-    const senderNewPoints = senderPoints - amount;
-    await user.update({
-      unsafeMetadata: {
-        ...(user.unsafeMetadata as any),
-        points: senderNewPoints,
-      }
-    });
-
-    // Update fromUserPoints in friend request metadata to reflect current points
-    const updatedFriendRequests = (user.unsafeMetadata as any)?.friendRequests || [];
-    const updatedRequests = updatedFriendRequests.map((req: any) => {
-      if (req.fromUserId === user.id) {
-        return {
-          ...req,
-          fromUserPoints: senderNewPoints, // Update with current points after transfer
-        };
-      }
-      return req;
-    });
-
-    await user.update({
-      unsafeMetadata: {
-        ...(user.unsafeMetadata as any),
-        friendRequests: updatedRequests.slice(-50), // Keep only recent 50
-      }
-    });
-
-
-    // Transaction records are now handled in the recipient update section
-
-    // Update recipient's points directly in Sanity
-    try {
-      console.log(`📝 Updating recipient ${receiverId} with +${amount} points via Sanity`);
-
-      const { client } = await import('@/sanityClient');
-
-      // Get recipient's current points from Sanity
-      const recipientDoc = await client.fetch(
-        `*[_type == "users" && clerkId == $clerkId][0]`,
-        { clerkId: receiverId }
-      );
-
-      const recipientCurrentPoints = recipientDoc?.points || 0;
-      const recipientNewPoints = recipientCurrentPoints + amount;
-
-      // Update recipient's points in Sanity
-      if (recipientDoc) {
-        await client
-          .patch(recipientDoc._id)
-          .set({ points: recipientNewPoints })
-          .commit();
-      } else {
-        // Create user document if it doesn't exist
-        await client.create({
-          _type: 'users',
-          clerkId: receiverId,
-          email: '', // Will be updated later
-          points: recipientNewPoints,
-        });
-      }
-
-      // For now, just update the recipient's points in Sanity
-      // Clerk metadata updates for other users require server-side implementation
-      console.log(`✅ Updated recipient ${receiverId} points in Sanity: ${recipientCurrentPoints} -> ${recipientNewPoints}`);
-
-      // Update sender's points in Sanity
-      const senderDoc = await client.fetch(
-        `*[_type == "users" && clerkId == $clerkId][0]`,
-        { clerkId: user?.id }
-      );
-
-      if (senderDoc) {
-        await client
-          .patch(senderDoc._id)
-          .set({ points: senderNewPoints })
-          .commit();
-      } else {
-        // Create user document if it doesn't exist
-        await client.create({
-          _type: 'users',
-          clerkId: user?.id,
-          email: user?.primaryEmailAddress?.emailAddress || '',
-          points: senderNewPoints,
-        });
-      }
-
-      // Update local state
-      setCurrentUserPoints(senderNewPoints);
-
-      // Add transaction record for sender (points already deducted above)
-      const senderTransactions = (user.unsafeMetadata as any)?.transactions || [];
-      senderTransactions.unshift({
-        id: `transfer_sent_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        type: "spent",
-        points: amount,
-        description: `Överfört ${amount} poäng till ${friendData.name}`,
-        date: new Date().toISOString(),
-      });
-
-      // Keep only the last 50 transactions for sender
-      const limitedSenderTransactions = senderTransactions.slice(0, 50);
-
-      await user.update({
-        unsafeMetadata: {
-          ...(user.unsafeMetadata as any),
-          transactions: limitedSenderTransactions,
-        }
-      });
-
-      console.log('✅ Transfer completed for both sender and recipient');
-
-    } catch (error) {
-      console.error('❌ Failed to update recipient points:', error);
-      // Revert sender's points if recipient update failed
-      await user.update({
-        unsafeMetadata: {
-          ...(user.unsafeMetadata as any),
-          points: senderPoints,
-        }
-      });
-      throw new Error('Failed to complete transfer - recipient could not be updated');
+    if (!receiverId) {
+      showAlert("Fel", "Vänligen välj en vän att överföra till");
+      return;
     }
 
-    // Send notification to recipient (this works in the current setup)
-    const notificationPayload = {
-      title: "Poäng mottagna! 🎉",
-      message: `${user?.fullName || user?.firstName || 'En vän'} har överfört ${amount} poäng till dig!`,
-      subID: receiverId,
-      pushData: {
-        type: "points_received",
-        amount: amount,
-        fromUser: user?.fullName || user?.firstName || 'En vän',
-      },
-    };
+    if (!amount || amount <= 0) {
+      showAlert("Fel", "Vänligen ange ett giltigt antal poäng");
+      return;
+    }
 
-    await nativeNotifyAPI.sendNotification(notificationPayload);
+    if (amount < 10) {
+      showAlert("Fel", "Minsta överföringsbelopp är 10 poäng");
+      return;
+    }
 
-    console.log('✅ Notification sent to recipient');
+    if (!user) {
+      showAlert("Fel", "Du är inte inloggad");
+      return;
+    }
 
-    showAlert(
-      "Överföring lyckades! 🎉",
-      `Du har överfört ${amount} poäng till ${friendData.name}. Mottagaren har fått poängen och en notifikation.`
+    const senderPoints = currentUserPoints;
+    if (senderPoints < amount) {
+      showAlert("Otillräckliga poäng", "Du har inte tillräckligt med poäng");
+      return;
+    }
+
+    // Check if recipient is in user's friends list
+    const friendData = currentUserFriends.find(
+      (friend) => friend.clerkId === receiverId
     );
+    if (!friendData) {
+      showAlert(
+        "Fel",
+        "Du kan endast överföra poäng till dina vänner. Lägg till personen som vän först."
+      );
+      return;
+    }
 
-    // Clear form
-    setRecipientClerkId("");
-    setPointsToTransfer("");
+    setIsLoading(true);
 
-    // Navigate back
-    setTimeout(() => {
-      router.back();
-    }, 2000);
+    try {
+      console.log("Starting transfer to:", receiverId);
 
-  } catch (error: any) {
-    console.error("Transfer error:", error);
-    showAlert("Fel", error.message || "Kunde inte genomföra överföringen.");
-  } finally {
-    setIsLoading(false);
-  }
-};
+      // Update sender's points
+      const senderNewPoints = senderPoints - amount;
+      await user.update({
+        unsafeMetadata: {
+          ...(user.unsafeMetadata as any),
+          points: senderNewPoints,
+        },
+      });
+
+      // Update fromUserPoints in friend request metadata to reflect current points
+      const updatedFriendRequests =
+        (user.unsafeMetadata as any)?.friendRequests || [];
+      const updatedRequests = updatedFriendRequests.map((req: any) => {
+        if (req.fromUserId === user.id) {
+          return {
+            ...req,
+            fromUserPoints: senderNewPoints, // Update with current points after transfer
+          };
+        }
+        return req;
+      });
+
+      await user.update({
+        unsafeMetadata: {
+          ...(user.unsafeMetadata as any),
+          friendRequests: updatedRequests.slice(-50), // Keep only recent 50
+        },
+      });
+
+      // Transaction records are now handled in the recipient update section
+
+      // Update recipient's points directly in Sanity
+      try {
+        console.log(
+          `📝 Updating recipient ${receiverId} with +${amount} points via Sanity`
+        );
+
+        const { client } = await import("@/sanityClient");
+
+        // Get recipient's current points from Sanity
+        const recipientDoc = await client.fetch(
+          `*[_type == "users" && clerkId == $clerkId][0]`,
+          { clerkId: receiverId }
+        );
+
+        const recipientCurrentPoints = recipientDoc?.points || 0;
+        const recipientNewPoints = recipientCurrentPoints + amount;
+
+        // Update recipient's points in Sanity
+        if (recipientDoc) {
+          await client
+            .patch(recipientDoc._id)
+            .set({ points: recipientNewPoints })
+            .commit();
+        } else {
+          // Create user document if it doesn't exist
+          await client.create({
+            _type: "users",
+            clerkId: receiverId,
+            email: "", // Will be updated later
+            points: recipientNewPoints,
+          });
+        }
+
+        // For now, just update the recipient's points in Sanity
+        // Clerk metadata updates for other users require server-side implementation
+        console.log(
+          `✅ Updated recipient ${receiverId} points in Sanity: ${recipientCurrentPoints} -> ${recipientNewPoints}`
+        );
+
+        // Update sender's points in Sanity
+        const senderDoc = await client.fetch(
+          `*[_type == "users" && clerkId == $clerkId][0]`,
+          { clerkId: user?.id }
+        );
+
+        if (senderDoc) {
+          await client
+            .patch(senderDoc._id)
+            .set({ points: senderNewPoints })
+            .commit();
+        } else {
+          // Create user document if it doesn't exist
+          await client.create({
+            _type: "users",
+            clerkId: user?.id,
+            email: user?.primaryEmailAddress?.emailAddress || "",
+            points: senderNewPoints,
+          });
+        }
+
+        // Update local state
+        setCurrentUserPoints(senderNewPoints);
+
+        // Add transaction record for sender (points already deducted above)
+        const senderTransactions =
+          (user.unsafeMetadata as any)?.transactions || [];
+        senderTransactions.unshift({
+          id: `transfer_sent_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          type: "spent",
+          points: amount,
+          description: `Överfört ${amount} poäng till ${friendData.name}`,
+          date: new Date().toISOString(),
+        });
+
+        // Keep only the last 50 transactions for sender
+        const limitedSenderTransactions = senderTransactions.slice(0, 50);
+
+        await user.update({
+          unsafeMetadata: {
+            ...(user.unsafeMetadata as any),
+            transactions: limitedSenderTransactions,
+          },
+        });
+
+        console.log("✅ Transfer completed for both sender and recipient");
+      } catch (error) {
+        console.error("❌ Failed to update recipient points:", error);
+        // Revert sender's points if recipient update failed
+        await user.update({
+          unsafeMetadata: {
+            ...(user.unsafeMetadata as any),
+            points: senderPoints,
+          },
+        });
+        throw new Error(
+          "Failed to complete transfer - recipient could not be updated"
+        );
+      }
+
+      // Send notification to recipient (this works in the current setup)
+      const notificationPayload = {
+        title: "Poäng mottagna! 🎉",
+        message: `${user?.fullName || user?.firstName || "En vän"} har överfört ${amount} poäng till dig!`,
+        subID: receiverId,
+        pushData: {
+          type: "points_received",
+          amount: amount,
+          fromUser: user?.fullName || user?.firstName || "En vän",
+        },
+      };
+
+      await nativeNotifyAPI.sendNotification(notificationPayload);
+
+      console.log("✅ Notification sent to recipient");
+
+      showAlert(
+        "Överföring lyckades! 🎉",
+        `Du har överfört ${amount} poäng till ${friendData.name}. Mottagaren har fått poängen och en notifikation.`
+      );
+
+      // Clear form
+      setRecipientClerkId("");
+      setPointsToTransfer("");
+
+      // Navigate back
+      setTimeout(() => {
+        router.back();
+      }, 2000);
+    } catch (error: any) {
+      console.error("Transfer error:", error);
+      showAlert("Fel", error.message || "Kunde inte genomföra överföringen.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
       {/* Header */}
@@ -368,10 +384,7 @@ const handleTransfer = async () => {
         </AutoText>
       </View>
 
-      <ScrollView
-        className=" mt-4 px-6 "
-        contentContainerStyle={{ paddingBottom: 100 }}
-      >
+      <View className=" mt-4 px-6 ">
         {/* Modern Wallet Card */}
         <Animated.View entering={FadeInUp.duration(600)}>
           <LinearGradient
@@ -422,187 +435,197 @@ const handleTransfer = async () => {
             </View>
           </LinearGradient>
         </Animated.View>
-
-        {/* Transfer Form */}
-        <Animated.View
-          entering={FadeInUp.delay(500)}
-          style={{
-            shadowColor: "#000",
-            shadowOpacity: 0.1,
-            shadowRadius: 8,
-            shadowOffset: { width: 0, height: 4 },
-            elevation: 6,
-          }}
-        >
-          <View
-            className={` p-6 mt-6 rounded-2xl mb-6  ${isDark ? "bg-dark-card" : "bg-light-card"}`}
+        <View className="mt-5">
+          <AutoText
+            className={`my-2 p-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}
           >
-            <AutoText
-              className={`text-lg font-semibold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}
-            >
-              Överföringsdetaljer
-            </AutoText>
+            Välj vän att överföra till *
+          </AutoText>
 
-            <AutoText
-              className={`my-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}
-            >
-              Välj vän att överföra till *
-            </AutoText>
-
-            {/* Friend Selector */}
-            <View className="mb-4">
-              {currentUserFriends.length > 0 ? (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  className="flex-row"
-                  contentContainerStyle={{ paddingVertical: 8 }}
+          {/* Friend Selector */}
+          <View>
+            {currentUserFriends.length > 0 ? (
+              <FlatList
+                data={currentUserFriends}
+                keyExtractor={(item) => item.id}
+                numColumns={2}
+                columnWrapperStyle={{ justifyContent: "space-between" }}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingVertical: 8 }}
+                renderItem={({ item: friend }) => (
+                  <TouchableOpacity
+                    onPress={() => setRecipientClerkId(friend.clerkId)}
+                    onPressIn={() => setRecipientClerkId(friend.clerkId)}
+                    className={`flex-row items-center p-3 mb-3 rounded-xl border-2 flex-1 mr-2 ${
+                      recipientClerkId === friend.clerkId
+                        ? "border-primary bg-primary/10"
+                        : isDark
+                          ? "border-gray-600 bg-dark-card"
+                          : "border-gray-300 bg-light-card"
+                    }`}
+                  >
+                    <View className="w-8 h-8 rounded-full bg-gray-300 mr-2 overflow-hidden">
+                      {friend.imageUrl ? (
+                        <Image
+                          source={{ uri: friend.imageUrl }}
+                          style={{ width: "100%", height: "100%" }}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View className="w-full h-full bg-gray-400 items-center justify-center">
+                          <AutoText className="text-white font-bold text-sm">
+                            {friend.name.charAt(0).toUpperCase()}
+                          </AutoText>
+                        </View>
+                      )}
+                    </View>
+                    <View className="flex-1">
+                      <AutoText
+                        className={`font-medium text-sm ${
+                          recipientClerkId === friend.clerkId
+                            ? "text-primary"
+                            : isDark
+                              ? "text-white"
+                              : "text-gray-900"
+                        }`}
+                      >
+                        {friend.name}
+                      </AutoText>
+                      <AutoText
+                        className={`text-xs ${
+                          recipientClerkId === friend.clerkId
+                            ? "text-primary/70"
+                            : isDark
+                              ? "text-gray-400"
+                              : "text-gray-600"
+                        }`}
+                      >
+                        {friend.clerkId.slice(-8)}
+                      </AutoText>
+                    </View>
+                  </TouchableOpacity>
+                )}
+              />
+            ) : (
+              <View
+                className={`p-4 rounded-lg ${isDark ? "bg-gray-800" : "bg-gray-100"}`}
+              >
+                <AutoText
+                  className={`text-center ${isDark ? "text-gray-400" : "text-gray-600"}`}
                 >
-                  {currentUserFriends.map((friend) => (
-                    <TouchableOpacity
-                      key={friend.id}
-                      onPress={() => setRecipientClerkId(friend.clerkId)}
-                      className={`flex-row items-center p-3 mr-3 rounded-xl border-2 ${
-                        recipientClerkId === friend.clerkId
-                          ? "border-primary bg-primary/10"
-                          : isDark
-                            ? "border-gray-600 bg-dark-card"
-                            : "border-gray-300 bg-light-card"
-                      }`}
-                    >
-                      <View className="w-8 h-8 rounded-full bg-gray-300 mr-2 overflow-hidden">
-                        {friend.imageUrl ? (
-                          <Image
-                            source={{ uri: friend.imageUrl }}
-                            style={{ width: '100%', height: '100%' }}
-                            resizeMode="cover"
-                          />
-                        ) : (
-                          <View className="w-full h-full bg-gray-400 items-center justify-center">
-                            <AutoText className="text-white font-bold text-sm">
-                              {friend.name.charAt(0).toUpperCase()}
-                            </AutoText>
-                          </View>
-                        )}
-                      </View>
-                      <View>
-                        <AutoText
-                          className={`font-medium text-sm ${
-                            recipientClerkId === friend.clerkId
-                              ? "text-primary"
-                              : isDark ? "text-white" : "text-gray-900"
-                          }`}
-                        >
-                          {friend.name}
-                        </AutoText>
-                        <AutoText
-                          className={`text-xs ${
-                            recipientClerkId === friend.clerkId
-                              ? "text-primary/70"
-                              : isDark ? "text-gray-400" : "text-gray-600"
-                          }`}
-                        >
-                          {friend.clerkId.slice(-8)}
-                        </AutoText>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              ) : (
-                <View className={`p-4 rounded-lg ${isDark ? "bg-gray-800" : "bg-gray-100"}`}>
-                  <AutoText className={`text-center ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                    Du har inga vänner än. Lägg till vänner först!
-                  </AutoText>
-                </View>
-              )}
-            </View>
-
-            <AutoText
-              className={`my-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}
-            >
-              Antal poäng att överföra *
-            </AutoText>
-            <Input
-              placeholder="Minst 10 poäng"
-              keyboardType="numeric"
-              value={pointsToTransfer}
-              onChangeText={setPointsToTransfer}
-              className={`border rounded-lg p-4 mb-4 ${
-                isDark
-                  ? "bg-dark-card text-white border-gray-600"
-                  : "bg-light-card text-black border-gray-300"
-              }`}
-              placeholderTextColor={isDark ? "gray" : "gray"}
-            />
-
+                  Du har inga vänner än. Lägg till vänner först!
+                </AutoText>
+              </View>
+            )}
+          </View>
+        </View>
+        {/* Transfer Form */}
+        <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
+          <Animated.View
+            entering={FadeInUp.delay(500)}
+            style={{
+              shadowColor: "#000",
+              shadowOpacity: 0.1,
+              shadowRadius: 8,
+              shadowOffset: { width: 0, height: 4 },
+              elevation: 6,
+            }}
+          >
             <View
-              className={`p-3 rounded-lg ${isDark ? "bg-blue-500/10" : "bg-blue-50"}`}
+              className={` p-6  rounded-2xl mb-6  ${isDark ? "bg-dark-card" : "bg-light-card"}`}
             >
               <AutoText
-                className={`text-sm ${isDark ? "text-blue-300" : "text-blue-700"}`}
+                className={`text-lg font-semibold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}
               >
-                💡 Minsta överföringsbelopp: 10 poäng
+                Överföringsdetaljer
               </AutoText>
-            </View>
-          </View>
-        </Animated.View>
 
-
-        {/* Add Friend Button */}
-        <Animated.View entering={ZoomIn.delay(800)}>
-          <TouchableOpacity
-            onPress={() => router.push("/(home)/profile/add-friend")}
-            className={`bg-green-500 rounded-2xl p-4 items-center mb-4 ${
-              isLoading ? "opacity-50" : ""
-            }`}
-            style={{
-              shadowColor: "#10B981",
-              shadowOpacity: 0.3,
-              shadowRadius: 10,
-              shadowOffset: { width: 0, height: 5 },
-              elevation: 8,
-            }}
-          >
-            <View className="flex-row items-center">
-              <Ionicons name="person-add-outline" size={14} color="white" />
-              <AutoText className="text-white font-semibold ml-2">
-                {currentUserFriends.length === 0
-                  ? "Lägg till vän först"
-                  : "Hantera vänner"}
+              <AutoText
+                className={`my-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}
+              >
+                Antal poäng att överföra *
               </AutoText>
-            </View>
-          </TouchableOpacity>
-        </Animated.View>
-
-        {/* Transfer Button */}
-        <Animated.View entering={ZoomIn.delay(600)}>
-          <TouchableOpacity
-            onPress={handleTransfer}
-            disabled={isLoading || currentUserFriends.length === 0}
-            className={`bg-primary rounded-2xl p-4 items-center mb-6 ${
-              isLoading || currentUserFriends.length === 0 ? "opacity-50" : ""
-            }`}
-            style={{
-              shadowColor: "#3B82F6",
-              shadowOpacity: 0.3,
-              shadowRadius: 10,
-              shadowOffset: { width: 0, height: 5 },
-              elevation: 8,
-            }}
-          >
-            <View className="flex-row items-center">
-              <Ionicons
-                name={isLoading ? "hourglass-outline" : "send-outline"}
-                size={14}
-                color={isDark ? "#fff" : "#fff"}
+              <Input
+                placeholder="Minst 10 poäng"
+                keyboardType="numeric"
+                value={pointsToTransfer}
+                onChangeText={setPointsToTransfer}
+                className={`border rounded-lg p-4 mb-4 ${
+                  isDark
+                    ? "bg-dark-card text-white border-gray-600"
+                    : "bg-light-card text-black border-gray-300"
+                }`}
+                placeholderTextColor={isDark ? "gray" : "gray"}
               />
-              <AutoText className="text-white font-semibold ml-2">
-                {isLoading ? "Överför..." : "Överför poäng"}
-              </AutoText>
+
+              <View
+                className={`p-3 rounded-lg ${isDark ? "bg-blue-500/10" : "bg-blue-50"}`}
+              >
+                <AutoText
+                  className={`text-sm ${isDark ? "text-blue-300" : "text-blue-700"}`}
+                >
+                  💡 Minsta överföringsbelopp: 10 poäng
+                </AutoText>
+              </View>
             </View>
-          </TouchableOpacity>
-        </Animated.View>
-      </ScrollView>
+          </Animated.View>
+
+          {/* Add Friend Button */}
+          <Animated.View entering={ZoomIn.delay(800)}>
+            <TouchableOpacity
+              onPress={() => router.push("/(home)/profile/add-friend")}
+              className={`bg-green-500 rounded-2xl p-4 items-center mb-4 ${
+                isLoading ? "opacity-50" : ""
+              }`}
+              style={{
+                shadowColor: "#10B981",
+                shadowOpacity: 0.3,
+                shadowRadius: 10,
+                shadowOffset: { width: 0, height: 5 },
+                elevation: 8,
+              }}
+            >
+              <View className="flex-row items-center">
+                <Ionicons name="person-add-outline" size={14} color="white" />
+                <AutoText className="text-white font-semibold ml-2">
+                  {currentUserFriends.length === 0
+                    ? "Lägg till vän först"
+                    : "Hantera vänner"}
+                </AutoText>
+              </View>
+            </TouchableOpacity>
+          </Animated.View>
+
+          {/* Transfer Button */}
+          <Animated.View entering={ZoomIn.delay(600)}>
+            <TouchableOpacity
+              onPress={handleTransfer}
+              disabled={isLoading || currentUserFriends.length === 0}
+              className={`bg-primary rounded-2xl p-4 items-center mb-6 ${
+                isLoading || currentUserFriends.length === 0 ? "opacity-50" : ""
+              }`}
+              style={{
+                shadowColor: "#3B82F6",
+                shadowOpacity: 0.3,
+                shadowRadius: 10,
+                shadowOffset: { width: 0, height: 5 },
+                elevation: 8,
+              }}
+            >
+              <View className="flex-row items-center">
+                <Ionicons
+                  name={isLoading ? "hourglass-outline" : "send-outline"}
+                  size={14}
+                  color={isDark ? "#fff" : "#fff"}
+                />
+                <AutoText className="text-white font-semibold ml-2">
+                  {isLoading ? "Överför..." : "Överför poäng"}
+                </AutoText>
+              </View>
+            </TouchableOpacity>
+          </Animated.View>
+        </ScrollView>
+      </View>
 
       <StatusBar style={isDark ? "light" : "dark"} />
     </SafeAreaView>
