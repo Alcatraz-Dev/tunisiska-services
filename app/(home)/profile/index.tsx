@@ -58,6 +58,7 @@ interface UserProfileData {
     locale?: string;
   };
   referrals?: Referral[];
+  friendsCount?: number;
   signUpMethod: "google" | "email";
 }
 
@@ -79,13 +80,17 @@ const Profile = () => {
   const [imageUrl, setImageUrl] = useState("");
   const router = useRouter();
 
+  const totalReferrals = (userProfile?.referrals ?? []).length;
   const pendingReferrals = (userProfile?.referrals ?? []).filter(
     (r) => r.status === "pending"
   ).length;
-  
+  const activeReferrals = (userProfile?.referrals ?? []).filter(
+    (r) => r.status === "active" || r.status === "completed"
+  ).length;
+
   // Initialize isDark early so it can be used in getTierColors
   const isDark = resolvedTheme === "dark";
-  
+
   // Function to determine membership tier based on points
   const getMembershipTier = (points: number) => {
     if (points >= 50000) return "Vipmedlem";
@@ -147,39 +152,89 @@ const Profile = () => {
   );
   // Load user profile data
   useEffect(() => {
-    if (!isLoaded || !user) return;
-    const generateReferralCode = (userId: string) => `${userId}`;
+    const loadProfileData = async () => {
+      if (!isLoaded || !user) return;
+      const generateReferralCode = (userId: string) => `${userId}`;
 
-    const profileData = {
-      firstName: user.unsafeMetadata?.firstName || "",
-      lastName: user.unsafeMetadata?.lastName || "",
-      email: user.emailAddresses[0]?.emailAddress || "",
-      phoneNumber: user.unsafeMetadata?.phoneNumber || "",
-      address: user.unsafeMetadata?.address || "",
-      city: user.unsafeMetadata?.city || "",
-      postalCode: user.unsafeMetadata?.postalCode || "",
-      country: user.unsafeMetadata?.country || "Sverige",
-      imageUrl: user.unsafeMetadata?.imageUrl || "",
-      referralCode: generateReferralCode(user.id),
-      referrals: user.unsafeMetadata?.referrals || [],
-      membershipTier: getMembershipTier((totalPoints as number) || 0),
-      signUpMethod: user?.unsafeMetadata?.signUpMethod || "email",
-      points: user.unsafeMetadata?.points || 0,
+      // Get referrals from Sanity as source of truth
+      let referrals = user.unsafeMetadata?.referrals || [];
+      try {
+        const { client } = await import("@/sanityClient");
+        const userDoc = await client.fetch(
+          `*[_type == "users" && clerkId == $clerkId][0]`,
+          { clerkId: user.id }
+        );
+        if (userDoc?.referrals && Array.isArray(userDoc.referrals)) {
+          referrals = userDoc.referrals;
+          // Sync Clerk metadata with Sanity
+          if (
+            JSON.stringify(user.unsafeMetadata?.referrals) !==
+            JSON.stringify(referrals)
+          ) {
+            await user.update({
+              unsafeMetadata: {
+                ...user.unsafeMetadata,
+                referrals: referrals,
+              },
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Error loading referrals from Sanity:", error);
+      }
+
+      // Get friends count from Sanity (similar to friends screen logic)
+      let friendsCount = 0;
+      try {
+        const { client } = await import("@/sanityClient");
+        const friendRequests = await client.fetch(
+          `*[_type == "friendRequest" && status == "accepted" && (fromUserId == $userId || toUserId == $userId)]`,
+          { userId: user.id }
+        );
+        friendsCount = friendRequests.length;
+      } catch (error) {
+        console.error("Error loading friends count from Sanity:", error);
+        // Fallback to metadata
+        friendsCount = (user.unsafeMetadata as any)?.friends?.length || 0;
+      }
+
+      const profileData = {
+        firstName: user.unsafeMetadata?.firstName || "",
+        lastName: user.unsafeMetadata?.lastName || "",
+        email: user.emailAddresses[0]?.emailAddress || "",
+        phoneNumber: user.unsafeMetadata?.phoneNumber || "",
+        address: user.unsafeMetadata?.address || "",
+        city: user.unsafeMetadata?.city || "",
+        postalCode: user.unsafeMetadata?.postalCode || "",
+        country: user.unsafeMetadata?.country || "Sverige",
+        imageUrl: user.unsafeMetadata?.imageUrl || "",
+        referralCode: generateReferralCode(user.id),
+        referrals: referrals,
+        friendsCount: friendsCount,
+        membershipTier: getMembershipTier((totalPoints as number) || 0),
+        signUpMethod: user?.unsafeMetadata?.signUpMethod || "email",
+        points: user.unsafeMetadata?.points || 0,
+        shipmentsCompleted: 0, // Not used in current implementation
+        ongoingShipments: 0, // Not used in current implementation
+        defaultLanguage: "sv", // Default to Swedish
+      };
+
+      setFirstName(profileData.firstName as string);
+      setLastName(profileData.lastName as string);
+      setEmail(profileData.email);
+      setPhoneNumber(profileData.phoneNumber as string);
+      setAddress(profileData.address as string);
+      setCity(profileData.city as string);
+      setPostalCode(profileData.postalCode as string);
+      setCountry(profileData.country as string);
+      setImageUrl((user.unsafeMetadata?.imageUrl as string) || user.imageUrl);
+      setReferralCode(profileData.referralCode as string);
+      setUserProfile(profileData as UserProfileData);
+
+      setLoading(false);
     };
 
-    setFirstName(profileData.firstName as string);
-    setLastName(profileData.lastName as string);
-    setEmail(profileData.email);
-    setPhoneNumber(profileData.phoneNumber as string);
-    setAddress(profileData.address as string);
-    setCity(profileData.city as string);
-    setPostalCode(profileData.postalCode as string);
-    setCountry(profileData.country as string);
-    setImageUrl((user.unsafeMetadata?.imageUrl as string) || user.imageUrl);
-    setReferralCode(profileData.referralCode as string);
-    setUserProfile(profileData as UserProfileData);
-
-    setLoading(false);
+    loadProfileData();
   }, [isLoaded, user]);
 
   const copyToClipboard = () => {
@@ -189,12 +244,16 @@ const Profile = () => {
   // Show loading state while user data is being fetched
   if (!isLoaded || loading) {
     return (
-      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-dark">
-        <ActivityIndicator size="large" color="#0ea5e9" />
-        <AutoText className="mt-4 text-gray-600 dark:text-gray-400">
+      <SafeAreaView
+        className={`flex-1 justify-center items-center ${isDark ? "bg-dark" : "bg-light"}`}
+      >
+        <ActivityIndicator size="large" color={isDark ? "#fff" : "#000"} />
+        <AutoText
+          className={`mt-4 ${isDark ? "text-gray-300" : "text-gray-600"}`}
+        >
           Laddar profil...
         </AutoText>
-      </View>
+      </SafeAreaView>
     );
   }
 
@@ -209,41 +268,32 @@ const Profile = () => {
       <SignedIn>
         {/* Header */}
 
+        {/* Header */}
         <View className={`px-6 pt-6 pb-4 ${isDark ? "bg-dark" : "bg-light"}`}>
-          {/* Header Row */}
-          <View className="flex-row items-center justify-between">
-            <TouchableOpacity onPress={() => router.back()} className="p-2">
+          <View className="flex-row items-center justify-center mb-4 relative">
+            <TouchableOpacity
+              onPress={() => router.back()}
+              className="absolute left-0 p-2"
+            >
               <Ionicons
                 name="arrow-back"
-                size={28}
+                size={24}
                 color={isDark ? "#fff" : "#000"}
               />
             </TouchableOpacity>
             <AutoText
-              className={`text-2xl font-extrabold text-center flex-1 mt-3 ${
+              className={`text-2xl font-extrabold text-center ${
                 isDark ? "text-white" : "text-gray-900"
               }`}
             >
               Profil
             </AutoText>
-            <View style={{ width: 28 }} />
           </View>
-
-          {/* Google Badge (if user signed in with Google) */}
-          {isGoogleUser && (
-            <View className="absolute right-6 top-2  bg-blue-100 dark:bg-blue-900 px-3 py-1 rounded-full shadow-md">
-              <AutoText className="text-blue-800 dark:text-blue-200 text-xs font-semibold">
-                Inloggad med Google
-              </AutoText>
-            </View>
-          )}
-
-          {/* Subtitle / description */}
           <AutoText
-            className={`text-center my-2  text-sm ${
-              isDark ? "text-gray-400" : "text-gray-600"
-            }`}
-          >
+          className={`text-sm text-center mt-3 mx-5 ${
+            isDark ? "text-gray-400" : "text-gray-600"
+          }`}
+        >
             Hantera din profilinformation, uppdatera detaljer och se din
             aktivitet.
           </AutoText>
@@ -287,8 +337,8 @@ const Profile = () => {
                   {!userProfile
                     ? ((user?.firstName + " " + user?.lastName) as string)
                     : userProfile?.firstName && userProfile?.lastName
-                    ? `${userProfile.firstName} ${userProfile.lastName}`
-                    : user?.firstName ?? "Användare"}
+                      ? `${userProfile.firstName} ${userProfile.lastName}`
+                      : (user?.firstName ?? "Användare")}
                 </AutoText>
                 <AutoText
                   className={`mt-1 ${
@@ -317,12 +367,12 @@ const Profile = () => {
                       isDark ? "text-white" : "text-gray-900"
                     }`}
                   >
-                    {userProfile?.referrals?.length || 0}
+                    {userProfile?.friendsCount || 0}
                   </AutoText>
                   <AutoText
                     className={isDark ? "text-gray-200" : "text-gray-600"}
                   >
-                    Leveranser
+                    Vänner
                   </AutoText>
                 </View>
                 <View className="items-center ">
@@ -331,12 +381,12 @@ const Profile = () => {
                       isDark ? "text-white" : "text-gray-900"
                     }`}
                   >
-                    {pendingReferrals || 0}
+                    {activeReferrals || 0}
                   </AutoText>
                   <AutoText
                     className={isDark ? "text-gray-200" : "text-gray-600"}
                   >
-                    Pågående
+                    Referrals
                   </AutoText>
                 </View>
                 <View className="items-center">
@@ -355,28 +405,23 @@ const Profile = () => {
                 </View>
               </View>
 
-              {/* Additional Google user info */}
-              {isGoogleUser && userProfile?.googleProfile && (
+              {/* Google Badge inside user info card */}
+              {isGoogleUser && (
                 <View className="mt-4 pt-4 border-t border-gray-700">
-                  <AutoText
-                    className={`text-sm font-medium ${
-                      isDark ? "text-gray-400" : "text-gray-600"
-                    } mb-2`}
-                  >
-                    Google-konto information
-                  </AutoText>
-                  <View className="flex-row items-center">
-                    <Ionicons
-                      name="logo-google"
-                      size={16}
-                      color={isDark ? "#93c5fd" : "#3b82f6"}
-                      style={{ marginRight: 8 }}
-                    />
-                    <AutoText
-                      className={isDark ? "text-gray-400" : "text-gray-600"}
-                    >
-                      Ansluten via Google
-                    </AutoText>
+                  <View className="flex-row items-center justify-center">
+                    <View className="bg-blue-100 dark:bg-blue-900 px-3 py-1 rounded-full">
+                      <View className="flex-row items-center">
+                        <Ionicons
+                          name="logo-google"
+                          size={10}
+                          color={isDark ? "#93c5fd" : "#3b82f6"}
+                          style={{ marginRight: 4 }}
+                        />
+                        <AutoText className="text-blue-800 dark:text-blue-200 text-xs font-semibold">
+                          Inloggad med Google
+                        </AutoText>
+                      </View>
+                    </View>
                   </View>
                 </View>
               )}
@@ -466,7 +511,7 @@ const Profile = () => {
                   text: "Dina bokningar",
                   href: "/profile/booking",
                 },
-                 {
+                {
                   icon: icons.people,
                   text: " Vänner",
                   href: "/profile/add-friend",

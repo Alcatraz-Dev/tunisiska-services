@@ -20,8 +20,15 @@ import { useTheme } from "../context/ThemeContext";
 import icons from "../constants/icons";
 import { AutoText } from "./ui/AutoText";
 import { showAlert } from "../utils/showAlert";
+import Constants from "expo-constants";
 
-const EXPO_DEV_URL = "https://expo.dev/preview/update?message=fix+the+friends+screen+ui&updateRuntimeVersion=1.0.0&createdAt=2025-10-16T17%3A57%3A51.829Z&slug=exp&projectId=c7b65ce0-2aa6-4b42-b6d7-4f04277bc839&group=7ad1bc83-fc2a-4400-be52-ade3c54939a0";
+const getExpoDevUrl = () => {
+  const projectId = Constants.expoConfig?.extra?.eas?.projectId || 'c7b65ce0-2aa6-4b42-b6d7-4f04277bc839';
+  const runtimeVersion = Constants.expoConfig?.version || '1.0.0';
+  return `https://expo.dev/preview/update?message=share+app&updateRuntimeVersion=${runtimeVersion}&createdAt=${encodeURIComponent(new Date().toISOString())}&slug=exp&projectId=${projectId}&group=latest`;
+};
+
+const EXPO_DEV_URL = getExpoDevUrl();
 
 export default function ShareScreen() {
   const { resolvedTheme } = useTheme();

@@ -448,15 +448,14 @@ export default function TransferPointsScreen() {
               <FlatList
                 data={currentUserFriends}
                 keyExtractor={(item) => item.id}
-                numColumns={2}
-                columnWrapperStyle={{ justifyContent: "space-between" }}
-                showsVerticalScrollIndicator={false}
+                horizontal={true}
+                showsHorizontalScrollIndicator={false}
                 contentContainerStyle={{ paddingVertical: 8 }}
                 renderItem={({ item: friend }) => (
                   <TouchableOpacity
                     onPress={() => setRecipientClerkId(friend.clerkId)}
                     onPressIn={() => setRecipientClerkId(friend.clerkId)}
-                    className={`flex-row items-center p-3 mb-3 rounded-xl border-2 flex-1 mr-2 ${
+                    className={`flex-row items-center p-3 mr-3 rounded-xl border-2 min-w-[160px] ${
                       recipientClerkId === friend.clerkId
                         ? "border-primary bg-primary/10"
                         : isDark
