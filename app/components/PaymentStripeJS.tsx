@@ -178,7 +178,6 @@ export default function PaymentStripeJS({
           />
         </View>
       </Modal>
-
       <TouchableOpacity
         testID="checkout-button-stripe-js"
         disabled={disableAll || loading || disabled}

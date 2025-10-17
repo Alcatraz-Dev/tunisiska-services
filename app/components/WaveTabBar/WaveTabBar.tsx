@@ -9,6 +9,7 @@ import HomeScreen from "@/app/components/Homescreen";
 import ProfileScreen from "@/app/(home)/profile";
 import BookingScreen from "@/app/(home)/profile/booking";
 import WalletScreen from "@/app/(home)/profile/wallet";
+import MapOverviewScreen from "@/app/(home)/map/overview";
 import { useLanguage } from "@/app/hooks/useLanguage";
 import { useTranslationText } from "@/app/hooks/useTranslation";
 const TAB_HEIGHT = 55;
@@ -132,6 +133,33 @@ export default function WaveTabBar() {
         </Text>
       ),
     },
+    Map: {
+      icon: ({ focused }) => (
+        <Image
+          source={icons.map}
+          style={{
+            width: 26,
+            height: 26,
+            marginTop: focused ? 8 : 20, // Added space from top of bar
+            marginBottom: 4, // Space between icon and title
+            tintColor: focused ? ACTIVE_COLOR : INACTIVE_COLOR,
+          }}
+          resizeMode="contain"
+        />
+      ),
+      renderTitle: ({ focused }) => (
+        <Text
+          style={{
+            color: focused ? ACTIVE_COLOR : INACTIVE_COLOR,
+            fontWeight: "600",
+            fontSize: 10,
+            marginTop: 2, // Space between icon and title
+          }}
+        >
+        {getTitle("Map")}
+        </Text>
+      ),
+    },
   };
   const Tab = createBottomTabNavigator();
   return (
@@ -171,6 +199,11 @@ export default function WaveTabBar() {
           name="Wallet"
           component={WalletScreen}
           options={{ title: "Wallet" }}
+        />
+        <Tab.Screen
+          name="Map"
+          component={MapOverviewScreen}
+          options={{ title: "Karta" }}
         />
         <Tab.Screen
           name="Profile"

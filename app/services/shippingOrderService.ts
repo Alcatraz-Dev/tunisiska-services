@@ -129,6 +129,26 @@ export class ShippingOrderService {
     }
   }
 
+  // Get all active shipping orders (for public map view)
+  static async getAllActiveShippingOrders(): Promise<{ success: boolean; orders?: any[]; error?: string }> {
+    try {
+      console.log('🔍 Fetching all active shipping orders for public map view');
+
+      const orders = await client.fetch(
+        `*[_type == "shippingOrder" && (status == "confirmed" || status == "in_progress")] | order(createdAt desc)`
+      );
+
+      console.log(`✅ Found ${orders.length} active shipping orders`);
+      return { success: true, orders };
+    } catch (error: any) {
+      console.error('💥 Error fetching active shipping orders:', error);
+      return {
+        success: false,
+        error: error.message || 'Unknown error occurred'
+      };
+    }
+  }
+
   // Get shipping order by ID
   static async getShippingOrder(orderId: string): Promise<{ success: boolean; order?: any; error?: string }> {
     try {

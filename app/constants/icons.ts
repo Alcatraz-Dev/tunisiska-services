@@ -40,6 +40,7 @@ import moon from "../assets/icons/moon.png";
 import sun from "../assets/icons/sun.png";
 import system from "../assets/icons/system.png";
 import homeIcon from "../assets/icons/homeIcon.png";
+import map from "../assets/icons/map.png";
 import referral from "../assets/icons/referral.png";
 export default {
   google,
@@ -84,5 +85,6 @@ export default {
   sun,
   system,
   homeIcon,
+  map,
   referral,
 };

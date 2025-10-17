@@ -127,8 +127,16 @@ module.exports = {
             color: '#ffffff'
           }
         }
+        [
+        "expo-maps",
+        {
+          "requestLocationPermission": true,
+          "locationPermission": "Allow $(PRODUCT_NAME) to use your location"
+        }
+        ],
       ]
     ],
+
     experiments: {
       typedRoutes: true
     },
