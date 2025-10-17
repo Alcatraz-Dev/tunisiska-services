@@ -139,24 +139,9 @@ module.exports = {
             color: '#ffffff'
           }
         }
-        [
-        "expo-maps",
-        {
-          requestLocationPermission: true,
-          locationPermission: "Allow $(tunisiska-services) to use your location"
-        }
-        ],
-        [
-          "expo-location",
-          {
-            locationAlwaysAndWhenInUsePermission: "Allow $(tunisiska-services) to use your location.",
-            locationAlwaysPermission: "Allow $(tunisiska-services) to use your location.",
-            locationWhenInUsePermission: "Allow $(tunisiska-services) to use your location.",
-            isIosBackgroundLocationEnabled: true,
-            isAndroidBackgroundLocationEnabled: true
-          }
-        ]
-      ]
+      ],
+      "expo-maps",
+      "expo-location"
     ],
 
     experiments: {
