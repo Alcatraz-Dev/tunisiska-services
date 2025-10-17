@@ -13,7 +13,7 @@ import MapOverviewScreen from "@/app/(home)/map/overview";
 import { useLanguage } from "@/app/hooks/useLanguage";
 import { useTranslationText } from "@/app/hooks/useTranslation";
 const TAB_HEIGHT = 55;
-export default function WaveTabBar() {
+function WaveTabBar() {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
   const ACTIVE_COLOR_DOT = isDark ? "#1b1b1c" : "#F3F4F6";
@@ -214,3 +214,5 @@ export default function WaveTabBar() {
     </SafeAreaProvider>
   );
 }
+
+export default WaveTabBar;

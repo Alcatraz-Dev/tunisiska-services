@@ -23,6 +23,7 @@ function PushBootstrap() {
 }
 export default function RootLayout() {
   registerNNPushToken(32172, "PNF5T5VibvtV6lj8i7pbil");
+
   const [loaded] = useFonts({
     RubikBold: require("./assets/fonts/Rubik-Bold.ttf"),
     RubikRegular: require("./assets/fonts/Rubik-Regular.ttf"),

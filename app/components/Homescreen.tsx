@@ -265,6 +265,7 @@ export default function HomePage() {
     });
   }, [searchQuery, activeCategory]);
 
+
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
       <SignedIn>

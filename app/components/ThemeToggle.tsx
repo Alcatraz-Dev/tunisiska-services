@@ -4,7 +4,7 @@ import { useTheme } from "../context/ThemeContext";
 import icons from "../constants/icons";
 import { AutoText } from "./ui/AutoText";
 
-export const ThemeToggle: React.FC = () => {
+const ThemeToggle: React.FC = () => {
   const { theme, setTheme, resolvedTheme } = useTheme();
 
   const toggleTheme = () => {
@@ -49,4 +49,6 @@ export const ThemeToggle: React.FC = () => {
       
     </View>
   );
-};
+}
+
+export default ThemeToggle;

@@ -95,7 +95,7 @@ export default function LiveStatus() {
                 isDark ? "text-gray-200" : "text-gray-800"
               }`}
             >
-              {title ? title : "direkt för idag"}-{status.length}
+              {title || "direkt för idag"}-{status.length}
             </AutoText>
           </View>
           <View className="flex-col items-center">

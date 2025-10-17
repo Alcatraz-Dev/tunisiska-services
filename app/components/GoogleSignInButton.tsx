@@ -15,7 +15,7 @@ type Props = {
   autoText?: any;
 };
 
-export function GoogleSignInButton({ setUserProfile }: Props) {
+export default function GoogleSignInButton({ setUserProfile }: Props) {
   useWarmUpBrowser();
   const { user, isLoaded } = useUser();
   const { startOAuthFlow } = useOAuth({ strategy: "oauth_google" });

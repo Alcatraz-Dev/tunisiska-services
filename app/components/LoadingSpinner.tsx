@@ -2,7 +2,7 @@ import React from "react";
 import { View, ActivityIndicator, Text } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 
-export const LoadingSpinner: React.FC<{
+const LoadingSpinner: React.FC<{
   fullscreen?: boolean;
   size?: string;
 }> = ({ fullscreen = false, size }) => {
@@ -25,4 +25,6 @@ export const LoadingSpinner: React.FC<{
       </Text> */}
     </View>
   );
-};
+}
+
+export default LoadingSpinner;

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { AutoText } from "./ui/AutoText";
 import { showAlert } from "../utils/showAlert";
 
-export function SignOutButton() {
+function SignOutButton() {
   const { signOut } = useAuth();
   const [loading, setLoading] = useState(false);
 
@@ -48,3 +48,5 @@ export function SignOutButton() {
     </TouchableOpacity>
   );
 }
+
+export default SignOutButton;
