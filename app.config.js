@@ -23,7 +23,6 @@ module.exports = {
           ? 'com.alcatrazdev.tunisiskaservices.preview'
           : 'com.alcatrazdev.tunisiskaservices',
       infoPlist: {
-
         CFBundleDisplayName: IS_DEV ? 'Tunisiska Services Dev' : IS_PREVIEW ? 'Tunisiska Services Preview' : 'Tunisiska Services',
         UIBackgroundModes: ['remote-notification'],
         UNUserNotificationCenter: {
@@ -33,7 +32,12 @@ module.exports = {
         NSUserNotificationsUsageDescription: 'This app uses notifications to keep you updated on your service bookings and important announcements.',
         // Enable badge updates
         'com.apple.developer.usernotifications.communication': true,
-        'ITSAppUsesNonExemptEncryption': false,
+        ITSAppUsesNonExemptEncryption: false,
+        // Location permissions for map functionality
+        NSLocationWhenInUseUsageDescription: 'This app uses location services to show shipping routes and driver locations on the map.',
+        NSLocationAlwaysAndWhenInUseUsageDescription: 'This app uses location services to track shipping deliveries and provide real-time updates.',
+        NSLocationAlwaysUsageDescription: 'This app uses location services in the background to track shipping deliveries and provide real-time updates.',
+        NSFaceIDUsageDescription: "Allows App to use Face ID for a simpler sign in.",
         // Add URL schemes for Stripe redirect
         CFBundleURLTypes: [
           {
@@ -55,7 +59,10 @@ module.exports = {
       permissions: [
         'RECEIVE_BOOT_COMPLETED',
         'VIBRATE',
-        'WAKE_LOCK'
+        'WAKE_LOCK',
+        'ACCESS_FINE_LOCATION',
+        'ACCESS_COARSE_LOCATION',
+        'FOREGROUND_SERVICE'
       ],
       intentFilters: [
         {
@@ -67,7 +74,12 @@ module.exports = {
           ],
           category: ['BROWSABLE', 'DEFAULT']
         }
-      ]
+      ],
+      config: {
+        googleMaps: {
+          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY_HERE"
+        }
+      },
     },
     web: {
       bundler: 'metro',
@@ -130,10 +142,20 @@ module.exports = {
         [
         "expo-maps",
         {
-          "requestLocationPermission": true,
-          "locationPermission": "Allow $(PRODUCT_NAME) to use your location"
+          requestLocationPermission: true,
+          locationPermission: "Allow $(tunisiska-services) to use your location"
         }
         ],
+        [
+          "expo-location",
+          {
+            locationAlwaysAndWhenInUsePermission: "Allow $(tunisiska-services) to use your location.",
+            locationAlwaysPermission: "Allow $(tunisiska-services) to use your location.",
+            locationWhenInUsePermission: "Allow $(tunisiska-services) to use your location.",
+            isIosBackgroundLocationEnabled: true,
+            isAndroidBackgroundLocationEnabled: true
+          }
+        ]
       ]
     ],
 
