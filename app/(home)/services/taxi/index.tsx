@@ -226,7 +226,8 @@ export default function Taxi() {
               amount,
               currency: 'sek',
               successUrl: window.location.origin + '/success',
-              cancelUrl: window.location.origin + '/cancel'
+              cancelUrl: window.location.origin + '/cancel',
+              isDark: isDark
             }),
           });
 

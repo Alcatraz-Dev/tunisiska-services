@@ -166,6 +166,7 @@ function WaveTabBar() {
     <SafeAreaProvider>
       <Tab.Navigator
         screenOptions={{ headerShown: false }}
+        initialRouteName="Home"
         tabBar={(props) => (
           <View
             style={{
@@ -185,7 +186,7 @@ function WaveTabBar() {
           </View>
         )}
       >
-        <Tab.Screen
+         <Tab.Screen
           name="Home"
           component={HomeScreen}
           options={{ title: "Hem" }}
@@ -200,10 +201,12 @@ function WaveTabBar() {
           component={WalletScreen}
           options={{ title: "Wallet" }}
         />
+       
         <Tab.Screen
           name="Map"
           component={MapOverviewScreen}
           options={{ title: "Karta" }}
+          
         />
         <Tab.Screen
           name="Profile"

@@ -65,6 +65,7 @@ export default function PaymentStripeJS({
           amount: Math.round(amount * 100) , // Convert SEK to öre (cents)
           currency: "sek",
           points: points || Math.round(amount * 10) ,
+          isDark: isDark,
         }),
       });
 
@@ -93,12 +94,52 @@ export default function PaymentStripeJS({
         }
       } else {
         // For native platforms, use WebView in modal
-        if (data.url) {
-          setCheckoutUrl(data.url);
-          setShowModal(true);
-        } else {
-          throw new Error("No checkout URL received");
-        }
+          if (data.url) {
+            setCheckoutUrl(data.url);
+            setShowModal(true);
+          } else {
+            throw new Error("No checkout URL received");
+          }
+  
+          // Inject theme styling into the WebView
+          const themeStyles = isDark ? `
+            <style>
+              body {
+                background-color: #1e1e1e !important;
+                color: #ffffff !important;
+              }
+              .StripeElement, .stripe-element {
+                background-color: #374151 !important;
+                color: #ffffff !important;
+                border-color: #4b5563 !important;
+              }
+              input, textarea, select {
+                background-color: #374151 !important;
+                color: #ffffff !important;
+                border-color: #4b5563 !important;
+              }
+              .checkout-header, .checkout-title {
+                color: #ffffff !important;
+              }
+            </style>
+          ` : `
+            <style>
+              body {
+                background-color: #ffffff !important;
+                color: #000000 !important;
+              }
+              .StripeElement, .stripe-element {
+                background-color: #f9fafb !important;
+                color: #000000 !important;
+                border-color: #d1d5db !important;
+              }
+              input, textarea, select {
+                background-color: #f9fafb !important;
+                color: #000000 !important;
+                border-color: #d1d5db !important;
+              }
+            </style>
+          `;
       }
     } catch (error) {
       console.error("❌ [PAYMENT] Error creating checkout session:", error);
@@ -150,7 +191,12 @@ export default function PaymentStripeJS({
       >
         <View className={`flex-1 ${isDark ? "bg-dark" : "bg-white"}`}>
           <WebView
-            source={{ uri: checkoutUrl }}
+            source={{
+              uri: checkoutUrl,
+              headers: {
+                'X-Theme': isDark ? 'dark' : 'light'
+              }
+            }}
             onMessage={handleWebViewMessage}
             onNavigationStateChange={(navState) => {
               // Handle success/cancel URLs
@@ -175,6 +221,211 @@ export default function PaymentStripeJS({
             domStorageEnabled={true}
             startInLoadingState={true}
             scalesPageToFit={true}
+            injectedJavaScript={`
+              (function() {
+                const isDark = ${isDark};
+
+                // Function to apply comprehensive theme override
+                const applyTheme = () => {
+                  // Remove any existing theme styles first
+                  const existingStyles = document.querySelectorAll('style[data-theme-override]');
+                  existingStyles.forEach(style => style.remove());
+
+                  // Create new comprehensive style override
+                  const style = document.createElement('style');
+                  style.setAttribute('data-theme-override', 'true');
+                  style.textContent = \`
+                    /* FORCE THEME OVERRIDE - HIGHEST PRIORITY */
+                    * {
+                      box-sizing: border-box !important;
+                    }
+
+                    /* ROOT ELEMENTS - FORCE BACKGROUND */
+                    html, body, #root, #app, main, [data-testid="checkout"] {
+                      background: \${isDark ? '#0f0f0f' : '#ffffff'} !important;
+                      background-color: \${isDark ? '#0f0f0f' : '#ffffff'} !important;
+                      color: \${isDark ? '#ffffff' : '#111827'} !important;
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+                    }
+
+                    /* ALL INPUT ELEMENTS - FORCE STYLING */
+                    input, textarea, select,
+                    [class*="Input"], [class*="input"], [class*="Field"], [class*="field"],
+                    [role="textbox"], [role="combobox"], [role="listbox"],
+                    .StripeElement, .stripe-element, [class*="StripeElement"] {
+                      background: \${isDark ? '#1f2937' : '#f9fafb'} !important;
+                      background-color: \${isDark ? '#1f2937' : '#f9fafb'} !important;
+                      color: \${isDark ? '#ffffff' : '#111827'} !important;
+                      border: 1px solid \${isDark ? '#374151' : '#d1d5db'} !important;
+                      border-radius: 8px !important;
+                      padding: 12px 16px !important;
+                      font-size: 16px !important;
+                      width: 100% !important;
+                      box-sizing: border-box !important;
+                      -webkit-appearance: none !important;
+                      appearance: none !important;
+                    }
+
+                    /* INPUT FOCUS STATES */
+                    input:focus, textarea:focus, select:focus,
+                    .StripeElement:focus, .stripe-element:focus {
+                      border-color: #3b82f6 !important;
+                      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1) !important;
+                      outline: none !important;
+                    }
+
+                    /* ALL BUTTONS - FORCE STYLING */
+                    button, [class*="Button"], [class*="button"], [class*="Btn"], [class*="btn"],
+                    input[type="submit"], input[type="button"], [role="button"],
+                    [data-testid*="button"], [data-testid*="checkout"] {
+                      background: \${isDark ? '#2563eb' : '#3b82f6'} !important;
+                      background-color: \${isDark ? '#2563eb' : '#3b82f6'} !important;
+                      color: #ffffff !important;
+                      border: 1px solid \${isDark ? '#2563eb' : '#3b82f6'} !important;
+                      border-radius: 8px !important;
+                      padding: 12px 16px !important;
+                      font-size: 14px !important;
+                      font-weight: 600 !important;
+                      cursor: pointer !important;
+                      text-decoration: none !important;
+                      display: inline-block !important;
+                      transition: all 0.2s ease !important;
+                      -webkit-appearance: none !important;
+                      appearance: none !important;
+                    }
+
+                    /* BUTTON HOVER STATES */
+                    button:hover, [class*="Button"]:hover, [class*="button"]:hover {
+                      background: \${isDark ? '#1d4ed8' : '#2563eb'} !important;
+                      background-color: \${isDark ? '#1d4ed8' : '#2563eb'} !important;
+                      transform: translateY(-1px) !important;
+                    }
+
+                    /* ALL TEXT ELEMENTS - FORCE COLOR */
+                    h1, h2, h3, h4, h5, h6, p, span, div, label, strong, em, b, i,
+                    [class*="title"], [class*="Title"], [class*="header"], [class*="Header"],
+                    [class*="text"], [class*="Text"], [class*="description"], [class*="Description"],
+                    [class*="label"], [class*="Label"], [class*="content"], [class*="Content"],
+                    [class*="message"], [class*="Message"] {
+                      color: \${isDark ? '#ffffff' : '#111827'} !important;
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+                    }
+
+                    /* LINKS */
+                    a, [class*="link"], [class*="Link"] {
+                      color: \${isDark ? '#60a5fa' : '#3b82f6'} !important;
+                      text-decoration: none !important;
+                    }
+
+                    /* CARDS AND CONTAINERS */
+                    [class*="card"], [class*="Card"], [class*="section"], [class*="Section"],
+                    [class*="container"], [class*="Container"], [class*="summary"], [class*="Summary"],
+                    [class*="form"], [class*="Form"], [class*="panel"], [class*="Panel"] {
+                      background: \${isDark ? '#1f2937' : '#ffffff'} !important;
+                      background-color: \${isDark ? '#1f2937' : '#ffffff'} !important;
+                      border: 1px solid \${isDark ? '#374151' : '#e5e7eb'} !important;
+                      border-radius: 12px !important;
+                      box-shadow: \${isDark ? '0 4px 6px -1px rgba(0, 0, 0, 0.3)' : '0 1px 3px 0 rgba(0, 0, 0, 0.1)'} !important;
+                    }
+
+                    /* ICONS AND SVG ELEMENTS */
+                    svg, [class*="icon"], [class*="Icon"], [class*="svg"], [class*="Svg"] {
+                      fill: \${isDark ? '#ffffff' : '#111827'} !important;
+                      color: \${isDark ? '#ffffff' : '#111827'} !important;
+                      stroke: \${isDark ? '#ffffff' : '#111827'} !important;
+                    }
+
+                    /* IMAGES AND LOGOS */
+                    img, [class*="image"], [class*="Image"], [class*="logo"], [class*="Logo"] {
+                      filter: \${isDark ? 'brightness(0) invert(1)' : 'none'} !important;
+                    }
+
+                    /* SPECIFIC STRIPE CLASSES */
+                    .p-Card, .p-Field, .p-Button, .p-Text, .p-Link,
+                    .StripeElement, .stripe-element, [class*="stripe"] {
+                      background: \${isDark ? '#1f2937' : '#f9fafb'} !important;
+                      background-color: \${isDark ? '#1f2937' : '#f9fafb'} !important;
+                      color: \${isDark ? '#ffffff' : '#111827'} !important;
+                      border-color: \${isDark ? '#374151' : '#d1d5db'} !important;
+                    }
+
+                    /* ERROR STATES */
+                    [class*="error"], [class*="Error"], [class*="field-error"] {
+                      color: #ef4444 !important;
+                    }
+
+                    /* SUCCESS STATES */
+                    [class*="success"], [class*="Success"] {
+                      color: #22c55e !important;
+                    }
+
+                    /* LOADING STATES */
+                    [class*="loading"], [class*="Loading"] {
+                      color: \${isDark ? '#9ca3af' : '#6b7280'} !important;
+                    }
+
+                    /* FORCE ALL ELEMENTS TO INHERIT THEME */
+                    * {
+                      color: inherit !important;
+                    }
+
+                    /* OVERRIDE ANY INLINE STYLES */
+                    [style*="color"], [style*="background"] {
+                      color: \${isDark ? '#ffffff' : '#111827'} !important;
+                      background: inherit !important;
+                      background-color: inherit !important;
+                    }
+                  \`;
+                  document.head.appendChild(style);
+                };
+
+                // Apply theme immediately
+                applyTheme();
+
+                // Re-apply theme multiple times to catch dynamic content
+                setTimeout(applyTheme, 100);
+                setTimeout(applyTheme, 500);
+                setTimeout(applyTheme, 1000);
+                setTimeout(applyTheme, 2000);
+                setTimeout(applyTheme, 3000);
+
+                // Watch for DOM changes and re-apply theme
+                const observer = new MutationObserver((mutations) => {
+                  let shouldApply = false;
+                  mutations.forEach((mutation) => {
+                    if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                      shouldApply = true;
+                    }
+                  });
+                  if (shouldApply) {
+                    setTimeout(applyTheme, 100);
+                  }
+                });
+
+                observer.observe(document.body, {
+                  childList: true,
+                  subtree: true,
+                  attributes: true,
+                  attributeFilter: ['class', 'style']
+                });
+
+                // Force theme on window load and any navigation
+                window.addEventListener('load', applyTheme);
+                window.addEventListener('DOMContentLoaded', applyTheme);
+
+                // Override any existing Stripe theme functions
+                if (window.Stripe) {
+                  const originalMount = window.Stripe.prototype.mount;
+                  if (originalMount) {
+                    window.Stripe.prototype.mount = function(...args) {
+                      const result = originalMount.apply(this, args);
+                      setTimeout(applyTheme, 100);
+                      return result;
+                    };
+                  }
+                }
+              })();
+            `}
           />
         </View>
       </Modal>
