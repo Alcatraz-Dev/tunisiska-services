@@ -8,6 +8,7 @@ import { AutoText } from "@/app/components/ui/AutoText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ShippingOrderService } from "@/app/services/shippingOrderService";
 import { useAuth } from "@clerk/clerk-expo";
+import { GoogleMaps } from "expo-maps";
 
 export default function ShipmentMapScreen() {
   const { resolvedTheme } = useTheme();
@@ -34,6 +35,7 @@ export default function ShipmentMapScreen() {
 
         if (result.success && result.order) {
           setShipment(result.order);
+
 
           // Simulate driver location updates (in real app, this would come from GPS tracking)
           // For demo purposes, we'll set a mock location

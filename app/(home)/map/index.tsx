@@ -7,7 +7,7 @@ import Animated, { FadeInUp } from "react-native-reanimated";
 import { AutoText } from "@/app/components/ui/AutoText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ShippingOrderService } from "@/app/services/shippingOrderService";
-import { GoogleMaps, AppleMaps } from "expo-maps";
+import { GoogleMaps } from "expo-maps";
 
 const { width } = Dimensions.get('window');
 
