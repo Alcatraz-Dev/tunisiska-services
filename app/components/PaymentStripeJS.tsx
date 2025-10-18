@@ -55,25 +55,36 @@ export default function PaymentStripeJS({
       const serverUrl =
         process.env.EXPO_PUBLIC_SERVER_URL || "http://localhost:3000";
       console.log("🔗 [PAYMENT] Using server URL:", serverUrl);
-      console.log("💰 [PAYMENT] Sending amount:", amount, "points:", points || amount);
+      console.log(
+        "💰 [PAYMENT] Sending amount:",
+        amount,
+        "points:",
+        points || amount
+      );
       const response = await fetch(`${serverUrl}/create-checkout-session`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          amount: Math.round(amount * 100) , // Convert SEK to öre (cents)
+          amount: Math.round(amount * 100), // Convert SEK to öre (cents)
           currency: "sek",
-          points: points || Math.round(amount * 10) ,
+          points: points || Math.round(amount * 10),
           isDark: isDark,
         }),
       });
 
       if (!response.ok) {
-        console.error("❌ [PAYMENT] Server response not OK:", response.status, response.statusText);
+        console.error(
+          "❌ [PAYMENT] Server response not OK:",
+          response.status,
+          response.statusText
+        );
         const errorText = await response.text();
         console.error("❌ [PAYMENT] Server error details:", errorText);
-        throw new Error(`Failed to create checkout session: ${response.status} ${response.statusText}`);
+        throw new Error(
+          `Failed to create checkout session: ${response.status} ${response.statusText}`
+        );
       }
 
       const data = await response.json();
@@ -94,15 +105,16 @@ export default function PaymentStripeJS({
         }
       } else {
         // For native platforms, use WebView in modal
-          if (data.url) {
-            setCheckoutUrl(data.url);
-            setShowModal(true);
-          } else {
-            throw new Error("No checkout URL received");
-          }
-  
-          // Inject theme styling into the WebView
-          const themeStyles = isDark ? `
+        if (data.url) {
+          setCheckoutUrl(data.url);
+          setShowModal(true);
+        } else {
+          throw new Error("No checkout URL received");
+        }
+
+        // Inject theme styling into the WebView
+        const themeStyles = isDark
+          ? `
             <style>
               body {
                 background-color: #1e1e1e !important;
@@ -122,7 +134,8 @@ export default function PaymentStripeJS({
                 color: #ffffff !important;
               }
             </style>
-          ` : `
+          `
+          : `
             <style>
               body {
                 background-color: #ffffff !important;
@@ -143,7 +156,10 @@ export default function PaymentStripeJS({
       }
     } catch (error) {
       console.error("❌ [PAYMENT] Error creating checkout session:", error);
-      showAlert("Fel", `Kunde inte skapa betalningssession: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      showAlert(
+        "Fel",
+        `Kunde inte skapa betalningssession: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
     } finally {
       setLoading(false);
     }
@@ -194,8 +210,8 @@ export default function PaymentStripeJS({
             source={{
               uri: checkoutUrl,
               headers: {
-                'X-Theme': isDark ? 'dark' : 'light'
-              }
+                "X-Theme": isDark ? "dark" : "light",
+              },
             }}
             onMessage={handleWebViewMessage}
             onNavigationStateChange={(navState) => {
@@ -444,19 +460,20 @@ export default function PaymentStripeJS({
             shadowRadius: 8,
             shadowOffset: { width: 0, height: 10 },
             elevation: loading ? 6 : 3,
-            backgroundColor: loading || disabled
-              ? isDark
-                ? "#1e1e1e"
-                : "#f3f4f6"
-              : disabled
+            backgroundColor:
+              loading || disabled
                 ? isDark
-                  ? "#374151" // Dark gray when disabled
-                  : "#9CA3AF" // Light gray when disabled
-                : isWallet
+                  ? "#1e1e1e"
+                  : "#f3f4f6"
+                : disabled
                   ? isDark
-                    ? "#2563EB" // Blue for wallet dark mode
-                    : "#3B82F6" // Blue for wallet light mode
-                  : "#d1d5db", // Gray for services
+                    ? "#374151" // Dark gray when disabled
+                    : "#9CA3AF" // Light gray when disabled
+                  : isWallet
+                    ? isDark
+                      ? "#2563EB" // Blue for wallet dark mode
+                      : "#3B82F6" // Blue for wallet light mode
+                    : "#d1d5db", // Gray for services
           },
           customStyle,
         ]}
@@ -469,8 +486,8 @@ export default function PaymentStripeJS({
                   ? "bg-blue-600" // Blue background for wallet loading
                   : "bg-blue-500"
                 : isDark
-                ? "bg-dark-card"
-                : "bg-light-card"
+                  ? "bg-dark-card"
+                  : "bg-light-card"
             } py-5`}
             style={{
               paddingVertical: 35,
@@ -499,12 +516,12 @@ export default function PaymentStripeJS({
           <View
             className={`w-full rounded-2xl ${
               !isWallet
-                ? isDark 
+                ? isDark
                   ? "bg-blue-600" // Blue background for wallet
                   : "bg-blue-500"
-                : isDark 
-                ? "bg-dark-card"
-                : "bg-light-card"
+                : isDark
+                  ? "bg-dark-card"
+                  : "bg-light-card"
             } py-5`}
             style={{
               paddingVertical: 35,
@@ -529,7 +546,11 @@ export default function PaymentStripeJS({
               <>
                 <AutoText
                   className={`text-xs font-medium text-center mt-2 ${
-                    isWallet ? "text-white" : isDark ? "text-white" : "text-black"
+                    isWallet
+                      ? "text-black"
+                      : isDark
+                        ? "text-white"
+                        : "text-black"
                   }`}
                   style={{ letterSpacing: 0.5 }}
                 >
@@ -537,7 +558,11 @@ export default function PaymentStripeJS({
                 </AutoText>
                 <AutoText
                   className={`text-xs font-semibold text-center mt-2 ${
-                    isWallet ? "text-white" : isDark ? "text-white" : "text-black"
+                    isWallet
+                      ? "text-black"
+                      : isDark
+                        ? "text-white"
+                        : "text-black"
                   }`}
                   style={{ letterSpacing: 0.5 }}
                 >
@@ -545,12 +570,9 @@ export default function PaymentStripeJS({
                 </AutoText>
               </>
             )}
-
           </View>
         )}
       </TouchableOpacity>
     </View>
   );
-
-
 }
