@@ -23,6 +23,7 @@
     "@expo/cli": "^54.0.8",
     "@expo/metro-runtime": "~6.1.2",
     "@expo/vector-icons": "^15.0.2",
+    "@mapbox/polyline": "^1.2.1",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "8.4.4",
     "@react-native-google-signin/google-signin": "^16.0.0",
@@ -98,6 +99,7 @@
   "devDependencies": {
     "@babel/core": "^7.26.10",
     "@react-native-community/cli-server-api": "^15.1.0",
+    "@types/mapbox__polyline": "^1.0.5",
     "@types/pako": "^2.0.4",
     "@types/react": "~19.1.10",
     "concurrently": "^9.2.1",
