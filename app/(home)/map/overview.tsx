@@ -405,14 +405,13 @@ export default function MapOverviewScreen() {
           </Callout>
         </Marker>
 
-        {/* Other Drivers */}
+        {/* All Drivers (including current user) */}
         {drivers
           .filter(
             (d) =>
               d.driverLocation &&
               d.driverLocation.lat &&
-              d.driverLocation.lng &&
-              d._id !== user?.id
+              d.driverLocation.lng
           )
           .map((d, index) => (
             <Marker
@@ -421,7 +420,7 @@ export default function MapOverviewScreen() {
                 latitude: d.driverLocation.lat,
                 longitude: d.driverLocation.lng,
               }}
-              pinColor="orange"
+              pinColor={d._id === user?.id ? "blue" : "orange"}
             >
               <Callout tooltip>
                 <View style={{ alignItems: "center", marginBottom: 6 }}>
@@ -445,7 +444,7 @@ export default function MapOverviewScreen() {
                         fontSize: 12,
                       }}
                     >
-                      🚚 Förare ({d.email?.split('@')[0]})
+                      🚚 {d._id === user?.id ? "Du (Förare)" : `Förare (${d.email?.split('@')[0]})`}
                     </AutoText>
                   </View>
 
@@ -467,54 +466,6 @@ export default function MapOverviewScreen() {
             </Marker>
           ))}
 
-        {/* Current User Driver Location */}
-        {isCurrentUserDriver && (
-          <Marker
-          coordinate={currentUserLocation || defaultCoord}
-          pinColor="blue">
-            <Callout tooltip>
-              <View style={{ alignItems: "center", marginBottom: 6 }}>
-                <View
-                  style={{
-                    backgroundColor: isDark ? "#000000" : "#ffffff",
-                    borderRadius: 10,
-                    paddingVertical: 6,
-                    paddingHorizontal: 10,
-                    shadowColor: "#000",
-                    shadowOpacity: 0.25,
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowRadius: 2,
-                    elevation: 3,
-                  }}
-                >
-                  <AutoText
-                    style={{
-                      color: isDark ? "#f1f5f9" : "#000000",
-                      fontWeight: "600",
-                      fontSize: 12,
-                    }}
-                  >
-                    🚚 Du (Förare) {currentUserLocation ? "📍" : "❓"}
-                  </AutoText>
-                </View>
-
-                <View
-                  style={{
-                    width: 0,
-                    height: 0,
-                    borderLeftWidth: 6,
-                    borderRightWidth: 6,
-                    borderTopWidth: 8,
-                    borderLeftColor: "transparent",
-                    borderRightColor: "transparent",
-                    borderTopColor: isDark ? "#000000" : "#ffffff",
-                    marginTop: -1,
-                  }}
-                />
-              </View>
-            </Callout>
-          </Marker>
-        )}
 
         {/* Simulated Driver for Testing */}
         {routeCoords.length > 0 && (
