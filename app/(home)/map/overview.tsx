@@ -214,18 +214,6 @@ export default function MapOverviewScreen() {
   return (
     <View className="flex-1 ">
       <MapView
-        // provider={PROVIDER_GOOGLE}
-        // style={{ flex: 1 }}
-        // region={{
-        //   latitude: FROM.latitude,
-        //   longitude: FROM.longitude,
-        //   latitudeDelta: 10,
-        //   longitudeDelta: 10,
-        // }}
-        // showsUserLocation={false}
-        // showsMyLocationButton={false}
-        // mapType={isDark ? "standard" : "standard"}
-        // maxZoomLevel={15}
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
         style={{ flex: 1 }}
@@ -460,7 +448,7 @@ export default function MapOverviewScreen() {
                       🚚{" "}
                       {d._id === user?.id
                         ? "Du (Förare)"
-                        : `Förare (${d.email?.split("@")[0]})`}
+                        : `Förare`}
                     </AutoText>
                   </View>
 
