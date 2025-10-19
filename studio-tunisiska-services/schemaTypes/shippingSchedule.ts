@@ -1,82 +1,59 @@
-import { defineType, defineField } from "sanity";
-
-const routeCoordinates: Record<
-  string,
-  { from: { lat: number; lng: number }; to: { lat: number; lng: number } }
-> = {
-  stockholm_tunis: {
-    from: { lat: 59.3293, lng: 18.0686 },
-    to: { lat: 36.8065, lng: 10.1815 },
-  },
-  goteborg_tunis: {
-    from: { lat: 57.7089, lng: 11.9746 },
-    to: { lat: 36.8065, lng: 10.1815 },
-  },
-  malmo_tunis: {
-    from: { lat: 55.605, lng: 13.0038 },
-    to: { lat: 36.8065, lng: 10.1815 },
-  },
-  tunis_stockholm: {
-    from: { lat: 36.8065, lng: 10.1815 },
-    to: { lat: 59.3293, lng: 18.0686 },
-  },
-  tunis_goteborg: {
-    from: { lat: 36.8065, lng: 10.1815 },
-    to: { lat: 57.7089, lng: 11.9746 },
-  },
-  tunis_malmo: {
-    from: { lat: 36.8065, lng: 10.1815 },
-    to: { lat: 55.605, lng: 13.0038 },
-  },
-};
+import {defineType, defineField} from 'sanity'
 
 export default defineType({
-  name: "shippingSchedule",
-  title: "Shipping Schedules",
-  type: "document",
+  name: 'shippingSchedule',
+  title: 'Shipping Schedules',
+  type: 'document',
   fields: [
     defineField({
-      name: "route",
-      title: "Route",
-      type: "string",
+      name: 'route',
+      title: 'Route',
+      type: 'string',
       options: {
         list: [
-          { title: "Stockholm → Tunis", value: "stockholm_tunis" },
-          { title: "Göteborg → Tunis", value: "goteborg_tunis" },
-          { title: "Malmö → Tunis", value: "malmo_tunis" },
-          { title: "Tunis → Stockholm", value: "tunis_stockholm" },
-          { title: "Tunis → Göteborg", value: "tunis_goteborg" },
-          { title: "Tunis → Malmö", value: "tunis_malmo" },
+          {title: 'Stockholm → Tunis', value: 'stockholm_tunis'},
+          {title: 'Göteborg → Tunis', value: 'goteborg_tunis'},
+          {title: 'Malmö → Tunis', value: 'malmo_tunis'},
+          {title: 'Tunis → Stockholm', value: 'tunis_stockholm'},
+          {title: 'Tunis → Göteborg', value: 'tunis_goteborg'},
+          {title: 'Tunis → Malmö', value: 'tunis_malmo'},
         ],
       },
       validation: (Rule) => Rule.required(),
     }),
+    defineField({
+      name: 'isActive',
+      title: 'Active Route',
+      type: 'boolean',
+      initialValue: false,
+      description: 'Mark the route currently in use on the map.',
+    }),
 
     defineField({
-      name: "departureTime",
-      title: "Departure Time",
-      type: "datetime",
+      name: 'departureTime',
+      title: 'Departure Time',
+      type: 'datetime',
       validation: (Rule) => Rule.required(),
     }),
 
     defineField({
-      name: "pickupLocations",
-      title: "Pickup Locations & Times",
-      type: "array",
+      name: 'pickupLocations',
+      title: 'Pickup Locations & Times',
+      type: 'array',
       of: [
         {
-          type: "object",
+          type: 'object',
           fields: [
             {
-              name: "location",
-              title: "Location",
-              type: "string",
+              name: 'location',
+              title: 'Location',
+              type: 'string',
               validation: (Rule) => Rule.required(),
             },
             {
-              name: "pickupDateTime",
-              title: "Pickup Date & Time",
-              type: "datetime",
+              name: 'pickupDateTime',
+              title: 'Pickup Date & Time',
+              type: 'datetime',
               validation: (Rule) => Rule.required(),
             },
           ],
@@ -86,78 +63,74 @@ export default defineType({
     }),
 
     defineField({
-      name: "capacity",
-      title: "Capacity (kg)",
-      type: "number",
+      name: 'capacity',
+      title: 'Capacity (kg)',
+      type: 'number',
       validation: (Rule) => Rule.min(1).required(),
     }),
 
     defineField({
-      name: "availableCapacity",
-      title: "Available Capacity (kg)",
-      type: "number",
+      name: 'availableCapacity',
+      title: 'Available Capacity (kg)',
+      type: 'number',
       validation: (Rule) => Rule.min(0),
     }),
 
     defineField({
-      name: "status",
-      title: "Status",
-      type: "string",
+      name: 'status',
+      title: 'Status',
+      type: 'string',
       options: {
         list: [
-          { title: "Available", value: "available" },
-          { title: "Full", value: "full" },
-          { title: "Cancelled", value: "cancelled" },
-          { title: "Departed", value: "departed" },
+          {title: 'Available', value: 'available'},
+          {title: 'Full', value: 'full'},
+          {title: 'Cancelled', value: 'cancelled'},
+          {title: 'Departed', value: 'departed'},
         ],
       },
-      initialValue: "available",
+      initialValue: 'available',
       validation: (Rule) => Rule.required(),
     }),
 
     defineField({
-      name: "vehicle",
-      title: "Vehicle",
-      type: "string",
+      name: 'vehicle',
+      title: 'Vehicle',
+      type: 'string',
       options: {
         list: [
-          { title: "Cargo Van", value: "cargo_van" },
-          { title: "Truck", value: "truck" },
-          { title: "Container Ship", value: "container_ship" },
-          { title: "Air Freight", value: "air_freight" },
+          {title: 'Cargo Van', value: 'cargo_van'},
+          {title: 'Truck', value: 'truck'},
+          {title: 'Container Ship', value: 'container_ship'},
+          {title: 'Air Freight', value: 'air_freight'},
         ],
       },
       validation: (Rule) => Rule.required(),
     }),
 
     defineField({
-      name: "notes",
-      title: "Notes",
-      type: "text",
+      name: 'notes',
+      title: 'Notes',
+      type: 'text',
       rows: 2,
     }),
   ],
 
   preview: {
     select: {
-      route: "route",
-      status: "status",
-      time: "departureTime",
-      pickupLocations: "pickupLocations",
+      route: 'route',
+      status: 'status',
+      time: 'departureTime',
+      pickupLocations: 'pickupLocations',
     },
     prepare(selection) {
-      const { route, status, time, pickupLocations } = selection;
-      const pickupCount = pickupLocations ? pickupLocations.length : 0;
-      const routeTitle =
-        route?.replace("_", " → ")?.replace("tunis", "Tunis") || "Unknown Route";
+      const {route, status, time, pickupLocations} = selection
+      const pickupCount = pickupLocations ? pickupLocations.length : 0
+      const routeTitle = route?.replace('_', ' → ')?.replace('tunis', 'Tunis') || 'Unknown Route'
 
       return {
         title: `${routeTitle} - ${status}`,
         subtitle: `${new Date(time).toLocaleDateString()} • ${pickupCount} pickups`,
-      };
+      }
     },
   },
-});
-
-// 🔹 Usage tip in frontend:
-// const coords = routeCoordinates[doc.route];
+})

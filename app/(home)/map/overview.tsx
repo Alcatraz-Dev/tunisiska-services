@@ -1,4 +1,5 @@
 import { ShippingOrderService } from "@/app/services/shippingOrderService";
+import polyline from "@mapbox/polyline"; // decode polyline from Directions API
 import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 import MapView, {
@@ -8,72 +9,72 @@ import MapView, {
   PROVIDER_GOOGLE,
 } from "react-native-maps";
 import { useTheme } from "../../context/ThemeContext";
-import React from "react";
-import polyline from "@mapbox/polyline"; // decode polyline from Directions API
+import { routeCoordinates } from "@/app/utils/routeCoordinates";
+import { ShippingRouteService } from "@/app/utils/shippingRouteService";
 
-// Stockholm → Tunis coordinates
-const STOCKHOLM = { latitude: 59.3293, longitude: 18.0686 };
-const TUNIS = { latitude: 36.8065, longitude: 10.1815 };
-
-// Replace with your API key
-const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
 export default function MapOverviewScreen() {
+  const [route, setRoute] = useState<any>(null);
+  const [routeCoords, setRouteCoords] = useState([]);
+  const [driverIndex, setDriverIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
+  const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
-  const [activeShipments, setActiveShipments] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [routeCoords, setRouteCoords] = useState<
-    { latitude: number; longitude: number }[]
-  >([]);
-  const [driverIndex, setDriverIndex] = useState(0);
+  const fetchActiveRoute = async () => {
+    const result = await ShippingRouteService.getActiveRoute();
+    if (result) setRoute(result);
+    setLoading(false);
+  };
 
-  // Fetch road path between Stockholm and Tunis
-  const fetchRoute = async () => {
+  const fetchGoogleRoute = async (from: any, to: any) => {
     try {
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/directions/json?origin=${STOCKHOLM.latitude},${STOCKHOLM.longitude}&destination=${TUNIS.latitude},${TUNIS.longitude}&mode=driving&key=${GOOGLE_MAPS_API_KEY}`
+      const res = await fetch(
+        `https://maps.googleapis.com/maps/api/directions/json?origin=${from.lat},${from.lng}&destination=${to.lat},${to.lng}&mode=driving&key=${GOOGLE_MAPS_API_KEY}`
       );
-      const json = await response.json();
+      const json = await res.json();
       if (json.routes.length > 0) {
         const points = polyline.decode(json.routes[0].overview_polyline.points);
         const coords = points.map(([lat, lng]: [number, number]) => ({
           latitude: lat,
           longitude: lng,
         }));
-        setRouteCoords(coords);
+        setRouteCoords(coords as any);
       }
-    } catch (error) {
-      console.error("Error fetching route:", error);
+    } catch (e) {
+      console.error("Error fetching route:", e);
     }
   };
 
   useEffect(() => {
-    fetchRoute();
-
-    const fetchOrders = async () => {
-      const result = await ShippingOrderService.getAllActiveShippingOrders();
-      if (result.success && result.orders) setActiveShipments(result.orders);
-      setLoading(false);
-    };
-    fetchOrders();
+    fetchActiveRoute();
   }, []);
 
-  // Animate driver along the route
+  useEffect(() => {
+    if (route) fetchGoogleRoute(route.from, route.to);
+  }, [route]);
+
   useEffect(() => {
     if (routeCoords.length === 0) return;
-
     const interval = setInterval(() => {
       setDriverIndex((prev) =>
         prev + 1 < routeCoords.length ? prev + 1 : routeCoords.length - 1
       );
-    }, 2000); // move every 2s
-
+    }, 2000);
     return () => clearInterval(interval);
   }, [routeCoords]);
 
-  const driverCoord = routeCoords[driverIndex] || STOCKHOLM;
+  if (!route)
+    return (
+      <View className="flex-1 items-center justify-center">
+        <Text>No active route found</Text>
+      </View>
+    );
+
+  const FROM = { latitude: route.from.lat, longitude: route.from.lng };
+  const TO = { latitude: route.to.lat, longitude: route.to.lng };
+  const driverCoord = routeCoords[driverIndex] || FROM;
 
   return (
     <View className="flex-1">
@@ -81,8 +82,8 @@ export default function MapOverviewScreen() {
         provider={PROVIDER_GOOGLE}
         style={{ flex: 1 }}
         region={{
-          latitude: STOCKHOLM.latitude,
-          longitude: STOCKHOLM.longitude,
+          latitude: FROM.latitude,
+          longitude: FROM.longitude,
           latitudeDelta: 20,
           longitudeDelta: 20,
         }}
@@ -181,49 +182,96 @@ export default function MapOverviewScreen() {
         }
       >
         {/* Pickup */}
-        <Marker coordinate={STOCKHOLM} pinColor="green">
+        <Marker coordinate={FROM} pinColor="green">
           <Callout tooltip>
             <View
               style={{
-                backgroundColor: isDark ? "black" : "white",
-                padding: 8,
-                borderRadius: 8,
-                marginBottom: 10,
+                alignItems: "center",
               }}
             >
-              <Text
+              <View
                 style={{
-                  fontWeight: "bold",
-                  color: isDark ? "white" : "black",
-                  fontSize: 10,
+                  backgroundColor: isDark ? "#0f172a" : "#fff",
+                  borderRadius: 10,
+                  paddingVertical: 6,
+                  paddingHorizontal: 10,
+                  shadowColor: "#000",
+                  shadowOpacity: 0.2,
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowRadius: 2,
+                  elevation: 3,
                 }}
               >
-                Pickup
-              </Text>
+                <Text
+                  style={{
+                    color: isDark ? "#f1f5f9" : "#0f172a",
+                    fontWeight: "600",
+                    fontSize: 12,
+                  }}
+                >
+                  📦 Pickup
+                </Text>
+              </View>
+
+              {/* Small triangle pointer */}
+              <View
+                style={{
+                  width: 0,
+                  height: 0,
+                  borderLeftWidth: 6,
+                  borderRightWidth: 6,
+                  borderTopWidth: 8,
+                  borderLeftColor: "transparent",
+                  borderRightColor: "transparent",
+                  borderTopColor: isDark ? "#0f172a" : "#fff",
+                  marginTop: -1,
+                }}
+              />
             </View>
           </Callout>
         </Marker>
 
         {/* Delivery */}
-        <Marker coordinate={TUNIS} pinColor="red">
+        <Marker coordinate={TO} pinColor="red">
           <Callout tooltip>
-            <View
-              style={{
-                backgroundColor: isDark ? "black" : "white",
-                padding: 8,
-                borderRadius: 8,
-                marginBottom: 10,
-              }}
-            >
-              <Text
+            <View style={{ alignItems: "center" }}>
+              <View
                 style={{
-                  fontWeight: "bold",
-                  color: isDark ? "white" : "black",
-                  fontSize: 10,
+                  backgroundColor: isDark ? "#1e293b" : "#ffffff",
+                  borderRadius: 10,
+                  paddingVertical: 6,
+                  paddingHorizontal: 10,
+                  shadowColor: "#000",
+                  shadowOpacity: 0.25,
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowRadius: 2,
+                  elevation: 3,
                 }}
               >
-                Delivery
-              </Text>
+                <Text
+                  style={{
+                    color: isDark ? "#f8fafc" : "#0f172a",
+                    fontWeight: "600",
+                    fontSize: 12,
+                  }}
+                >
+                  🎯 Delivery
+                </Text>
+              </View>
+
+              <View
+                style={{
+                  width: 0,
+                  height: 0,
+                  borderLeftWidth: 6,
+                  borderRightWidth: 6,
+                  borderTopWidth: 8,
+                  borderLeftColor: "transparent",
+                  borderRightColor: "transparent",
+                  borderTopColor: isDark ? "#1e293b" : "#ffffff",
+                  marginTop: -1,
+                }}
+              />
             </View>
           </Callout>
         </Marker>
@@ -231,23 +279,44 @@ export default function MapOverviewScreen() {
         {/* Driver */}
         <Marker coordinate={driverCoord} pinColor="orange">
           <Callout tooltip>
-            <View
-              style={{
-                backgroundColor: isDark ? "black" : "white",
-                padding: 8,
-                borderRadius: 8,
-                marginBottom: 10,
-              }}
-            >
-              <Text
+            <View style={{ alignItems: "center" }}>
+              <View
                 style={{
-                  fontWeight: "bold",
-                  color: isDark ? "white" : "black",
-                  fontSize: 10,
+                  backgroundColor: isDark ? "#1e1e1e" : "#ffffff",
+                  borderRadius: 10,
+                  paddingVertical: 6,
+                  paddingHorizontal: 10,
+                  shadowColor: "#000",
+                  shadowOpacity: 0.25,
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowRadius: 2,
+                  elevation: 3,
                 }}
               >
-                Driver
-              </Text>
+                <Text
+                  style={{
+                    color: isDark ? "#f1f5f9" : "#0f172a",
+                    fontWeight: "600",
+                    fontSize: 12,
+                  }}
+                >
+                  🚚 Driver
+                </Text>
+              </View>
+
+              <View
+                style={{
+                  width: 0,
+                  height: 0,
+                  borderLeftWidth: 6,
+                  borderRightWidth: 6,
+                  borderTopWidth: 8,
+                  borderLeftColor: "transparent",
+                  borderRightColor: "transparent",
+                  borderTopColor: isDark ? "#1e1e1e" : "#ffffff",
+                  marginTop: -1,
+                }}
+              />
             </View>
           </Callout>
         </Marker>
@@ -256,8 +325,11 @@ export default function MapOverviewScreen() {
         {routeCoords.length > 0 && (
           <Polyline
             coordinates={routeCoords}
-            strokeColor="orange"
-            strokeWidth={4}
+            strokeColor={isDark ? "#f97316" : "#ea580c"} // dark/light orange
+            strokeWidth={3}
+            lineJoin="round"
+            lineCap="round"
+            geodesic={true} // smoother curve on globe
           />
         )}
       </MapView>

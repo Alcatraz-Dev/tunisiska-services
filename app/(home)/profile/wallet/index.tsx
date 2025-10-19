@@ -504,7 +504,7 @@ export default function Wallet() {
             isDark ? "text-gray-400" : "text-gray-600"
           }`}
         >
-          Välj mellan Stripe, Klarna, Apple Pay, Google Pay ... och fler !
+          Välj mellan Bankkort, Klarna, Apple Pay, Google Pay ... och fler !
         </AutoText>
 
         <View className="mt-4 flex-row flex-wrap justify-between gap-2">
