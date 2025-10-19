@@ -65,8 +65,10 @@ export default function MapOverviewScreen() {
 
         const isDriver = userDoc?.isDriver || false;
         setIsCurrentUserDriver(isDriver);
+        console.log("User is driver:", isDriver);
 
         if (isDriver) {
+          console.log("Starting location tracking for driver");
           // Start location tracking if user is a driver
           const subscription = await DriverService.startLocationTracking(
             user.id
@@ -74,14 +76,19 @@ export default function MapOverviewScreen() {
 
           // Get current location immediately for display
           const { status } = await Location.requestForegroundPermissionsAsync();
+          console.log("Location permission status:", status);
           if (status === "granted") {
             const location = await Location.getCurrentPositionAsync({
               accuracy: Location.Accuracy.High,
             });
-            setCurrentUserLocation({
+            const newLocation = {
               latitude: location.coords.latitude,
               longitude: location.coords.longitude,
-            });
+            };
+            console.log("Got current location:", newLocation);
+            setCurrentUserLocation(newLocation);
+          } else {
+            console.log("Location permission denied");
           }
         }
       } catch (error) {
@@ -197,19 +204,20 @@ export default function MapOverviewScreen() {
     }, [])
   );
   return (
-    <View className="flex-1">
+    <View className="flex-1 ">
       <MapView
         provider={PROVIDER_GOOGLE}
         style={{ flex: 1 }}
         region={{
           latitude: FROM.latitude,
           longitude: FROM.longitude,
-          latitudeDelta: 20,
-          longitudeDelta: 20,
+          latitudeDelta: 10,
+          longitudeDelta: 10,
         }}
         showsUserLocation={false}
         showsMyLocationButton={false}
         mapType={isDark ? "standard" : "standard"}
+        maxZoomLevel={15}
         customMapStyle={
           isDark
             ? [
@@ -437,7 +445,7 @@ export default function MapOverviewScreen() {
                         fontSize: 12,
                       }}
                     >
-                      🚚 Förare
+                      🚚 Förare ({d.email?.split('@')[0]})
                     </AutoText>
                   </View>
 
@@ -460,12 +468,10 @@ export default function MapOverviewScreen() {
           ))}
 
         {/* Current User Driver Location */}
-        {isCurrentUserDriver && currentUserLocation && (
-          <Marker 
-          coordinate={currentUserLocation}
-          // for testing 
-          // coordinate={routeCoords[driverIndex]}
-           pinColor="blue">
+        {isCurrentUserDriver && (
+          <Marker
+          coordinate={currentUserLocation || defaultCoord}
+          pinColor="blue">
             <Callout tooltip>
               <View style={{ alignItems: "center", marginBottom: 6 }}>
                 <View
@@ -488,7 +494,56 @@ export default function MapOverviewScreen() {
                       fontSize: 12,
                     }}
                   >
-                    🚚 Du (Förare)
+                    🚚 Du (Förare) {currentUserLocation ? "📍" : "❓"}
+                  </AutoText>
+                </View>
+
+                <View
+                  style={{
+                    width: 0,
+                    height: 0,
+                    borderLeftWidth: 6,
+                    borderRightWidth: 6,
+                    borderTopWidth: 8,
+                    borderLeftColor: "transparent",
+                    borderRightColor: "transparent",
+                    borderTopColor: isDark ? "#000000" : "#ffffff",
+                    marginTop: -1,
+                  }}
+                />
+              </View>
+            </Callout>
+          </Marker>
+        )}
+
+        {/* Simulated Driver for Testing */}
+        {routeCoords.length > 0 && (
+          <Marker
+          coordinate={routeCoords[driverIndex]}
+          pinColor="purple">
+            <Callout tooltip>
+              <View style={{ alignItems: "center", marginBottom: 6 }}>
+                <View
+                  style={{
+                    backgroundColor: isDark ? "#000000" : "#ffffff",
+                    borderRadius: 10,
+                    paddingVertical: 6,
+                    paddingHorizontal: 10,
+                    shadowColor: "#000",
+                    shadowOpacity: 0.25,
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowRadius: 2,
+                    elevation: 3,
+                  }}
+                >
+                  <AutoText
+                    style={{
+                      color: isDark ? "#f1f5f9" : "#000000",
+                      fontWeight: "600",
+                      fontSize: 12,
+                    }}
+                  >
+                    🚚 Simulerad Förare
                   </AutoText>
                 </View>
 
@@ -560,42 +615,6 @@ export default function MapOverviewScreen() {
         </View>
       )}
 
-      {/* Driver Location Button */}
-      {isCurrentUserDriver && (
-        <View
-          style={{
-            position: "absolute",
-            bottom: 110,
-            right: 20,
-            backgroundColor: isDark ? "#000000" : "#fff",
-            borderRadius: 25,
-            shadowColor: "#000",
-            shadowOpacity: 0.3,
-            shadowRadius: 5,
-            shadowOffset: { width: 0, height: 2 },
-            elevation: 5,
-          }}
-        >
-          <TouchableOpacity
-            onPress={getCurrentLocation}
-            style={{
-              padding: 12,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <AutoText
-              style={{
-                color: isDark ? "#f1f5f9" : "#00000",
-                fontSize: 12,
-                fontWeight: "600",
-              }}
-            >
-              📍 Uppdatera
-            </AutoText>
-          </TouchableOpacity>
-        </View>
-      )}
     </View>
   );
 }
