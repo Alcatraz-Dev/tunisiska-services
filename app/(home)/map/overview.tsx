@@ -1,5 +1,5 @@
 import polyline from "@mapbox/polyline"; // decode polyline from Directions API
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Text, View, TouchableOpacity } from "react-native";
 import MapView, {
   Callout,
@@ -34,8 +34,16 @@ export default function MapOverviewScreen() {
   const isDark = resolvedTheme === "dark";
   const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "";
   const { user } = useUser();
-
   const defaultCoord = { latitude: 59.3293, longitude: 18.0686 };
+  const mapRef = useRef<MapView>(null);
+  useEffect(() => {
+    if (routeCoords.length > 0 && mapRef.current) {
+      mapRef.current.fitToCoordinates(routeCoords, {
+        edgePadding: { top: 100, right: 50, bottom: 50, left: 50 },
+        animated: true,
+      });
+    }
+  }, [routeCoords]);
   useEffect(() => {
     if (routeCoords.length === 0) return;
     const interval = setInterval(() => {
@@ -206,14 +214,21 @@ export default function MapOverviewScreen() {
   return (
     <View className="flex-1 ">
       <MapView
+        // provider={PROVIDER_GOOGLE}
+        // style={{ flex: 1 }}
+        // region={{
+        //   latitude: FROM.latitude,
+        //   longitude: FROM.longitude,
+        //   latitudeDelta: 10,
+        //   longitudeDelta: 10,
+        // }}
+        // showsUserLocation={false}
+        // showsMyLocationButton={false}
+        // mapType={isDark ? "standard" : "standard"}
+        // maxZoomLevel={15}
+        ref={mapRef}
         provider={PROVIDER_GOOGLE}
         style={{ flex: 1 }}
-        region={{
-          latitude: FROM.latitude,
-          longitude: FROM.longitude,
-          latitudeDelta: 10,
-          longitudeDelta: 10,
-        }}
         showsUserLocation={false}
         showsMyLocationButton={false}
         mapType={isDark ? "standard" : "standard"}
@@ -409,9 +424,7 @@ export default function MapOverviewScreen() {
         {drivers
           .filter(
             (d) =>
-              d.driverLocation &&
-              d.driverLocation.lat &&
-              d.driverLocation.lng
+              d.driverLocation && d.driverLocation.lat && d.driverLocation.lng
           )
           .map((d, index) => (
             <Marker
@@ -444,7 +457,10 @@ export default function MapOverviewScreen() {
                         fontSize: 12,
                       }}
                     >
-                      🚚 {d._id === user?.id ? "Du (Förare)" : `Förare (${d.email?.split('@')[0]})`}
+                      🚚{" "}
+                      {d._id === user?.id
+                        ? "Du (Förare)"
+                        : `Förare (${d.email?.split("@")[0]})`}
                     </AutoText>
                   </View>
 
@@ -466,12 +482,9 @@ export default function MapOverviewScreen() {
             </Marker>
           ))}
 
-
         {/* Simulated Driver for Testing */}
         {routeCoords.length > 0 && (
-          <Marker
-          coordinate={routeCoords[driverIndex]}
-          pinColor="purple">
+          <Marker coordinate={routeCoords[driverIndex]} pinColor="purple">
             <Callout tooltip>
               <View style={{ alignItems: "center", marginBottom: 6 }}>
                 <View
@@ -565,7 +578,6 @@ export default function MapOverviewScreen() {
           </AutoText>
         </View>
       )}
-
     </View>
   );
 }
