@@ -3,7 +3,6 @@ import { TouchableOpacity, View, ScrollView, Image, Alert } from "react-native";
 import { useSignUp } from "@clerk/clerk-expo";
 import { Link, useRouter } from "expo-router";
 import { useTheme } from "../context/ThemeContext";
-import { GoogleSignInButton } from "../components/GoogleSignInButton";
 import { useState } from "react";
 import { StatusBar } from "expo-status-bar";
 import { OtpInput } from "react-native-otp-entry";
@@ -12,6 +11,7 @@ import Input from "../components/ui/Input";
 import { LinearGradient } from "expo-linear-gradient";
 import { getPremiumGradient } from "../utils/getPremiumGradient";
 import { showAlert } from "../utils/showAlert";
+import GoogleSignInButton from "../components/GoogleSignInButton";
 
 export default function SignUpScreen() {
   const { isLoaded, signUp, setActive } = useSignUp();
