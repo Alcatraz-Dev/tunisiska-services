@@ -8,7 +8,7 @@ export const ShippingRouteService = {
       const query = `*[_type == "shippingSchedule" && isActive == true][0]{route}`;
       const result = await client.fetch(query);
 
-      if (!result || !result.route) throw new Error("No active route found");
+      if (!result || !result.route) return null;
 
       // Map to coordinates
       const coords = routeCoordinates[result.route];

@@ -1,6 +1,5 @@
-import { ShippingOrderService } from "@/app/services/shippingOrderService";
 import polyline from "@mapbox/polyline"; // decode polyline from Directions API
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Text, View } from "react-native";
 import MapView, {
   Callout,
@@ -9,23 +8,32 @@ import MapView, {
   PROVIDER_GOOGLE,
 } from "react-native-maps";
 import { useTheme } from "../../context/ThemeContext";
-import { routeCoordinates } from "@/app/utils/routeCoordinates";
 import { ShippingRouteService } from "@/app/utils/shippingRouteService";
-
+import { AutoText } from "@/app/components/ui/AutoText";
+import { useFocusEffect } from "expo-router";
 
 export default function MapOverviewScreen() {
   const [route, setRoute] = useState<any>(null);
-  const [routeCoords, setRouteCoords] = useState([]);
+  const [routeCoords, setRouteCoords] = useState<
+    { latitude: number; longitude: number }[]
+  >([]);
   const [driverIndex, setDriverIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
   const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
+  const defaultCoord = { latitude: 59.3293, longitude: 18.0686 }; // fallback location
+
   const fetchActiveRoute = async () => {
-    const result = await ShippingRouteService.getActiveRoute();
-    if (result) setRoute(result);
-    setLoading(false);
+    try {
+      const result = await ShippingRouteService.getActiveRoute();
+      if (result) setRoute(result);
+    } catch (e) {
+      console.error("Error fetching active route:", e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const fetchGoogleRoute = async (from: any, to: any) => {
@@ -36,11 +44,12 @@ export default function MapOverviewScreen() {
       const json = await res.json();
       if (json.routes.length > 0) {
         const points = polyline.decode(json.routes[0].overview_polyline.points);
-        const coords = points.map(([lat, lng]: [number, number]) => ({
-          latitude: lat,
-          longitude: lng,
-        }));
-        setRouteCoords(coords as any);
+        setRouteCoords(
+          points.map(([lat, lng]: [number, number]) => ({
+            latitude: lat,
+            longitude: lng,
+          }))
+        );
       }
     } catch (e) {
       console.error("Error fetching route:", e);
@@ -65,17 +74,18 @@ export default function MapOverviewScreen() {
     return () => clearInterval(interval);
   }, [routeCoords]);
 
-  if (!route)
-    return (
-      <View className="flex-1 items-center justify-center">
-        <Text>No active route found</Text>
-      </View>
-    );
-
-  const FROM = { latitude: route.from.lat, longitude: route.from.lng };
-  const TO = { latitude: route.to.lat, longitude: route.to.lng };
+  const FROM = route
+    ? { latitude: route.from.lat, longitude: route.from.lng }
+    : defaultCoord;
+  const TO = route
+    ? { latitude: route.to.lat, longitude: route.to.lng }
+    : defaultCoord;
   const driverCoord = routeCoords[driverIndex] || FROM;
-
+useFocusEffect(
+  useCallback(() => {
+    fetchActiveRoute(); // fetch every time screen comes into view
+  }, [])
+);
   return (
     <View className="flex-1">
       <MapView
@@ -187,11 +197,12 @@ export default function MapOverviewScreen() {
             <View
               style={{
                 alignItems: "center",
+                marginBottom: 6,
               }}
             >
               <View
                 style={{
-                  backgroundColor: isDark ? "#0f172a" : "#fff",
+                  backgroundColor: isDark ? "#000000" : "#fff",
                   borderRadius: 10,
                   paddingVertical: 6,
                   paddingHorizontal: 10,
@@ -202,15 +213,15 @@ export default function MapOverviewScreen() {
                   elevation: 3,
                 }}
               >
-                <Text
+                <AutoText
                   style={{
-                    color: isDark ? "#f1f5f9" : "#0f172a",
+                    color: isDark ? "#f1f5f9" : "#000000",
                     fontWeight: "600",
                     fontSize: 12,
                   }}
                 >
-                  📦 Pickup
-                </Text>
+                  📦 Upphämtning
+                </AutoText>
               </View>
 
               {/* Small triangle pointer */}
@@ -223,7 +234,7 @@ export default function MapOverviewScreen() {
                   borderTopWidth: 8,
                   borderLeftColor: "transparent",
                   borderRightColor: "transparent",
-                  borderTopColor: isDark ? "#0f172a" : "#fff",
+                  borderTopColor: isDark ? "#000000" : "#fff",
                   marginTop: -1,
                 }}
               />
@@ -234,10 +245,10 @@ export default function MapOverviewScreen() {
         {/* Delivery */}
         <Marker coordinate={TO} pinColor="red">
           <Callout tooltip>
-            <View style={{ alignItems: "center" }}>
+            <View style={{ alignItems: "center", marginBottom: 6 }}>
               <View
                 style={{
-                  backgroundColor: isDark ? "#1e293b" : "#ffffff",
+                  backgroundColor: isDark ? "#000000" : "#ffffff",
                   borderRadius: 10,
                   paddingVertical: 6,
                   paddingHorizontal: 10,
@@ -248,15 +259,15 @@ export default function MapOverviewScreen() {
                   elevation: 3,
                 }}
               >
-                <Text
+                <AutoText
                   style={{
-                    color: isDark ? "#f8fafc" : "#0f172a",
+                    color: isDark ? "#f8fafc" : "#000000",
                     fontWeight: "600",
                     fontSize: 12,
                   }}
                 >
-                  🎯 Delivery
-                </Text>
+                  🎯 Leverans
+                </AutoText>
               </View>
 
               <View
@@ -268,7 +279,7 @@ export default function MapOverviewScreen() {
                   borderTopWidth: 8,
                   borderLeftColor: "transparent",
                   borderRightColor: "transparent",
-                  borderTopColor: isDark ? "#1e293b" : "#ffffff",
+                  borderTopColor: isDark ? "#000000" : "#ffffff",
                   marginTop: -1,
                 }}
               />
@@ -279,10 +290,10 @@ export default function MapOverviewScreen() {
         {/* Driver */}
         <Marker coordinate={driverCoord} pinColor="orange">
           <Callout tooltip>
-            <View style={{ alignItems: "center" }}>
+            <View style={{ alignItems: "center", marginBottom: 6 }}>
               <View
                 style={{
-                  backgroundColor: isDark ? "#1e1e1e" : "#ffffff",
+                  backgroundColor: isDark ? "#000000" : "#ffffff",
                   borderRadius: 10,
                   paddingVertical: 6,
                   paddingHorizontal: 10,
@@ -293,15 +304,15 @@ export default function MapOverviewScreen() {
                   elevation: 3,
                 }}
               >
-                <Text
+                <AutoText
                   style={{
-                    color: isDark ? "#f1f5f9" : "#0f172a",
+                    color: isDark ? "#f1f5f9" : "#000000",
                     fontWeight: "600",
                     fontSize: 12,
                   }}
                 >
-                  🚚 Driver
-                </Text>
+                  🚚 Förare
+                </AutoText>
               </View>
 
               <View
@@ -313,7 +324,7 @@ export default function MapOverviewScreen() {
                   borderTopWidth: 8,
                   borderLeftColor: "transparent",
                   borderRightColor: "transparent",
-                  borderTopColor: isDark ? "#1e1e1e" : "#ffffff",
+                  borderTopColor: isDark ? "#000000" : "#ffffff",
                   marginTop: -1,
                 }}
               />
@@ -349,9 +360,25 @@ export default function MapOverviewScreen() {
             alignItems: "center",
           }}
         >
-          <Text style={{ color: isDark ? "#fff" : "#000" }}>
-            Loading route...
-          </Text>
+          <AutoText style={{ color: isDark ? "#fff" : "#000" }}>
+            Laddar rutt...
+          </AutoText>
+        </View>
+      )}
+      {!route && !loading && (
+        <View
+          style={{
+            position: "absolute",
+            top: 20,
+            alignSelf: "center",
+            backgroundColor: isDark ? "#1e293b" : "#fff",
+            padding: 8,
+            borderRadius: 8,
+          }}
+        >
+          <AutoText style={{ color: isDark ? "#f1f5f9" : "#000" }}>
+            Ingen aktiv rutt
+          </AutoText>
         </View>
       )}
     </View>

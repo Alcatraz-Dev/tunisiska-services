@@ -12,11 +12,9 @@ export default defineType({
       options: {
         list: [
           {title: 'Stockholm → Tunis', value: 'stockholm_tunis'},
-          {title: 'Göteborg → Tunis', value: 'goteborg_tunis'},
-          {title: 'Malmö → Tunis', value: 'malmo_tunis'},
           {title: 'Tunis → Stockholm', value: 'tunis_stockholm'},
-          {title: 'Tunis → Göteborg', value: 'tunis_goteborg'},
-          {title: 'Tunis → Malmö', value: 'tunis_malmo'},
+          {title: 'Tunis → Sousse', value: 'tunis_sousse'},
+          {title: 'Tunis → Sfax', value: 'tunis_sfax'},
         ],
       },
       validation: (Rule) => Rule.required(),
