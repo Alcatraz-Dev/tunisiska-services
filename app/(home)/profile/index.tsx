@@ -308,6 +308,10 @@ const toggleDriverMode = async (value: boolean) => {
       if (subscription) {
         setLocationTracking(true);
         showAlert("Förarläge aktiverat", "Din plats spåras nu i realtid.");
+      } else {
+        showAlert("Fel", "Kunde inte starta platspårning. Kontrollera behörigheter.");
+        setIsDriver(false); // Reset if tracking failed
+        return;
       }
     } else {
       setLocationTracking(false);

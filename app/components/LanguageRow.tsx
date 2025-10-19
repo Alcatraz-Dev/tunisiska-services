@@ -1,4 +1,4 @@
-import { View,  Image, TouchableOpacity } from "react-native";
+import { View, Image, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 
 import icons from "@/app/constants/icons";
@@ -6,7 +6,6 @@ import { useTheme } from "../context/ThemeContext";
 import { useLanguage } from "../hooks/useLanguage";
 import { supportedLanguages } from "../constants/languages";
 import { AutoText } from "./ui/AutoText";
-
 
 export default function LanguageRow({ userProfile }: { userProfile?: any }) {
   const router = useRouter();
@@ -24,8 +23,7 @@ export default function LanguageRow({ userProfile }: { userProfile?: any }) {
   );
 
   // Determine displayed language
-  const currentLang = userProfile?.defaultLanguage || language || "sv";
-
+  const currentLang = language || userProfile?.defaultLanguage || "sv";
   return (
     <View
       className={`flex-row items-center justify-between p-4 border-b ${

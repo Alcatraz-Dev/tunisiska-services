@@ -56,7 +56,7 @@ export const DriverService = {
       // Update location in Sanity
       await this.updateDriverLocation(userId, location.coords.latitude, location.coords.longitude);
 
-      // Start watching location
+      // Start watching location with proper error handling
       const locationSubscription = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.High,
@@ -64,8 +64,12 @@ export const DriverService = {
           distanceInterval: 10, // Or when moved 10 meters
         },
         async (newLocation) => {
-          console.log('Location update:', newLocation.coords);
-          await this.updateDriverLocation(userId, newLocation.coords.latitude, newLocation.coords.longitude);
+          try {
+            console.log('Location update:', newLocation.coords);
+            await this.updateDriverLocation(userId, newLocation.coords.latitude, newLocation.coords.longitude);
+          } catch (error) {
+            console.error('Error updating location in watch callback:', error);
+          }
         }
       );
 
