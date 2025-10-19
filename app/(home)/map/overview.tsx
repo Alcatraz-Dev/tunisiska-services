@@ -222,7 +222,7 @@ export default function MapOverviewScreen() {
                   fontSize: 10,
                 }}
               >
-                Driver
+                Delivery
               </Text>
             </View>
           </Callout>
