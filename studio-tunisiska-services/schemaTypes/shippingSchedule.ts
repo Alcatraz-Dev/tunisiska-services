@@ -111,6 +111,16 @@ export default defineType({
       type: 'text',
       rows: 2,
     }),
+
+    defineField({
+      name: 'assignedDriver',
+      title: 'Assigned Driver',
+      type: 'reference',
+      to: [{ type: 'users' }],
+      options: {
+        filter: 'isDriver == true',
+      },
+    }),
   ],
 
   preview: {

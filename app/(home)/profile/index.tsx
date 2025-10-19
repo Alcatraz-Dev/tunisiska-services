@@ -26,6 +26,8 @@ import LanguageRow from "@/app/components/LanguageRow";
 import { AutoText } from "@/app/components/ui/AutoText";
 import { showAlert } from "@/app/utils/showAlert";
 import NotificationSettings from "@/app/components/NotificationSettings";
+import { DriverService } from "@/app/utils/shippingRouteService";
+import * as Location from "expo-location";
 // Interface for user profile data
 interface Referral {
   id: string;
@@ -60,6 +62,7 @@ interface UserProfileData {
   referrals?: Referral[];
   friendsCount?: number;
   signUpMethod: "google" | "email";
+  isDriver?: boolean;
 }
 
 const Profile = () => {
@@ -78,6 +81,8 @@ const Profile = () => {
   const [postalCode, setPostalCode] = useState("");
   const [country, setCountry] = useState("Sverige"); // default country
   const [imageUrl, setImageUrl] = useState("");
+  const [isDriver, setIsDriver] = useState(false);
+  const [locationTracking, setLocationTracking] = useState(false);
   const router = useRouter();
 
   const totalReferrals = (userProfile?.referrals ?? []).length;
@@ -158,9 +163,10 @@ const Profile = () => {
 
       // Get referrals from Sanity as source of truth
       let referrals = user.unsafeMetadata?.referrals || [];
+      let userDoc: any = null;
       try {
         const { client } = await import("@/sanityClient");
-        const userDoc = await client.fetch(
+        userDoc = await client.fetch(
           `*[_type == "users" && clerkId == $clerkId][0]`,
           { clerkId: user.id }
         );
@@ -217,6 +223,7 @@ const Profile = () => {
         shipmentsCompleted: 0, // Not used in current implementation
         ongoingShipments: 0, // Not used in current implementation
         defaultLanguage: "sv", // Default to Swedish
+        isDriver: userDoc?.isDriver || false,
       };
 
       setFirstName(profileData.firstName as string);
@@ -229,6 +236,7 @@ const Profile = () => {
       setCountry(profileData.country as string);
       setImageUrl((user.unsafeMetadata?.imageUrl as string) || user.imageUrl);
       setReferralCode(profileData.referralCode as string);
+      setIsDriver(profileData.isDriver || false);
       setUserProfile(profileData as UserProfileData);
 
       setLoading(false);
@@ -239,6 +247,50 @@ const Profile = () => {
 
   const copyToClipboard = () => {
     showAlert("Kopierad", "Referenskoden har kopierats till urklipp!");
+  };
+
+  const toggleDriverMode = async (value: boolean) => {
+    try {
+      const { client } = await import("@/sanityClient");
+
+      // First check if user document exists in Sanity
+      const existingUser = await client.fetch(
+        `*[_type == "users" && clerkId == $clerkId][0]`,
+        { clerkId: user?.id }
+      );
+
+      if (!existingUser) {
+        // Create user document if it doesn't exist
+        await client.create({
+          _type: "users",
+          clerkId: user?.id,
+          email: user?.emailAddresses[0]?.emailAddress,
+          isDriver: value,
+        });
+      } else {
+        // Update existing user document
+        await client.patch(existingUser._id).set({ isDriver: value }).commit();
+      }
+
+      setIsDriver(value);
+
+      if (value) {
+        // Start location tracking when becoming a driver
+        const subscription = await DriverService.startLocationTracking(
+          user?.id || ""
+        );
+        if (subscription) {
+          setLocationTracking(true);
+          showAlert("Förarläge aktiverat", "Din plats spåras nu i realtid.");
+        }
+      } else {
+        setLocationTracking(false);
+        showAlert("Förarläge inaktiverat", "Platspårning stoppad.");
+      }
+    } catch (error) {
+      console.error("Error toggling driver mode:", error);
+      showAlert("Fel", "Kunde inte ändra förarstatus.");
+    }
   };
 
   // Show loading state while user data is being fetched
@@ -290,10 +342,10 @@ const Profile = () => {
             </AutoText>
           </View>
           <AutoText
-          className={`text-sm text-center mt-3 mx-5 ${
-            isDark ? "text-gray-400" : "text-gray-600"
-          }`}
-        >
+            className={`text-sm text-center mt-3 mx-5 ${
+              isDark ? "text-gray-400" : "text-gray-600"
+            }`}
+          >
             Hantera din profilinformation, uppdatera detaljer och se din
             aktivitet.
           </AutoText>
@@ -448,8 +500,8 @@ const Profile = () => {
                   isDark ? "text-zinc-400" : "text-zinc-600"
                 }`}
               >
-                Dela din referenskod med vänner och få 100 poäng när de
-                registrerar sig!
+                Dela din referenskod med 10 vänner och få 50 poäng när de
+                registrerar sig ! , 50 poäng per vän du refererar.
               </AutoText>
 
               <View
@@ -585,6 +637,34 @@ const Profile = () => {
 
               {/* Theme Toggle */}
               <ThemeToggle />
+              {/* Driver Mode Toggle */}
+              {userProfile?.isDriver && (
+                <View
+                  className={`flex-row items-center justify-between p-4 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}
+                >
+                  <View className="flex-1">
+                    <AutoText
+                      className={`text-sm font-medium ${
+                        isDark ? "text-white" : "text-gray-900"
+                      }`}
+                    >
+                      Förarläge
+                    </AutoText>
+                    <AutoText
+                      className={`text-xs mt-1 ${
+                        isDark ? "text-gray-400" : "text-gray-600"
+                      }`}
+                    >
+                      Aktivera för att dela din plats i realtid på kartan
+                    </AutoText>
+                  </View>
+                  <Switch
+                    value={isDriver}
+                    onValueChange={toggleDriverMode}
+             
+                  />
+                </View>
+              )}
             </View>
           </View>
           {/* Support */}
