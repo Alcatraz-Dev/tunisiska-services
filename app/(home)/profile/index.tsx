@@ -249,49 +249,75 @@ const Profile = () => {
     showAlert("Kopierad", "Referenskoden har kopierats till urklipp!");
   };
 
-  const toggleDriverMode = async (value: boolean) => {
-    try {
-      const { client } = await import("@/sanityClient");
+const requestLocationPermission = async (): Promise<boolean> => {
+  try {
+    // This triggers the native foreground permission popup
+    const { status: fgStatus } = await Location.requestForegroundPermissionsAsync();
 
-      // First check if user document exists in Sanity
-      const existingUser = await client.fetch(
-        `*[_type == "users" && clerkId == $clerkId][0]`,
-        { clerkId: user?.id }
-      );
-
-      if (!existingUser) {
-        // Create user document if it doesn't exist
-        await client.create({
-          _type: "users",
-          clerkId: user?.id,
-          email: user?.emailAddresses[0]?.emailAddress,
-          isDriver: value,
-        });
-      } else {
-        // Update existing user document
-        await client.patch(existingUser._id).set({ isDriver: value }).commit();
-      }
-
-      setIsDriver(value);
-
-      if (value) {
-        // Start location tracking when becoming a driver
-        const subscription = await DriverService.startLocationTracking(
-          user?.id || ""
-        );
-        if (subscription) {
-          setLocationTracking(true);
-          showAlert("Förarläge aktiverat", "Din plats spåras nu i realtid.");
-        }
-      } else {
-        setLocationTracking(false);
-        showAlert("Förarläge inaktiverat", "Platspårning stoppad.");
-      }
-    } catch (error) {
-      console.error("Error toggling driver mode:", error);
-      showAlert("Fel", "Kunde inte ändra förarstatus.");
+    if (fgStatus !== "granted") {
+      console.log("User denied foreground location permission");
+      return false;
     }
-  };
+
+    // Optional: request background permission (triggers native popup if needed)
+    const { status: bgStatus } = await Location.requestBackgroundPermissionsAsync();
+    if (bgStatus !== "granted") {
+      console.log("User denied background location permission");
+      // Not fatal; tracking may be limited
+    }
+
+    return true; // Permission granted
+  } catch (error) {
+    console.error("Error requesting location permission:", error);
+    return false;
+  }
+};
+
+const toggleDriverMode = async (value: boolean) => {
+  // Ask permission first
+  const hasPermission = await requestLocationPermission();
+  if (!hasPermission) return;
+
+  try {
+    const { client } = await import("@/sanityClient");
+
+    // Check if user document exists
+    const existingUser = await client.fetch(
+      `*[_type == "users" && clerkId == $clerkId][0]`,
+      { clerkId: user?.id }
+    );
+
+    if (!existingUser) {
+      // Create new user document
+      await client.create({
+        _type: "users",
+        clerkId: user?.id,
+        email: user?.emailAddresses[0]?.emailAddress,
+        isDriver: value,
+      });
+    } else {
+      // Update existing document
+      await client.patch(existingUser._id).set({ isDriver: value }).commit();
+    }
+
+    setIsDriver(value);
+
+    if (value) {
+      // Start location tracking
+      const subscription = await DriverService.startLocationTracking(user?.id || "");
+      if (subscription) {
+        setLocationTracking(true);
+        showAlert("Förarläge aktiverat", "Din plats spåras nu i realtid.");
+      }
+    } else {
+      setLocationTracking(false);
+      showAlert("Förarläge inaktiverat", "Platspårning stoppad.");
+    }
+  } catch (error) {
+    console.error("Error toggling driver mode:", error);
+    showAlert("Fel", "Kunde inte ändra förarstatus.");
+  }
+};
 
   // Show loading state while user data is being fetched
   if (!isLoaded || loading) {
@@ -761,3 +787,4 @@ const Profile = () => {
 };
 
 export default Profile;
+
