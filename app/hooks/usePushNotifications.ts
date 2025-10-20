@@ -82,14 +82,17 @@ export default function usePushNotifications() {
   // Handle incoming notification
   const handleIncomingNotification = async (notif: any) => {
     const data = notif?.notification || notif?.request?.content?.data || {};
+    const pushData = data?.pushData || data;
     const newNotification: NotificationItem = {
       id: notif.notificationId || notif.request?.identifier || `notif-${Date.now()}`,
       title: notif.title || notif.request?.content?.title || "No title",
       message: notif.body || notif.request?.content?.body || "",
-      type: data?.type ?? "general",
+      type: pushData?.notificationType || pushData?.type || data?.type || "general",
       read: false,
       date: new Date().toISOString() as any,
       image: data?.image ?? data?.bigPicture ?? data?.smallIcon,
+      route: pushData?.route,
+      screenImage: pushData?.screenImage,
     };
     addNotification(newNotification);
     saveNotifications([newNotification]);

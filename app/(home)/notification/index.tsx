@@ -25,6 +25,7 @@ import {
   InteractionManager,
   Image,
 } from "react-native";
+import VideoPlayer from "@/app/components/VideoPlayer";
 import Animated, { FadeInUp, FadeOutDown } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@clerk/clerk-expo";
@@ -42,6 +43,10 @@ interface NotificationItem {
   date?: string;
   date_sent?: string;
   image?: string;
+  route?: string;
+  screenImage?: string;
+  mediaType?: string;
+  videoUrl?: string;
 }
 
 // Lightweight in-memory cache for first page per user (session-scoped)
@@ -275,6 +280,26 @@ export default function Notification() {
               "Image URL:",
               imageUrl
             );
+
+            // Extract screenImage, route, and media info from pushData
+            let screenImageUrl = imageUrl;
+            let routeUrl = undefined;
+            let mediaType = "image";
+            let videoUrl = undefined;
+            if (n.pushData) {
+              try {
+                const pushData = typeof n.pushData === "string" ? JSON.parse(n.pushData) : n.pushData;
+                screenImageUrl = pushData.screenImage || pushData.image || imageUrl;
+                routeUrl = pushData.route;
+                mediaType = pushData.mediaType || "image";
+                videoUrl = pushData.videoUrl;
+                console.log("Extracted from pushData - screenImage:", screenImageUrl, "route:", routeUrl, "mediaType:", mediaType, "videoUrl:", videoUrl);
+                console.log("Full pushData:", JSON.stringify(pushData, null, 2));
+              } catch (e) {
+                console.warn("Failed to parse pushData:", n.pushData);
+              }
+            }
+
             return {
               id: n.notification_id?.toString() || n.id?.toString(),
               notification_id: n.notification_id?.toString(),
@@ -286,6 +311,10 @@ export default function Notification() {
               date: n.date ?? n.date_sent ?? new Date().toISOString(),
               date_sent: n.date_sent ?? n.date,
               image: imageUrl,
+              screenImage: screenImageUrl,
+              route: routeUrl,
+              mediaType: mediaType,
+              videoUrl: videoUrl,
             };
           })
         : [];
@@ -372,13 +401,28 @@ export default function Notification() {
     security: { icon: "lock-closed-outline", color: "#F97316" },
     review: { icon: "star-outline", color: "#14B8A6" },
     system: { icon: "settings-outline", color: "#A78BFA" },
+    update: { icon: "refresh-outline", color: "#06B6D4" },
+    announcement: { icon: "megaphone-outline", color: "#F59E0B" },
+    maintenance: { icon: "construct-outline", color: "#EF4444" },
+    promotion: { icon: "pricetag-outline", color: "#EC4899" },
+    general: { icon: "notifications-outline", color: "#3B82F6" },
     default: { icon: "notifications-outline", color: "#3B82F6" },
   };
 
   const renderItem = useCallback(
     ({ item, index }: { item: NotificationItem; index: number }) => {
+      // Determine notification type - check pushData first, then item properties
+      let notificationType = "general";
+      if (item.route?.includes("announcements")) {
+        notificationType = "announcement";
+      } else if (item.type) {
+        notificationType = item.type;
+      } else if (item.category) {
+        notificationType = item.category;
+      }
+
       const { icon, color } =
-        notificationConfig[item.type || item.category || "default"] ||
+        notificationConfig[notificationType] ||
         notificationConfig.default;
 
       const handlePress = () => {
@@ -388,6 +432,12 @@ export default function Notification() {
             markItemAsRead(notificationId);
           }
         }
+
+        // Navigate to route if specified (for announcements)
+        if (item.route) {
+          console.log("Navigating to route:", item.route);
+          router.push(item.route as any);
+        }
       };
 
       return (
@@ -395,7 +445,11 @@ export default function Notification() {
           key={item.id || item.notification_id}
           entering={FadeInUp}
           exiting={FadeOutDown}
-          className="flex-row items-start gap-3 py-2"
+          className="flex-row items-start gap-3 py-2 my-2"
+          style={{
+            borderBottomWidth: index < data.length - 1 ? 1 : 0,
+            borderBottomColor: isDark ? "#374151" : "#e5e7eb",
+          }}
         >
           <TouchableOpacity
             className="flex-1 flex-row items-start p-2 "
@@ -420,16 +474,16 @@ export default function Notification() {
                 }}
               />
             )}
-            <View className="flex-1 mx-1 my-2">
+            <View className="flex-1 mx-1 my-3">
               <AutoText
-                className={`text-base font-bold capitalize ${
+                className={`text-sm font-bold capitalize my-1 ${
                   isDark ? "text-white" : "text-gray-900"
                 }`}
               >
                 {item.title || "No Title"}
               </AutoText>
               <AutoText
-                className={`text-sm mt-1 ${
+                className={`text-xs mt-1 ${
                   isDark ? "text-gray-300" : "text-gray-600"
                 }`}
               >
@@ -437,7 +491,7 @@ export default function Notification() {
               </AutoText>
               <TranslatableDateText
                 dateString={item.date || item.date_sent}
-                className={`text-xs mt-3 ${
+                className={`text-[9px] mt-3 ${
                   isDark ? "text-gray-400" : "text-gray-500"
                 }`}
               />
@@ -445,30 +499,77 @@ export default function Notification() {
           </TouchableOpacity>
 
           <View className="flex-row items-start mt-3 ">
-            {/* Display image if available */}
-            {item.image && item.image.trim() !== "" && (
-              <Image
-                source={{ uri: item.image }}
-                style={{
-                  width: 60,
-                  height: 60,
-                  borderRadius: 8,
-                  resizeMode: "cover",
-                  borderWidth: 1,
-                  borderColor: isDark ? "#374151" : "#e5e7eb",
-                }}
-                onLoadStart={() => console.log("Loading image:", item.image)}
-                onLoad={() =>
-                  console.log("Image loaded successfully:", item.image)
-                }
-                onError={(error) => {
-                  console.warn(
-                    "Failed to load notification image:",
-                    item.image,
-                    error
-                  );
-                }}
-              />
+            {/* Display image/video preview for announcements */}
+            {((item.screenImage && item.screenImage.trim() !== "") ||
+              (item.image && item.image.trim() !== "") ||
+              (item.videoUrl && item.videoUrl.trim() !== "")) && (
+              <View className="relative">
+                {/* For videos, show the actual video playing */}
+                {item.mediaType === "video" && item.videoUrl ? (
+                  <View
+                    style={{
+                      width: 70,
+                      height: 70,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: isDark ? "#374151" : "#e5e7eb",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <VideoPlayer
+                      uri={item.videoUrl}
+                      muted={true}
+                      aspectRatio={1} // Square aspect ratio for thumbnail
+                    />
+                  </View>
+                ) : item.mediaType === "video" ? (
+                  /* Fallback for videos without URL: show video icon */
+                  <View
+                    style={{
+                       width: 70,
+                      height: 70,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: isDark ? "#374151" : "#e5e7eb",
+                      backgroundColor: isDark ? "#1f2937" : "#f9fafb",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Ionicons
+                      name="videocam"
+                      size={24}
+                      color={isDark ? "#9ca3af" : "#6b7280"}
+                    />
+                  </View>
+                ) : (
+                  /* For images, show the image directly */
+                  <Image
+                    source={{
+                      uri: item.screenImage || item.image
+                    }}
+                    style={{
+                      width: 60,
+                      height: 60,
+                      borderRadius: 8,
+                      resizeMode: "cover",
+                      borderWidth: 1,
+                      borderColor: isDark ? "#374151" : "#e5e7eb",
+                    }}
+                    onLoadStart={() => console.log("Loading notification image:", item.screenImage || item.image)}
+                    onLoad={() =>
+                      console.log("Image loaded successfully:", item.screenImage || item.image)
+                    }
+                    onError={(error) => {
+                      console.warn(
+                        "Failed to load notification image:",
+                        item.screenImage || item.image,
+                        error
+                      );
+                    }}
+                  />
+                )}
+              </View>
             )}
           </View>
           <TouchableOpacity
@@ -478,14 +579,14 @@ export default function Notification() {
           >
             <Ionicons
               name="trash-outline"
-              size={18}
+              size={14}
               color={isDark ? "#9CA3AF" : "#6B7280"}
             />
           </TouchableOpacity>
         </Animated.View>
       );
     },
-    [isDark, markItemAsRead, deleteItem]
+    [isDark, markItemAsRead, deleteItem, data.length]
   );
 
   const keyExtractor = useCallback(

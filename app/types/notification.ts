@@ -9,4 +9,6 @@ export interface NotificationItem {
   date?: string;
   date_sent?: string;
   image?: string;
+  route?: string;
+  screenImage?: string;
 }

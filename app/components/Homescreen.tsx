@@ -3,13 +3,25 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Link, useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import {
-  getNotificationInbox,
-  getUnreadNotificationInboxCount,
-} from "native-notify";
 import { useEffect, useMemo, useState } from "react";
 import { Image, ScrollView, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+// Conditionally import native-notify functions to prevent crashes in Expo Go
+const getNotificationInbox = (() => {
+  try {
+    return require("native-notify").getNotificationInbox;
+  } catch {
+    return null;
+  }
+})();
+const getUnreadNotificationInboxCount = (() => {
+  try {
+    return require("native-notify").getUnreadNotificationInboxCount;
+  } catch {
+    return null;
+  }
+})();
 import AnnouncementsCarousel from "../components/AnnouncementsCarousel";
 import AppFooter from "../components/AppFooter";
 import LiveStatus from "../components/LiveStatus";
@@ -119,57 +131,66 @@ export default function HomePage() {
     console.log('🔢 Calculating unread notification count...');
 
     // Always try to get the count, even in Expo Go - just handle failures gracefully
-    try {
-      // Try Native Notify API first (works in Expo Go on device)
-      console.log('📱 Trying Native Notify API for unread count');
-      const unreadResp = await getUnreadNotificationInboxCount(
-        32172,
-        "PNF5T5VibvtV6lj8i7pbil"
-      );
+    if (getUnreadNotificationInboxCount) {
+      try {
+        // Try Native Notify API first (works in Expo Go on device)
+        console.log('📱 Trying Native Notify API for unread count');
+        const unreadResp = await getUnreadNotificationInboxCount(
+          32172,
+          "PNF5T5VibvtV6lj8i7pbil"
+        );
 
-      let count = 0;
-      if (unreadResp && typeof unreadResp === 'object') {
-        if ('data' in unreadResp) {
-          count = Number(unreadResp.data) || 0;
+        let count = 0;
+        if (unreadResp && typeof unreadResp === 'object') {
+          if ('data' in unreadResp) {
+            count = Number(unreadResp.data) || 0;
+          } else if (typeof unreadResp === 'number') {
+            count = unreadResp;
+          }
         } else if (typeof unreadResp === 'number') {
           count = unreadResp;
         }
-      } else if (typeof unreadResp === 'number') {
-        count = unreadResp;
-      }
 
-      console.log('📊 Native Notify unread count:', count);
-      setUnreadNotificationCount(count);
-      return;
-    } catch (error) {
-      console.warn('Native Notify API failed, trying fallback:', error);
+        console.log('📊 Native Notify unread count:', count);
+        setUnreadNotificationCount(count);
+        return;
+      } catch (error) {
+        console.warn('Native Notify API failed, trying fallback:', error);
+      }
     }
 
     // Fallback: derive from inbox + local overlays
-    try {
-      const [storedRead, storedHidden] = await Promise.all([
-        AsyncStorage.getItem(READ_IDS_KEY),
-        AsyncStorage.getItem(HIDDEN_IDS_KEY),
-      ]);
-      const read = storedRead ? JSON.parse(storedRead) : [];
-      const hidden = storedHidden ? JSON.parse(storedHidden) : [];
+    if (getNotificationInbox) {
+      try {
+        const [storedRead, storedHidden] = await Promise.all([
+          AsyncStorage.getItem(READ_IDS_KEY),
+          AsyncStorage.getItem(HIDDEN_IDS_KEY),
+        ]);
+        const read = storedRead ? JSON.parse(storedRead) : [];
+        const hidden = storedHidden ? JSON.parse(storedHidden) : [];
 
-      const response = await getNotificationInbox(
-        32172,
-        "PNF5T5VibvtV6lj8i7pbil",
-        50,
-        0
-      );
-      const raw = Array.isArray(response) ? response : response?.data ?? [];
-      const scoped = filterForUser(raw);
-      const processed = applyOverlays(scoped, read, hidden);
-      const unreadCount = processed.filter((n: any) => !n.read).length;
-      console.log('📊 Fallback unread count from inbox:', unreadCount);
-      setUnreadNotificationCount(unreadCount);
-    } catch (error) {
-      // Final fallback: use local notification state from context
+        const response = await getNotificationInbox(
+          32172,
+          "PNF5T5VibvtV6lj8i7pbil",
+          50,
+          0
+        );
+        const raw = Array.isArray(response) ? response : response?.data ?? [];
+        const scoped = filterForUser(raw);
+        const processed = applyOverlays(scoped, read, hidden);
+        const unreadCount = processed.filter((n: any) => !n.read).length;
+        console.log('📊 Fallback unread count from inbox:', unreadCount);
+        setUnreadNotificationCount(unreadCount);
+      } catch (error) {
+        // Final fallback: use local notification state from context
+        const localUnreadCount = notifications.filter((n) => !n.read).length;
+        console.log('📊 Final fallback unread count from context:', localUnreadCount);
+        setUnreadNotificationCount(localUnreadCount);
+      }
+    } else {
+      // If native-notify is not available (Expo Go), use context
       const localUnreadCount = notifications.filter((n) => !n.read).length;
-      console.log('📊 Final fallback unread count from context:', localUnreadCount);
+      console.log('📊 Native Notify not available, using context unread count:', localUnreadCount);
       setUnreadNotificationCount(localUnreadCount);
     }
   };

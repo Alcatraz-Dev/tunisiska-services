@@ -47,9 +47,11 @@ export default function AnnouncementDetails() {
   useEffect(() => {
     const fetchAnnouncement = async () => {
       try {
+        console.log("Fetching announcement with slug:", slug);
         const data: Announcement = await client.fetch(singleAnnouncementQuery, {
           slug,
         });
+        console.log("Fetched announcement data:", data);
         setAnnouncement(data || null);
       } catch (error) {
         console.error("Error fetching announcement:", error);
@@ -58,7 +60,11 @@ export default function AnnouncementDetails() {
       }
     };
 
-    fetchAnnouncement();
+    if (slug) {
+      fetchAnnouncement();
+    } else {
+      setLoading(false);
+    }
   }, [slug]);
 
   if (loading) {

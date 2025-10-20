@@ -18,6 +18,7 @@ export interface NotificationPayload {
   bigPictureURL?: string;
   subID?: string;
   image?: string;
+  mediaURL?: string;
 }
 
 export interface BulkNotificationPayload extends NotificationPayload {
@@ -152,6 +153,7 @@ export class NativeNotifyAPI {
     if (payload.subtitle) apiPayload.subtitle = payload.subtitle;
     if (payload.bigPictureURL) apiPayload.bigPictureURL = payload.bigPictureURL;
     if (payload.image) apiPayload.bigPictureURL = payload.image;
+    if (payload.mediaURL) apiPayload.bigPictureURL = payload.mediaURL;
 
     const response = await retryApiCall(async () => {
       const fetchResponse = await fetch(url, {
