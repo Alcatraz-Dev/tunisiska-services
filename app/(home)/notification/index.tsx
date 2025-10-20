@@ -4,7 +4,7 @@ import { useTheme } from "@/app/context/ThemeContext";
 import usePushNotifications from "@/app/hooks/usePushNotifications";
 import { showAlert } from "@/app/utils/showAlert";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -38,14 +38,6 @@ import {
   NotificationType,
 } from "@/app/types/notification";
 
-// In-memory cache
-interface InboxCache {
-  userId: string | null;
-  page0Raw: NotificationItem[];
-  ts: number;
-}
-let inboxCache: InboxCache | null = null;
-
 export default function Notification() {
   const { notifications, markAllAsRead, markAsRead } = useNotifications();
   const { unreadCount, syncNativeNotifyInbox } = usePushNotifications();
@@ -55,9 +47,9 @@ export default function Notification() {
   const isDark = resolvedTheme === "dark";
   const router = useRouter();
   const { userId } = useAuth();
-
-  const [refreshing, setRefreshing] = useState(false);
   const [data, setData] = useState<NotificationItem[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+
   const [readIds, setReadIds] = useState<string[]>([]);
   const [hiddenIds, setHiddenIds] = useState<string[]>([]);
   const [iconsReady, setIconsReady] = useState(false);
@@ -68,6 +60,12 @@ export default function Notification() {
   const loadingRef = useRef(false);
   const ROW_HEIGHT = 88;
 
+  const loadNextPage = async () => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    await notiser({ page, append: true });
+    loadingRef.current = false;
+  };
   const READ_IDS_KEY = useMemo(
     () => `notification_read_ids:${userId ?? "anon"}`,
     [userId]
@@ -76,7 +74,21 @@ export default function Notification() {
     () => `notification_hidden_ids:${userId ?? "anon"}`,
     [userId]
   );
-
+useFocusEffect(
+  useCallback(() => {
+    (async () => {
+      try {
+        const response = getNotificationInbox
+          ? await getNotificationInbox(APP_ID, APP_TOKEN, PAGE_SIZE, 0)
+          : [];
+        const notifications: NotificationItem[] = (response);
+        setData(applyOverlays(filterForUser(notifications)));
+      } catch (err) {
+        console.error("Failed fetching notifications:", err);
+      }
+    })();
+  }, [userId])
+);
   const getId = (n: NotificationItem) =>
     ((n.id || n.notification_id) ?? "").toString();
 
@@ -271,11 +283,6 @@ export default function Notification() {
       setData((prev) => (opts?.append ? [...prev, ...processed] : processed));
       if (!opts?.append) {
         setPage(1);
-        inboxCache = {
-          userId: userId ?? null,
-          page0Raw: typedData,
-          ts: Date.now(),
-        };
       } else setPage((p) => p + 1);
     } catch (error) {
       console.error("Error fetching notifications:", error);
@@ -306,15 +313,7 @@ export default function Notification() {
         const hidden = storedHidden ? JSON.parse(storedHidden) : [];
         setReadIds(read);
         setHiddenIds(hidden);
-        const fresh =
-          inboxCache &&
-          inboxCache.userId === (userId ?? null) &&
-          Date.now() - inboxCache.ts < 120000;
-        if (fresh) {
-          const scoped = filterForUser(inboxCache!.page0Raw);
-          setData(applyOverlays(scoped, { read, hidden }));
-          setPage(1);
-        } else await notiser({ read, hidden, page: 0, append: false });
+        await notiser({ read, hidden, page: 0, append: false });
       } catch {
         setReadIds([]);
         setHiddenIds([]);
@@ -525,16 +524,9 @@ export default function Notification() {
     setRefreshing(false);
     setLoading(false); // Hide loading after refresh
     showAlert("Uppdaterad", "Notifikationerna har uppdaterats");
-    if (unreadCount > 0) {
-      syncNativeNotifyInbox();
-    }
   };
   const hasUnread = data.some((n) => !n.read);
-  useEffect(() => {
-    if (unreadCount > 0) {
-      syncNativeNotifyInbox();
-    }
-  }, [unreadCount, syncNativeNotifyInbox]);
+
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
       <View className="px-6 py-4 relative">
