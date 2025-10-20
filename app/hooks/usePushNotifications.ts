@@ -6,22 +6,21 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import { useNotifications } from "@/app/context/NotificationContext";
 import { showAlert } from "@/app/utils/showAlert";
-
 import { getNotificationInbox, getUnreadNotificationInboxCount } from "native-notify";
 import { nativeNotifyAPI } from "@/app/services/nativeNotifyApi";
 import { useAuth } from "@clerk/clerk-expo";
 import { NotificationItem } from "../types/notification";
 
-// Notification handler is now managed in NotificationContext.tsx
-
 export default function usePushNotifications() {
-  const { notifications, addNotification, addMultipleNotifications, markAsRead, markAllAsRead } =
-    useNotifications();
+  const { notifications, addNotification, addMultipleNotifications, markAsRead } = useNotifications();
   const { userId } = useAuth();
   const [expoPushToken, setExpoPushToken] = useState<string>("");
   const [unreadCount, setUnreadCount] = useState<number>(0);
 
-  // Persist notifications
+  const isRealDevice = Platform.OS !== "web" && Device.isDevice;
+  const isUsingOneSignal = isRealDevice && !!process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID;
+
+  // Local storage helpers
   const saveNotifications = async (notifs: NotificationItem[]) => {
     await AsyncStorage.setItem("notifications", JSON.stringify(notifs));
   };
@@ -29,20 +28,10 @@ export default function usePushNotifications() {
     const stored = await AsyncStorage.getItem("notifications");
     if (stored) addMultipleNotifications(JSON.parse(stored));
   };
-
   const saveUnreadCount = async (count: number) => {
     await AsyncStorage.setItem("unreadCount", count.toString());
-    // Update app badge count - only on real devices, skip in Expo Go
-    const isExpoGo = Platform.OS === 'web' || !Device.isDevice;
-    if (!isExpoGo) {
-      try {
-        await Notifications.setBadgeCountAsync(count);
-        console.log('✅ Badge count updated:', count);
-      } catch (error) {
-        console.error('❌ Failed to update badge count:', error);
-      }
-    } else {
-      console.log('📱 Skipping badge count update in Expo Go/simulator');
+    if (isRealDevice) {
+      try { await Notifications.setBadgeCountAsync(count); } catch {}
     }
   };
   const loadUnreadCount = async () => {
@@ -50,424 +39,181 @@ export default function usePushNotifications() {
     if (stored) {
       const count = Number(stored);
       setUnreadCount(count);
-      // Set badge count on app load - only on real devices, skip in Expo Go
-      const isExpoGo = Platform.OS === 'web' || !Device.isDevice;
-      if (!isExpoGo) {
-        try {
-          await Notifications.setBadgeCountAsync(count);
-          console.log('✅ Badge count loaded:', count);
-        } catch (error) {
-          console.error('❌ Failed to load badge count:', error);
-        }
-      } else {
-        console.log('📱 Skipping badge count load in Expo Go/simulator');
-        // Clear badge count in Expo Go to prevent showing stale counts
-        try {
-          await Notifications.setBadgeCountAsync(0);
-          console.log('✅ Badge count cleared in Expo Go');
-        } catch (error) {
-          console.error('❌ Failed to clear badge count in Expo Go:', error);
-        }
+      if (isRealDevice) {
+        try { await Notifications.setBadgeCountAsync(count); } catch {}
       }
     }
   };
 
-  // Fetch Native Notify inbox
+  // Sync Native Notify inbox
   const syncNativeNotifyInbox = async () => {
+    if (!userId) return;
     try {
-      console.log('🔄 Starting Native Notify inbox sync...');
-
-      // Check if we're on web (no native modules) or simulator (limited native modules)
-      const isWebOrSimulator = Platform.OS === 'web' || !Device.isDevice;
-      console.log('📱 Is web/simulator:', isWebOrSimulator);
-
-      // Always try to sync notifications, even in Expo Go - just handle failures gracefully
-      console.log('🔄 Syncing Native Notify inbox...');
-      console.log('🔑 Using App ID: 32172, Token: PNF5T5VibvtV6lj8i7pbil');
-
-      let inbox: any[] = [];
-      let apiUnreadCount = 0;
-
-      try {
-        const inboxResp = await getNotificationInbox(32172, "PNF5T5VibvtV6lj8i7pbil", 50, 0);
-        console.log('📬 Raw inbox response:', JSON.stringify(inboxResp, null, 2));
-
-        // Handle different API response formats - sometimes direct array, sometimes wrapped in data
-        inbox = Array.isArray(inboxResp) ? inboxResp : (inboxResp?.data ?? []);
-        console.log('📬 Processed inbox:', inbox.length, 'notifications');
-
-        if (inbox.length > 0) {
-          console.log('📋 First notification sample:', JSON.stringify(inbox[0], null, 2));
-        }
-      } catch (inboxErr) {
-        console.warn('Failed to fetch inbox, using empty array:', inboxErr);
-        inbox = [];
-      }
-
-      // Filter for current user if we have userId
-      const userFilteredInbox = userId ? inbox.filter((n: any) => {
-        const subId = n.subscriber_id || n.subscriberId || n.user_id || n.userId || n.indie_id || n.indieId || n.sub_id || n.subId;
-        return subId?.toString() === userId?.toString();
-      }) : inbox;
-
-      const mapped = userFilteredInbox.map((n: any) => ({
-        id: n.notification_id?.toString() || n.id?.toString(),
-        title: n.title,
-        message: n.message,
-        type: n.category ?? "default",
-        read: n.read ?? false,
-        date: n.date ?? n.date_sent ?? new Date().toISOString(),
-        image: n.image ?? n.image_url ?? n.photo ?? n.picture ?? n.bigPictureURL,
+      const inboxResp = await getNotificationInbox(32172, "PNF5T5VibvtV6lj8i7pbil", 50, 0);
+      const inbox = Array.isArray(inboxResp) ? inboxResp : (inboxResp && typeof inboxResp === 'object' && 'data' in inboxResp ? inboxResp.data : []) || [];
+      const userInbox = inbox.filter((n: any) => {
+        const subId = n?.subscriber_id ?? n?.subscriberId ?? n?.user_id ?? n?.userId;
+        return subId?.toString() === userId;
+      });
+      const mapped = userInbox.map((n: any) => ({
+        id: n?.notification_id?.toString() || n?.id?.toString(),
+        title: n?.title || "No Title",
+        message: n?.message || "No Message",
+        type: n?.category ?? "default",
+        read: n?.read ?? false,
+        date: n?.date ?? n?.date_sent ?? new Date().toISOString(),
+        image: n?.image ?? n?.image_url,
       }));
-
-      console.log('✅ Mapped notifications:', mapped.length);
       if (mapped.length > 0) {
         addMultipleNotifications(mapped);
         saveNotifications(mapped);
       }
 
-      // Handle unread count with better error handling
-      try {
-        console.log('🔢 Getting unread count...');
-        const unreadResp = await getUnreadNotificationInboxCount(32172, "PNF5T5VibvtV6lj8i7pbil");
-
-        // Handle different API response formats more robustly
-        if (unreadResp !== null && unreadResp !== undefined) {
-          if (typeof unreadResp === 'object' && unreadResp !== null) {
-            if ('data' in unreadResp && unreadResp.data !== undefined) {
-              apiUnreadCount = Number(unreadResp.data) || 0;
-            } else if (typeof unreadResp === 'number') {
-              apiUnreadCount = unreadResp;
-            } else {
-              console.warn('Unexpected unread count response format:', unreadResp);
-              apiUnreadCount = 0;
-            }
-          } else if (typeof unreadResp === 'number') {
-            apiUnreadCount = unreadResp;
-          } else {
-            console.warn('Unexpected unread count response type:', typeof unreadResp, unreadResp);
-            apiUnreadCount = 0;
-          }
-        } else {
-          console.warn('Unread count response is null or undefined');
-          apiUnreadCount = 0;
-        }
-
-        console.log('📊 Unread count from API:', apiUnreadCount);
-      } catch (unreadErr) {
-        console.warn("Failed to get unread count from API, using inbox fallback", unreadErr);
-        // Fallback: count unread notifications from inbox
-        apiUnreadCount = mapped.filter((n: any) => !n.read).length;
-        console.log('📊 Fallback unread count from inbox:', apiUnreadCount);
-      }
-
-      // Always update the unread count, even in Expo Go
+      const unreadResp = await getUnreadNotificationInboxCount(32172, "PNF5T5VibvtV6lj8i7pbil");
+      const apiUnreadCount = typeof unreadResp === "number" ? unreadResp : (unreadResp && typeof unreadResp === 'object' && 'data' in unreadResp ? Number(unreadResp.data) : 0) || 0;
       setUnreadCount(apiUnreadCount);
       await saveUnreadCount(apiUnreadCount);
-
-      // Update badge count only on real devices
-      if (!isWebOrSimulator) {
-        try {
-          await Notifications.setBadgeCountAsync(apiUnreadCount);
-          console.log('✅ Badge count updated:', apiUnreadCount);
-        } catch (badgeErr) {
-          console.warn('⚠️ Failed to update badge count:', badgeErr);
-        }
-      } else {
-        console.log('📱 Skipping badge count update in Expo Go/simulator');
-      }
-
     } catch (err) {
-      console.error("Native Notify sync failed", err);
-      // Even if sync fails, ensure we have a valid unread count from local storage
-      try {
-        const storedCount = await AsyncStorage.getItem("unreadCount");
-        if (storedCount) {
-          const count = Number(storedCount);
-          setUnreadCount(count);
-          console.log('📊 Using stored unread count as fallback:', count);
-        } else {
-          // Last resort: use local notifications count
-          const localUnreadCount = notifications.filter((n) => !n.read).length;
-          setUnreadCount(localUnreadCount);
-          console.log('📊 Using local notifications count as final fallback:', localUnreadCount);
-        }
-      } catch (fallbackErr) {
-        console.warn('Even fallback failed:', fallbackErr);
-        setUnreadCount(0);
-      }
+      console.warn("Native Notify sync failed, continuing without it", err);
+      // Don't throw error, just continue silently
     }
   };
 
+  // Handle incoming notification
+  const handleIncomingNotification = async (notif: any) => {
+    const data = notif?.notification || notif?.request?.content?.data || {};
+    const newNotification: NotificationItem = {
+      id: notif.notificationId || notif.request?.identifier || `notif-${Date.now()}`,
+      title: notif.title || notif.request?.content?.title || "No title",
+      message: notif.body || notif.request?.content?.body || "",
+      type: data?.type ?? "general",
+      read: false,
+      date: new Date().toISOString() as any,
+      image: data?.image ?? data?.bigPicture ?? data?.smallIcon,
+    };
+    addNotification(newNotification);
+    saveNotifications([newNotification]);
+    const newCount = unreadCount + 1;
+    setUnreadCount(newCount);
+    await saveUnreadCount(newCount);
+    if (!isRealDevice) showAlert(newNotification.title, newNotification.message);
+  };
+
   useEffect(() => {
-   loadNotifications();
-   loadUnreadCount();
+    loadNotifications();
+    loadUnreadCount();
 
-   console.log('🔄 Initializing push notifications...');
-   console.log('📱 Platform:', Platform.OS);
-   console.log('🔍 Is device:', Device.isDevice);
-   console.log('👤 User ID:', userId);
+    // OneSignal initialization
+    if (isUsingOneSignal) {
+      try {
+        const OneSignal = require('react-native-onesignal');
+        OneSignal.initialize(process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID);
+        OneSignal.Notifications.addEventListener("opened", async (e: any) => {
+          const id = e?.notification?.notificationId;
+          if (id) {
+            markAsRead(id);
+            const newCount = Math.max(0, unreadCount - 1);
+            setUnreadCount(newCount);
+            await saveUnreadCount(newCount);
+          }
+        });
+        OneSignal.Notifications.addEventListener("received", handleIncomingNotification);
+      } catch (error) {
+        console.warn('OneSignal not available:', error);
+      }
+    }
 
-   // Only register for push notifications on native platforms
-   if (Platform.OS !== 'web') {
-     registerForPushNotificationsAsync().then(async (token) => {
-       const isSimulator = !Device.isDevice;
-       console.log('📲 Push token result:', token ? 'SUCCESS' : 'FAILED');
-       console.log('📱 Is simulator:', isSimulator);
-
-       if (token) {
-         console.log('🔑 Expo push token:', token.substring(0, 20) + '...');
-         setExpoPushToken(token);
-
-         // Register user with Native Notify if we have a userId
-         if (userId && userId.trim()) {
-           try {
-             console.log('🚀 Registering user with Native Notify...');
-             console.log('👤 User ID:', userId);
-             console.log('🔑 Token preview:', token.substring(0, 20) + '...');
-
-             const registerResult = await nativeNotifyAPI.registerUser(userId, token);
-             console.log('✅ User registration result:', registerResult);
-
-             if (!registerResult.success) {
-               console.error('❌ User registration failed:', registerResult.error);
-               // For Expo Go, we might need to store the Expo token separately for direct Expo SDK notifications
-               if (token.startsWith('ExponentPushToken[')) {
-                 console.log('📱 Storing Expo push token for direct Expo SDK notifications...');
-                 // Store the Expo token for later use in sendExpoNotification
-                 await AsyncStorage.setItem(`expo_token_${userId}`, token);
-               }
-               // Try to register again after a short delay in case of temporary issues
-               setTimeout(async () => {
-                 console.log('🔄 Retrying user registration...');
-                 const retryResult = await nativeNotifyAPI.registerUser(userId, token);
-                 console.log('✅ Retry registration result:', retryResult);
-               }, 2000);
-             } else {
-               // Store the Expo token for direct Expo SDK notifications
-               if (token.startsWith('ExponentPushToken[')) {
-                 await AsyncStorage.setItem(`expo_token_${userId}`, token);
-               }
-             }
-           } catch (error) {
-             console.error('❌ Failed to register user with Native Notify:', error);
-             // Still store the Expo token even if Native Notify registration fails
-             if (token.startsWith('ExponentPushToken[')) {
-               await AsyncStorage.setItem(`expo_token_${userId}`, token);
-             }
-           }
-         } else {
-           console.log('⚠️ No valid userId available for Native Notify registration');
-         }
-       } else {
-         // Only log as error if not in simulator (where push tokens are expected to fail)
-         if (!isSimulator) {
-           console.error('❌ No push token received from Expo');
-         } else {
-           console.log('📱 Simulator detected - push notifications not available (expected)');
-         }
-       }
-     }).catch((error) => {
-       const isSimulator = !Device.isDevice;
-       if (!isSimulator) {
-         console.error('❌ Push notification registration failed:', error);
-       } else {
-         console.log('📱 Push notification registration skipped in simulator (expected)');
-       }
-     });
-   } else {
-     console.log('🌐 Skipping push notifications on web platform');
-   }
-
-   syncNativeNotifyInbox();
-
-    // Listen for foreground notifications
-    const notificationListener = Notifications.addNotificationReceivedListener(
-      async (notification) => {
-        console.log('🔔 Foreground notification received:', JSON.stringify(notification, null, 2));
-
-        // Extract image from various possible sources
-        let imageUrl = (notification.request.content.data as any)?.image;
-        if (!imageUrl) {
-          // Try to get from pushData if image is nested there
-          const pushData = (notification.request.content.data as any)?.pushData;
-          if (pushData) {
-            if (typeof pushData === 'string') {
-              try {
-                const parsed = JSON.parse(pushData);
-                imageUrl = parsed.image;
-              } catch (e) {
-                console.warn('Failed to parse pushData for image:', pushData);
-              }
-            } else if (pushData.image) {
-              imageUrl = pushData.image;
-            }
+    // Expo push notifications
+    registerForPushNotificationsAsync().then(async (token) => {
+      if (token) setExpoPushToken(token);
+      if (token && userId) {
+        await AsyncStorage.setItem(`expo_token_${userId}`, token);
+        await nativeNotifyAPI.registerUser(userId, token);
+        if (isUsingOneSignal) {
+          try {
+            const OneSignal = require('react-native-onesignal');
+            OneSignal.User.addTag('userId', userId);
+          } catch (error) {
+            console.warn('OneSignal not available for user registration:', error);
           }
         }
-
-        const newNotification: NotificationItem = {
-          id: notification.request.identifier,
-          title: notification.request.content.title ?? "No title",
-          message: notification.request.content.body ?? "",
-          type: (notification.request.content.data as any)?.type ?? "general",
-          read: false,
-          date: new Date().toISOString() as any,
-          image: imageUrl,
-        };
-        console.log('📝 Adding notification to state:', newNotification);
-        addNotification(newNotification);
-        saveNotifications([newNotification]);
-        const newCount = unreadCount + 1;
-        setUnreadCount(newCount);
-        await saveUnreadCount(newCount);
-        console.log('✅ Notification processed, new count:', newCount);
-
-        // In Expo Go, also show the notification as a local alert since push notifications don't work
-        const isExpoGo = Platform.OS === 'web' || !Device.isDevice;
-        if (isExpoGo) {
-          showAlert(newNotification.title, newNotification.message);
-        }
       }
-    );
+    });
 
-    // User taps notification
-    const responseListener =
-      Notifications.addNotificationResponseReceivedListener(async (response) => {
-        console.log('👆 Notification response received:', JSON.stringify(response, null, 2));
-        const notifId = response.notification.request.identifier;
-        console.log('📖 Marking notification as read:', notifId);
-        markAsRead(notifId);
-        const newCount = Math.max(0, unreadCount - 1);
-        setUnreadCount(newCount);
-        await saveUnreadCount(newCount);
-        console.log('✅ Notification marked as read, new count:', newCount);
-      });
+    // Sync Native Notify inbox initially
+    syncNativeNotifyInbox();
 
-    // Sync when app comes to foreground
-    const appStateSub = AppState.addEventListener("change", async (state) => {
-      if (state === "active") {
-        syncNativeNotifyInbox();
-        // Optional: Clear badge when app opens (uncomment if desired)
-        // await Notifications.setBadgeCountAsync(0);
-      }
+    // Expo foreground notifications
+    const notificationListener = Notifications.addNotificationReceivedListener(handleIncomingNotification);
+    const responseListener = Notifications.addNotificationResponseReceivedListener(async (response) => {
+      const id = response.notification.request.identifier;
+      markAsRead(id);
+      const newCount = Math.max(0, unreadCount - 1);
+      setUnreadCount(newCount);
+      await saveUnreadCount(newCount);
+    });
+
+    // App comes to foreground
+    const appStateSub = AppState.addEventListener("change", (state) => {
+      if (state === "active") syncNativeNotifyInbox();
     });
 
     return () => {
       notificationListener.remove();
       responseListener.remove();
       appStateSub.remove();
+      if (isUsingOneSignal) {
+        try {
+          const OneSignal = require('react-native-onesignal');
+          OneSignal.Notifications.removeEventListener("opened");
+          OneSignal.Notifications.removeEventListener("received");
+        } catch (error) {
+          console.warn('OneSignal cleanup failed:', error);
+        }
+      }
     };
   }, []);
 
-  // Test function to send a notification directly
   const testNotification = async () => {
-    if (!userId) {
-      console.log('❌ No userId available for test notification');
-      return;
-    }
-
-    try {
-      console.log('🧪 Sending test notification...');
-
-      // Always try Native Notify first, even in Expo Go
-      console.log('🧪 Sending via Native Notify');
-      const result = await nativeNotifyAPI.sendNotification({
-        title: 'Test Notification',
-        message: 'This is a test notification from the app',
-        subID: userId,
-        pushData: {
-          type: 'test',
-          timestamp: new Date().toISOString(),
-        }
-      });
-      console.log('🧪 Test notification result:', result);
-
-      // Also add to local notifications for immediate display
-      const testNotif = {
-        id: `test-${Date.now()}`,
-        title: 'Test Notification',
-        message: 'This is a test notification from the app',
-        type: 'test',
-        read: false,
-        date: new Date().toISOString(),
-      };
-      addNotification(testNotif);
-      saveNotifications([testNotif]);
-      const newCount = unreadCount + 1;
-      setUnreadCount(newCount);
-      await saveUnreadCount(newCount);
-
-      return result;
-    } catch (error) {
-      console.error('❌ Test notification failed:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
-    }
+    if (!userId) return;
+    const result = await nativeNotifyAPI.sendNotification({
+      title: "Test Notification",
+      message: "This is a test",
+      subID: userId,
+    });
+    return result;
   };
 
-  return { expoPushToken, unreadCount, syncNativeNotifyInbox, testNotification };
+  return {
+    expoPushToken,
+    unreadCount,
+    syncNativeNotifyInbox,
+    testNotification,
+  };
 }
 
-// Register Expo Push Notifications
 export async function registerForPushNotificationsAsync(): Promise<string | undefined> {
-  console.log('🚀 Starting push notification registration...');
+  if (Platform.OS === "web" || !Device.isDevice) return;
 
-  // Skip push notification registration on web unless VAPID is configured
-  if (Platform.OS === 'web') {
-    console.log('🌐 Push notifications are not supported on web without VAPID configuration');
-    return;
-  }
-
-  console.log('📱 Checking if device:', Device.isDevice);
-  if (!Device.isDevice) {
-    console.log('📱 Not a real device - Expo Go detected, push notifications not available');
-    console.log('💡 To test push notifications, build a development build: npx expo run:ios or npx expo run:android');
-    // Don't show alert in Expo Go, just log the information
-    return;
-  }
-
-  console.log('🔐 Checking notification permissions...');
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  console.log('🔐 Existing permission status:', existingStatus);
-
   let finalStatus = existingStatus;
   if (existingStatus !== "granted") {
-    console.log('🔐 Requesting permissions...');
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
-    console.log('🔐 Permission request result:', finalStatus);
   }
+  if (finalStatus !== "granted") return;
 
-  if (finalStatus !== "granted") {
-    console.log('❌ Permission not granted, showing alert');
-    showAlert("Push notifications", "Permission not granted.");
-    return;
-  }
+  const tokenResp = await Notifications.getExpoPushTokenAsync({
+    projectId: Constants.expoConfig?.extra?.eas?.projectId,
+  });
 
-  console.log('🔑 Getting Expo push token...');
-  const projectId = Constants.expoConfig?.extra?.eas?.projectId || "c7b65ce0-2aa6-4b42-b6d7-4f04277bc839";
-  console.log('📋 Using project ID:', projectId);
-
-  try {
-    const tokenResp = await Notifications.getExpoPushTokenAsync({
-      projectId: projectId,
+  if (Platform.OS === "android") {
+    await Notifications.setNotificationChannelAsync("default", {
+      name: "default",
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#FF231F7C",
     });
-    console.log('✅ Push token obtained successfully');
-
-    // Android channel
-    if (Platform.OS === "android") {
-      console.log('🤖 Setting up Android notification channel...');
-      await Notifications.setNotificationChannelAsync("default", {
-        name: "default",
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: "#FF231F7C",
-      });
-      console.log('✅ Android channel configured');
-    }
-
-    return tokenResp.data;
-  } catch (error) {
-    console.error('❌ Failed to get push token:', error);
-    return undefined;
   }
+  return tokenResp.data;
 }

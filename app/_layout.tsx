@@ -1,24 +1,28 @@
+import usePushNotifications from "@/app/hooks/usePushNotifications";
+import { ClerkProvider } from "@clerk/clerk-expo";
+import { tokenCache } from "@clerk/clerk-expo/token-cache";
 import { useFonts } from "expo-font";
 import { Slot } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import registerNNPushToken from "native-notify";
 import { useEffect } from "react";
-import { ClerkProvider } from "@clerk/clerk-expo";
-import { tokenCache } from "@clerk/clerk-expo/token-cache";
-import "./global.css";
-import { ThemeProvider } from "./context/ThemeContext";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { NotificationProvider } from "./context/NotificationContext";
-import usePushNotifications from "@/app/hooks/usePushNotifications";
-import registerNNPushToken from "native-notify";
-import Constants from "expo-constants";
-import { Platform } from "react-native";
+import { ThemeProvider } from "./context/ThemeContext";
+import "./global.css";
 
 SplashScreen.preventAutoHideAsync();
 
 
 function PushBootstrap() {
-  usePushNotifications();
+  const { syncNativeNotifyInbox } = usePushNotifications();
+
+  // Sync notifications on app start
+  useEffect(() => {
+    syncNativeNotifyInbox();
+  }, [syncNativeNotifyInbox]);
+
   return null;
 }
 export default function RootLayout() {
