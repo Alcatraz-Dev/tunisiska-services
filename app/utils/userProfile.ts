@@ -19,6 +19,7 @@ export interface UserProfileData {
     picture?: string;
     locale?: string;
   };
+    isDriver?: boolean;
 }
 
 export const getUserProfile = async (userId: string): Promise<UserProfileData | null> => {

@@ -42,6 +42,7 @@ import system from "../assets/icons/system.png";
 import homeIcon from "../assets/icons/homeIcon.png";
 import map from "../assets/icons/map.png";
 import referral from "../assets/icons/referral.png";
+import driver from "../assets/icons/driver.png";
 export default {
   google,
   home,
@@ -87,4 +88,5 @@ export default {
   homeIcon,
   map,
   referral,
+  driver
 };

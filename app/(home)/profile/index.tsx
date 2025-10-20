@@ -1,33 +1,30 @@
+import LanguageRow from "@/app/components/LanguageRow";
+import NotificationSettings from "@/app/components/NotificationSettings";
+import RedirectIfSignedOut from "@/app/components/RedirectIfSignedOut";
+import { AutoText } from "@/app/components/ui/AutoText";
+import icons from "@/app/constants/icons";
+import { getPremiumGradient } from "@/app/utils/getPremiumGradient";
+import { showAlert } from "@/app/utils/showAlert";
+import { SignedIn, useUser } from "@clerk/clerk-expo";
+import { Ionicons } from "@expo/vector-icons";
+import * as Application from "expo-application";
+import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { useEffect, useState } from "react";
 import {
-  View,
+  ActivityIndicator,
+  Image,
+  Linking,
   ScrollView,
   TouchableOpacity,
-  Image,
-  Alert,
-  ActivityIndicator,
-  Linking,
-  Switch,
+  View,
 } from "react-native";
-import React, { useState, useEffect } from "react";
-import { SignedIn, SignedOut, useUser } from "@clerk/clerk-expo";
-import { Link, useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import { useTheme } from "../../context/ThemeContext";
-import ThemeToggle from "../../components/ThemeToggle";
-import { StatusBar } from "expo-status-bar";
-import SignOutButton from "../../components/SignOutButton";
-import icons from "@/app/constants/icons";
-import * as Application from "expo-application";
 import { SafeAreaView } from "react-native-safe-area-context";
-import RedirectIfSignedOut from "@/app/components/RedirectIfSignedOut";
-import { LinearGradient } from "expo-linear-gradient";
-import { getPremiumGradient } from "@/app/utils/getPremiumGradient";
-import LanguageRow from "@/app/components/LanguageRow";
-import { AutoText } from "@/app/components/ui/AutoText";
-import { showAlert } from "@/app/utils/showAlert";
-import NotificationSettings from "@/app/components/NotificationSettings";
-import { DriverService } from "@/app/utils/shippingRouteService";
-import * as Location from "expo-location";
+import SignOutButton from "../../components/SignOutButton";
+import ThemeToggle from "../../components/ThemeToggle";
+import { useTheme } from "../../context/ThemeContext";
+import DriverToggle from "@/app/components/DriverToggle";
 // Interface for user profile data
 interface Referral {
   id: string;
@@ -248,80 +245,6 @@ const Profile = () => {
   const copyToClipboard = () => {
     showAlert("Kopierad", "Referenskoden har kopierats till urklipp!");
   };
-
-const requestLocationPermission = async (): Promise<boolean> => {
-  try {
-    // This triggers the native foreground permission popup
-    const { status: fgStatus } = await Location.requestForegroundPermissionsAsync();
-
-    if (fgStatus !== "granted") {
-      console.log("User denied foreground location permission");
-      return false;
-    }
-
-    // Optional: request background permission (triggers native popup if needed)
-    const { status: bgStatus } = await Location.requestBackgroundPermissionsAsync();
-    if (bgStatus !== "granted") {
-      console.log("User denied background location permission");
-      // Not fatal; tracking may be limited
-    }
-
-    return true; // Permission granted
-  } catch (error) {
-    console.error("Error requesting location permission:", error);
-    return false;
-  }
-};
-
-const toggleDriverMode = async (value: boolean) => {
-  // Ask permission first
-  const hasPermission = await requestLocationPermission();
-  if (!hasPermission) return;
-
-  try {
-    const { client } = await import("@/sanityClient");
-
-    // Check if user document exists
-    const existingUser = await client.fetch(
-      `*[_type == "users" && clerkId == $clerkId][0]`,
-      { clerkId: user?.id }
-    );
-
-    if (!existingUser) {
-      // Create new user document
-      await client.create({
-        _type: "users",
-        clerkId: user?.id,
-        email: user?.emailAddresses[0]?.emailAddress,
-        isDriver: value,
-      });
-    } else {
-      // Update existing document
-      await client.patch(existingUser._id).set({ isDriver: value }).commit();
-    }
-
-    setIsDriver(value);
-
-    if (value) {
-      // Start location tracking
-      const subscription = await DriverService.startLocationTracking(user?.id || "");
-      if (subscription) {
-        setLocationTracking(true);
-        showAlert("Förarläge aktiverat", "Din plats spåras nu i realtid.");
-      } else {
-        showAlert("Fel", "Kunde inte starta platspårning. Kontrollera behörigheter.");
-        setIsDriver(false); // Reset if tracking failed
-        return;
-      }
-    } else {
-      setLocationTracking(false);
-      showAlert("Förarläge inaktiverat", "Platspårning stoppad.");
-    }
-  } catch (error) {
-    console.error("Error toggling driver mode:", error);
-    showAlert("Fel", "Kunde inte ändra förarstatus.");
-  }
-};
 
   // Show loading state while user data is being fetched
   if (!isLoaded || loading) {
@@ -668,33 +591,7 @@ const toggleDriverMode = async (value: boolean) => {
               {/* Theme Toggle */}
               <ThemeToggle />
               {/* Driver Mode Toggle */}
-              {userProfile?.isDriver && (
-                <View
-                  className={`flex-row items-center justify-between p-4 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}
-                >
-                  <View className="flex-1">
-                    <AutoText
-                      className={`text-sm font-medium ${
-                        isDark ? "text-white" : "text-gray-900"
-                      }`}
-                    >
-                      Förarläge
-                    </AutoText>
-                    <AutoText
-                      className={`text-xs mt-1 ${
-                        isDark ? "text-gray-400" : "text-gray-600"
-                      }`}
-                    >
-                      Aktivera för att dela din plats i realtid på kartan
-                    </AutoText>
-                  </View>
-                  <Switch
-                    value={isDriver}
-                    onValueChange={toggleDriverMode}
-             
-                  />
-                </View>
-              )}
+              <DriverToggle isDark={isDark} />
             </View>
           </View>
           {/* Support */}
@@ -791,4 +688,3 @@ const toggleDriverMode = async (value: boolean) => {
 };
 
 export default Profile;
-
