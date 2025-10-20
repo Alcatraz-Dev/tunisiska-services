@@ -313,103 +313,107 @@ export default function MapOverviewScreen() {
         }
       >
         {/* Pickup */}
-        <Marker coordinate={FROM} pinColor="green">
-          <Callout tooltip>
-            <View
-              style={{
-                alignItems: "center",
-                marginBottom: 6,
-              }}
-            >
+        {routeCoords.length > 0 && (
+          <Marker coordinate={FROM} pinColor="green">
+            <Callout tooltip>
               <View
                 style={{
-                  backgroundColor: isDark ? "#000000" : "#fff",
-                  borderRadius: 10,
-                  paddingVertical: 6,
-                  paddingHorizontal: 10,
-                  shadowColor: "#000",
-                  shadowOpacity: 0.2,
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowRadius: 2,
-                  elevation: 3,
+                  alignItems: "center",
+                  marginBottom: 6,
                 }}
               >
-                <AutoText
+                <View
                   style={{
-                    color: isDark ? "#f1f5f9" : "#000000",
-                    fontWeight: "600",
-                    fontSize: 12,
+                    backgroundColor: isDark ? "#000000" : "#fff",
+                    borderRadius: 10,
+                    paddingVertical: 6,
+                    paddingHorizontal: 10,
+                    shadowColor: "#000",
+                    shadowOpacity: 0.2,
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowRadius: 2,
+                    elevation: 3,
                   }}
                 >
-                  📦 Upphämtning
-                </AutoText>
+                  <AutoText
+                    style={{
+                      color: isDark ? "#f1f5f9" : "#000000",
+                      fontWeight: "600",
+                      fontSize: 12,
+                    }}
+                  >
+                    📦 Upphämtning
+                  </AutoText>
+                </View>
+
+                {/* Small triangle pointer */}
+                <View
+                  style={{
+                    width: 0,
+                    height: 0,
+                    borderLeftWidth: 6,
+                    borderRightWidth: 6,
+                    borderTopWidth: 8,
+                    borderLeftColor: "transparent",
+                    borderRightColor: "transparent",
+                    borderTopColor: isDark ? "#000000" : "#fff",
+                    marginTop: -1,
+                  }}
+                />
               </View>
-
-              {/* Small triangle pointer */}
-              <View
-                style={{
-                  width: 0,
-                  height: 0,
-                  borderLeftWidth: 6,
-                  borderRightWidth: 6,
-                  borderTopWidth: 8,
-                  borderLeftColor: "transparent",
-                  borderRightColor: "transparent",
-                  borderTopColor: isDark ? "#000000" : "#fff",
-                  marginTop: -1,
-                }}
-              />
-            </View>
-          </Callout>
-        </Marker>
-
+            </Callout>
+          </Marker>
+        )}
         {/* Delivery */}
-        <Marker coordinate={TO} pinColor="red">
-          <Callout tooltip>
-            <View style={{ alignItems: "center", marginBottom: 6 }}>
-              <View
-                style={{
-                  backgroundColor: isDark ? "#000000" : "#ffffff",
-                  borderRadius: 10,
-                  paddingVertical: 6,
-                  paddingHorizontal: 10,
-                  shadowColor: "#000",
-                  shadowOpacity: 0.25,
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowRadius: 2,
-                  elevation: 3,
-                }}
-              >
-                <AutoText
+        {routeCoords.length > 0 && (
+          <Marker coordinate={TO} pinColor="red">
+            <Callout tooltip>
+              <View style={{ alignItems: "center", marginBottom: 6 }}>
+                <View
                   style={{
-                    color: isDark ? "#f8fafc" : "#000000",
-                    fontWeight: "600",
-                    fontSize: 12,
+                    backgroundColor: isDark ? "#000000" : "#ffffff",
+                    borderRadius: 10,
+                    paddingVertical: 6,
+                    paddingHorizontal: 10,
+                    shadowColor: "#000",
+                    shadowOpacity: 0.25,
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowRadius: 2,
+                    elevation: 3,
                   }}
                 >
-                  🎯 Leverans
-                </AutoText>
-              </View>
+                  <AutoText
+                    style={{
+                      color: isDark ? "#f8fafc" : "#000000",
+                      fontWeight: "600",
+                      fontSize: 12,
+                    }}
+                  >
+                    🎯 Leverans
+                  </AutoText>
+                </View>
 
-              <View
-                style={{
-                  width: 0,
-                  height: 0,
-                  borderLeftWidth: 6,
-                  borderRightWidth: 6,
-                  borderTopWidth: 8,
-                  borderLeftColor: "transparent",
-                  borderRightColor: "transparent",
-                  borderTopColor: isDark ? "#000000" : "#ffffff",
-                  marginTop: -1,
-                }}
-              />
-            </View>
-          </Callout>
-        </Marker>
+                <View
+                  style={{
+                    width: 0,
+                    height: 0,
+                    borderLeftWidth: 6,
+                    borderRightWidth: 6,
+                    borderTopWidth: 8,
+                    borderLeftColor: "transparent",
+                    borderRightColor: "transparent",
+                    borderTopColor: isDark ? "#000000" : "#ffffff",
+                    marginTop: -1,
+                  }}
+                />
+              </View>
+            </Callout>
+          </Marker>
+        )}
 
         {/* All Drivers (including current user) */}
-        {drivers
+        
+        { routeCoords.length > 0 &&  drivers
           .filter(
             (d) =>
               d.driverLocation && d.driverLocation.lat && d.driverLocation.lng
@@ -445,10 +449,7 @@ export default function MapOverviewScreen() {
                         fontSize: 12,
                       }}
                     >
-                      🚚{" "}
-                      {d._id === user?.id
-                        ? "Du (Förare)"
-                        : `Förare`}
+                      🚚 {d._id === user?.id ? "Du (Förare)" : `Förare`}
                     </AutoText>
                   </View>
 
