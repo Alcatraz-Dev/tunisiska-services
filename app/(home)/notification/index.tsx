@@ -8,7 +8,15 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getNotificationInbox } from "native-notify";
+
+// Conditionally import getNotificationInbox to prevent crashes in Expo Go
+const getNotificationInbox = (() => {
+  try {
+    return require("native-notify").getNotificationInbox;
+  } catch {
+    return null;
+  }
+})();
 import {
   FlatList,
   RefreshControl,
@@ -96,6 +104,20 @@ export default function Notification() {
       keys.some((k) => it && typeof it === "object" && k in it)
     );
     if (!hasAnyKey) return items as NotificationItem[]; // Return all for broadcast notifications
+
+    // For admin notifications, check if it's a broadcast by looking at the type/category
+    const isBroadcast = items.some((it) =>
+      it?.type === "admin_broadcast" ||
+      it?.category === "admin_broadcast" ||
+      it?.pushData?.type === "admin_broadcast" ||
+      it?.pushData?.type === "announcement"
+    );
+
+    if (isBroadcast) {
+      // For broadcast notifications, return all items for all users
+      return items as NotificationItem[];
+    }
+
     const filtered = items.filter((it) => {
       // If it's a broadcast notification (no specific user ID), include it
       const hasUserKey = keys.some((k) => it?.[k] !== undefined);
@@ -151,22 +173,24 @@ export default function Notification() {
 
     // Best-effort: attempt to mark as read in Native Notify using Clerk userId as subscriber ID
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const nn = require("native-notify");
-      const candidates = [
-        "handleRead",
-        "setNotificationRead",
-        "markNotificationAsRead",
-        "readNotificationInbox",
-      ];
-      const fn = candidates.map((k) => nn?.[k]).find(Boolean);
-      if (typeof fn === "function" && userId) {
-        await fn(
-          userId.toString(),
-          notificationId.toString(),
-          APP_ID,
-          APP_TOKEN
-        );
+      if (getNotificationInbox) {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const nn = require("native-notify");
+        const candidates = [
+          "handleRead",
+          "setNotificationRead",
+          "markNotificationAsRead",
+          "readNotificationInbox",
+        ];
+        const fn = candidates.map((k) => nn?.[k]).find(Boolean);
+        if (typeof fn === "function" && userId) {
+          await fn(
+            userId.toString(),
+            notificationId.toString(),
+            APP_ID,
+            APP_TOKEN
+          );
+        }
       }
     } catch (e) {
       // silent fail; local overlay already applied
@@ -183,16 +207,18 @@ export default function Notification() {
 
     // Try remote delete in Native Notify with Clerk userId as subscriber ID
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const nn = require("native-notify");
-      const candidates = [
-        "handleDelete",
-        "deleteNotificationInbox",
-        "removeNotificationInbox",
-      ];
-      const fn = candidates.map((k) => nn?.[k]).find(Boolean);
-      if (typeof fn === "function" && userId) {
-        await fn(userId.toString(), idStr, APP_ID, APP_TOKEN);
+      if (getNotificationInbox) {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const nn = require("native-notify");
+        const candidates = [
+          "handleDelete",
+          "deleteNotificationInbox",
+          "removeNotificationInbox",
+        ];
+        const fn = candidates.map((k) => nn?.[k]).find(Boolean);
+        if (typeof fn === "function" && userId) {
+          await fn(userId.toString(), idStr, APP_ID, APP_TOKEN);
+        }
       }
     } catch (e) {
       // ignore network/SDK errors; we still hide locally
@@ -216,12 +242,12 @@ export default function Notification() {
     loadingRef.current = true;
     try {
       const currentPage = opts?.page ?? 0;
-      const response = await getNotificationInbox(
+      const response = getNotificationInbox ? await getNotificationInbox(
         APP_ID,
         APP_TOKEN,
         PAGE_SIZE,
         currentPage * PAGE_SIZE
-      );
+      ) : [];
       // Handle the API response structure - it might be response.data or just response
       const notificationData = response?.data || response || [];
       const typedData: NotificationItem[] = Array.isArray(notificationData)
@@ -263,6 +289,9 @@ export default function Notification() {
             };
           })
         : [];
+
+      // For broadcast notifications (admin notifications), include all items
+      // For user-specific notifications, filter by user ID
       const scoped = filterForUser(typedData);
       const processed = applyOverlays(scoped, opts);
       setData((prev) => (opts?.append ? [...prev, ...processed] : processed));

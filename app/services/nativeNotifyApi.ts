@@ -119,7 +119,7 @@ export class NativeNotifyAPI {
     }
   }
 
-  // Send Individual Notification
+  // Send Individual Notification with Expo fallback
   async sendNotification(payload: NotificationPayload): Promise<NotificationResponse> {
     try {
       const response = await retryApiCall(async () => {
@@ -146,25 +146,28 @@ export class NativeNotifyAPI {
           (apiPayload as any).bigPictureURL = payload.bigPictureURL;
         }
 
-        // Add image to pushData if provided in payload
-        if (payload.pushData?.image) {
-          (apiPayload as any).bigPictureURL = payload.pushData.image;
-        }
+        // Handle image field - prioritize direct image field, then bigPictureURL, then pushData
+        let finalImageUrl = payload.image || payload.bigPictureURL || payload.pushData?.image;
 
-        // Also check for direct image field - this should override others
-        if (payload.image) {
-          (apiPayload as any).bigPictureURL = payload.image;
-          console.log('Setting bigPictureURL from payload.image:', payload.image);
-          // Also store in pushData for retrieval
+        if (finalImageUrl) {
+          // Set bigPictureURL for native Android/iOS rich notifications
+          (apiPayload as any).bigPictureURL = finalImageUrl;
+          console.log('Setting bigPictureURL:', finalImageUrl);
+
+          // Also set image field for Expo Go compatibility
+          (apiPayload as any).image = finalImageUrl;
+          console.log('Setting image field for Expo Go compatibility:', finalImageUrl);
+
+          // Store in pushData for retrieval in notification handlers
           if (!(apiPayload as any).pushData) {
             (apiPayload as any).pushData = '{}';
           }
           try {
             const pushData = JSON.parse((apiPayload as any).pushData);
-            pushData.image = payload.image;
+            pushData.image = finalImageUrl;
             (apiPayload as any).pushData = JSON.stringify(pushData);
           } catch (e) {
-            (apiPayload as any).pushData = JSON.stringify({ image: payload.image });
+            (apiPayload as any).pushData = JSON.stringify({ image: finalImageUrl });
           }
         }
 
@@ -201,9 +204,47 @@ export class NativeNotifyAPI {
         }
       });
 
+      // For admin notifications (broadcast), we need to handle differently
+      // Admin notifications should go to all users, so we don't use subID
+      if (!payload.subID) {
+        console.log('📢 Admin broadcast notification - sending to all users');
+        // For broadcast notifications, use Native Notify which handles bulk sending
+        // The response.success check will determine if we return this result
+      } else {
+        // For individual notifications, prefer Expo SDK for Expo Go users
+        if (payload.subID.startsWith('ExponentPushToken[')) {
+          console.log('📱 Detected Expo push token, using Expo SDK for image support...');
+          try {
+            const expoResponse = await this.sendExpoNotification(payload);
+            if (expoResponse.success) {
+              console.log('✅ Expo SDK notification sent successfully with image support');
+              return expoResponse;
+            } else {
+              console.log('⚠️ Expo SDK failed, falling back to Native Notify...');
+            }
+          } catch (expoError) {
+            console.warn('⚠️ Expo SDK failed:', expoError);
+          }
+        }
+
+        // If Expo SDK failed or we don't have an Expo token, try Native Notify
+        if (!response.success) {
+          console.log('🔄 Native Notify failed, trying Expo SDK fallback...');
+          try {
+            const expoResponse = await this.sendExpoNotification(payload);
+            if (expoResponse.success) {
+              console.log('✅ Expo SDK fallback successful');
+              return expoResponse;
+            }
+          } catch (expoError) {
+            console.warn('⚠️ Expo SDK fallback also failed:', expoError);
+          }
+        }
+      }
+
       return {
-        success: true,
-        message: 'Notification sent successfully',
+        success: response.success,
+        message: response.success ? 'Notification sent successfully' : 'Failed to send notification',
         data: response,
       };
     } catch (error) {
@@ -236,6 +277,12 @@ export class NativeNotifyAPI {
 
         if (payload.bigPictureURL) {
           (apiPayload as any).bigPictureURL = payload.bigPictureURL;
+          (apiPayload as any).image = payload.bigPictureURL; // Also set image for Expo Go
+        }
+
+        // For Expo Go, ensure image is always set if available
+        if (payload.image && !(apiPayload as any).image) {
+          (apiPayload as any).image = payload.image;
         }
 
         const fetchResponse = await fetch(
@@ -308,10 +355,12 @@ export class NativeNotifyAPI {
 
         if (payload.bigPictureURL) {
           (apiPayload as any).bigPictureURL = payload.bigPictureURL;
+          (apiPayload as any).image = payload.bigPictureURL; // Also set image for Expo Go
         }
 
         if (payload.image) {
           (apiPayload as any).bigPictureURL = payload.image;
+          (apiPayload as any).image = payload.image; // Also set image for Expo Go
         }
 
         const url = payload.subID
@@ -484,6 +533,77 @@ export class NativeNotifyAPI {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to delete notification',
+      };
+    }
+  }
+
+  // Send Expo notification directly (primary for Expo Go with images)
+  async sendExpoNotification(payload: NotificationPayload): Promise<NotificationResponse> {
+    try {
+      // Get the server URL from environment or config
+      const serverUrl = process.env.EXPO_PUBLIC_SERVER_URL || 'http://localhost:3000';
+
+      // For Expo notifications, we need the actual Expo push token, not the user ID
+      let expoToken = payload.subID;
+
+      // If the subID is a user ID, try to get the stored Expo token
+      if (expoToken && !expoToken.startsWith('ExponentPushToken[')) {
+        try {
+          // Import AsyncStorage dynamically to avoid issues
+          const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+          const storedToken = await AsyncStorage.getItem(`expo_token_${expoToken}`);
+          if (storedToken) {
+            expoToken = storedToken;
+            console.log('🔑 Using stored Expo token for user:', expoToken.substring(0, 20) + '...');
+          } else {
+            console.warn('⚠️ No stored Expo token found for user:', expoToken);
+            return {
+              success: false,
+              error: 'No Expo push token available for user',
+            };
+          }
+        } catch (storageError) {
+          console.error('Failed to get stored Expo token:', storageError);
+          return {
+            success: false,
+            error: 'Failed to retrieve Expo push token',
+          };
+        }
+      }
+
+      const response = await retryApiCall(async () => {
+        const fetchResponse = await fetch(`${serverUrl}/api/send-expo-notification`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            expoPushToken: expoToken,
+            title: payload.title,
+            message: payload.message,
+            image: payload.image || payload.bigPictureURL,
+            data: payload.pushData,
+          }),
+        });
+
+        if (!fetchResponse.ok) {
+          const errorText = await fetchResponse.text();
+          throw new Error(`HTTP error! status: ${fetchResponse.status} - ${errorText}`);
+        }
+
+        return await fetchResponse.json();
+      });
+
+      return {
+        success: true,
+        message: 'Expo notification sent successfully',
+        data: response,
+      };
+    } catch (error) {
+      console.error('Failed to send Expo notification:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to send Expo notification',
       };
     }
   }

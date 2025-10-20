@@ -1,15 +1,16 @@
-import React, { useState } from "react";
-import { View, ScrollView, TouchableOpacity, Alert, Platform } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useTheme } from "@/app/context/ThemeContext";
 import { AutoText } from "@/app/components/ui/AutoText";
-import { SafeAreaView } from "react-native-safe-area-context";
 import Input from "@/app/components/ui/Input";
-import { showAlert } from "@/app/utils/showAlert";
+import { useTheme } from "@/app/context/ThemeContext";
 import { nativeNotifyAPI } from "@/app/services/nativeNotifyApi";
+import { showAlert } from "@/app/utils/showAlert";
+import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import DateTimePicker from '@react-native-community/datetimepicker';
+import { useState } from "react";
+import { Image, ScrollView, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { client } from "@/sanityClient";
 
 export default function AdminNotificationsScreen() {
   const { resolvedTheme } = useTheme();
@@ -19,7 +20,76 @@ export default function AdminNotificationsScreen() {
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const uploadImageToSanity = async (imageUri: string): Promise<string | null> => {
+    try {
+      console.log("Uploading image to Sanity:", imageUri);
+
+      // Convert image URI to blob for upload
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+
+      // Create a File object from the blob
+      const file = new File([blob], `notification-image-${Date.now()}.jpg`, {
+        type: 'image/jpeg',
+      });
+
+      // Upload to Sanity
+      const result = await client.assets.upload('image', file, {
+        filename: `notification-image-${Date.now()}.jpg`,
+      });
+
+      // Get the URL of the uploaded image
+      const uploadedUrl = result.url;
+
+      console.log("Image uploaded to Sanity successfully:", uploadedUrl);
+      return uploadedUrl;
+    } catch (error) {
+      console.error("Error uploading image to Sanity:", error);
+      return null;
+    }
+  };
+
+  const pickImage = async () => {
+    try {
+      // Request permissions
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        showAlert("Behörighet nekad", "Vi behöver åtkomst till ditt bildbibliotek för att välja bilder");
+        return;
+      }
+
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const imageUri = result.assets[0].uri;
+        setSelectedImage(imageUri);
+
+        // Upload image and get URL
+        showAlert("Laddar upp...", "Vänligen vänta medan bilden laddas upp");
+        const uploadedUrl = await uploadImageToSanity(imageUri);
+
+        if (uploadedUrl) {
+          setImageUrl(uploadedUrl);
+          showAlert("Lyckades", "Bilden har laddats upp och är klar att användas");
+        } else {
+          showAlert("Fel", "Kunde inte ladda upp bilden. Försök igen.");
+          setSelectedImage(null);
+        }
+      }
+    } catch (error) {
+      console.error("Error picking image:", error);
+      showAlert("Fel", "Kunde inte välja bild");
+    }
+  };
 
   const sendNotification = async () => {
     if (!title.trim() || !message.trim()) {
@@ -48,7 +118,7 @@ export default function AdminNotificationsScreen() {
 
       console.log('Sending notification with data:', notificationData);
       let result;
-      // Send immediate notification
+      // Send broadcast notification (no subID for all users)
       result = await nativeNotifyAPI.sendNotification(notificationData);
       console.log('Notification result:', result);
 
@@ -60,6 +130,7 @@ export default function AdminNotificationsScreen() {
         setTitle("");
         setMessage("");
         setImageUrl("");
+        setSelectedImage(null);
       } else {
         showAlert("Fel", result.error || "Kunde inte skicka notifikation");
       }
@@ -154,32 +225,92 @@ export default function AdminNotificationsScreen() {
           </View>
 
 
-          {/* Image URL Input */}
+          {/* Image Selection */}
           <View>
             <AutoText
               className={`text-lg font-semibold mb-2 ${
                 isDark ? "text-white" : "text-gray-900"
               }`}
             >
-              Bild URL (valfritt)
+              Bild (valfritt)
             </AutoText>
-            <Input
-              value={imageUrl}
-              onChangeText={setImageUrl}
-              placeholder="https://example.com/image.jpg"
-              className={`w-full p-4 rounded-xl border mb-4 ${
+
+            {/* Image Picker Button */}
+            <TouchableOpacity
+              onPress={pickImage}
+              className={`w-full p-4 rounded-xl border mb-4 items-center ${
                 isDark
-                  ? "border-gray-700 bg-dark-card text-white"
-                  : "border-gray-300 bg-white text-gray-900"
-              }`}
-            />
-            <AutoText
-              className={`text-xs ${
-                isDark ? "text-gray-400" : "text-gray-600"
+                  ? "border-gray-700 bg-dark-card"
+                  : "border-gray-300 bg-white"
               }`}
             >
-              Lämna tomt om ingen bild önskas
-            </AutoText>
+              <View className="flex-row items-center">
+                <Ionicons
+                  name="image-outline"
+                  size={20}
+                  color={isDark ? "#fff" : "#666"}
+                />
+                <AutoText
+                  className={`ml-2 ${
+                    isDark ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  {selectedImage ? "Ändra bild" : "Välj bild från galleri"}
+                </AutoText>
+              </View>
+            </TouchableOpacity>
+
+            {/* Selected Image Preview */}
+            {selectedImage && (
+              <View className="mb-4">
+                <Image
+                  source={{ uri: selectedImage }}
+                  style={{
+                    width: '100%',
+                    height: 200,
+                    borderRadius: 12,
+                    resizeMode: 'cover',
+                  }}
+                />
+                <TouchableOpacity
+                  onPress={() => {
+                    setSelectedImage(null);
+                    setImageUrl("");
+                  }}
+                  className="absolute top-2 right-2 bg-red-500 rounded-full p-1"
+                >
+                  <Ionicons name="close" size={16} color="white" />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* URL Display (read-only) */}
+            {imageUrl && (
+              <View className="mb-2">
+                <AutoText
+                  className={`text-sm font-medium mb-1 ${
+                    isDark ? "text-gray-300" : "text-gray-700"
+                  }`}
+                >
+                  Bild-URL:
+                </AutoText>
+                <View
+                  className={`p-3 rounded-xl border ${
+                    isDark
+                      ? "border-gray-700 bg-dark-card"
+                      : "border-gray-300 bg-gray-50"
+                  }`}
+                >
+                  <AutoText
+                    className={`text-xs break-all ${
+                      isDark ? "text-gray-400" : "text-gray-600"
+                    }`}
+                  >
+                    {imageUrl}
+                  </AutoText>
+                </View>
+              </View>
+            )}
           </View>
 
           {/* Send Button */}

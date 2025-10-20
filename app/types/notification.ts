@@ -8,4 +8,5 @@ export interface NotificationItem {
   read?: boolean;
   date?: string;
   date_sent?: string;
+  image?: string;
 }

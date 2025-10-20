@@ -136,7 +136,8 @@ module.exports = {
           },
           android: {
             icon: './app/assets/icons/adaptive-icon.png',
-            color: '#ffffff'
+            color: '#ffffff',
+            largeIcon: './app/assets/icons/adaptive-icon.png'
           }
         }
       ],

@@ -231,15 +231,30 @@ export default function usePushNotifications() {
 
              if (!registerResult.success) {
                console.error('❌ User registration failed:', registerResult.error);
+               // For Expo Go, we might need to store the Expo token separately for direct Expo SDK notifications
+               if (token.startsWith('ExponentPushToken[')) {
+                 console.log('📱 Storing Expo push token for direct Expo SDK notifications...');
+                 // Store the Expo token for later use in sendExpoNotification
+                 await AsyncStorage.setItem(`expo_token_${userId}`, token);
+               }
                // Try to register again after a short delay in case of temporary issues
                setTimeout(async () => {
                  console.log('🔄 Retrying user registration...');
                  const retryResult = await nativeNotifyAPI.registerUser(userId, token);
                  console.log('✅ Retry registration result:', retryResult);
                }, 2000);
+             } else {
+               // Store the Expo token for direct Expo SDK notifications
+               if (token.startsWith('ExponentPushToken[')) {
+                 await AsyncStorage.setItem(`expo_token_${userId}`, token);
+               }
              }
            } catch (error) {
              console.error('❌ Failed to register user with Native Notify:', error);
+             // Still store the Expo token even if Native Notify registration fails
+             if (token.startsWith('ExponentPushToken[')) {
+               await AsyncStorage.setItem(`expo_token_${userId}`, token);
+             }
            }
          } else {
            console.log('⚠️ No valid userId available for Native Notify registration');
@@ -270,13 +285,34 @@ export default function usePushNotifications() {
     const notificationListener = Notifications.addNotificationReceivedListener(
       async (notification) => {
         console.log('🔔 Foreground notification received:', JSON.stringify(notification, null, 2));
+
+        // Extract image from various possible sources
+        let imageUrl = (notification.request.content.data as any)?.image;
+        if (!imageUrl) {
+          // Try to get from pushData if image is nested there
+          const pushData = (notification.request.content.data as any)?.pushData;
+          if (pushData) {
+            if (typeof pushData === 'string') {
+              try {
+                const parsed = JSON.parse(pushData);
+                imageUrl = parsed.image;
+              } catch (e) {
+                console.warn('Failed to parse pushData for image:', pushData);
+              }
+            } else if (pushData.image) {
+              imageUrl = pushData.image;
+            }
+          }
+        }
+
         const newNotification: NotificationItem = {
           id: notification.request.identifier,
           title: notification.request.content.title ?? "No title",
           message: notification.request.content.body ?? "",
           type: (notification.request.content.data as any)?.type ?? "general",
           read: false,
-          date: new Date().toISOString() as any ,
+          date: new Date().toISOString() as any,
+          image: imageUrl,
         };
         console.log('📝 Adding notification to state:', newNotification);
         addNotification(newNotification);

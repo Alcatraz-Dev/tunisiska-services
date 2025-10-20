@@ -66,6 +66,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
     
     initializeNotifications();
   }, []);
+  
 
   const requestPermissions = async (): Promise<boolean> => {
     try {
