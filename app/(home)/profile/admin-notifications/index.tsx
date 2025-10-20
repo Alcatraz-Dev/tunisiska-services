@@ -340,21 +340,21 @@ export default function AdminNotificationsScreen() {
               Information
             </AutoText>
             <AutoText
-              className={`text-sm mb-2 ${
+              className={`text-xs mb-2 ${
                 isDark ? "text-gray-300" : "text-gray-600"
               }`}
             >
               • Notifikationer skickas till alla registrerade användare
             </AutoText>
             <AutoText
-              className={`text-sm mb-2 ${
+              className={`text-xs mb-2 ${
                 isDark ? "text-gray-300" : "text-gray-600"
               }`}
             >
               • Användare måste ha push-notifikationer aktiverade
             </AutoText>
             <AutoText
-              className={`text-sm ${
+              className={`text-xs ${
                 isDark ? "text-gray-300" : "text-gray-600"
               }`}
             >
