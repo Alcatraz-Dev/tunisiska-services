@@ -175,11 +175,15 @@ export default function HomePage() {
   };
   useEffect(() => {
     unCountNotifications();
-  }, [READ_IDS_KEY, HIDDEN_IDS_KEY, userId, notifications]);
+  }, [READ_IDS_KEY, HIDDEN_IDS_KEY, userId]);
 
   // Refresh unread count when screen comes into focus
   useFocusEffect(() => {
-    unCountNotifications();
+    // Small delay to prevent rapid re-renders
+    const timeoutId = setTimeout(() => {
+      unCountNotifications();
+    }, 100);
+    return () => clearTimeout(timeoutId);
   });
   const createUser = async () => {
     if (!user || !userId || userCreated) return;
@@ -292,11 +296,7 @@ export default function HomePage() {
               </Link>
               {/* Notifications */}
               <TouchableOpacity
-                onPress={async () => {
-                  // Refresh unread count before navigating
-                  await unCountNotifications();
-                  router.push("/notification");
-                }}
+                onPress={() => router.push("/notification")}
                 className="w-10 h-10 rounded-full items-center justify-center mb-10 relative"
               >
                 {unreadNotificationCount > 0 && (

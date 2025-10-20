@@ -93,9 +93,9 @@ export default function usePushNotifications() {
     };
     addNotification(newNotification);
     saveNotifications([newNotification]);
-    const newCount = unreadCount + 1;
-    setUnreadCount(newCount);
-    await saveUnreadCount(newCount);
+    // Update unread count immediately
+    setUnreadCount(prev => prev + 1);
+    await saveUnreadCount(unreadCount + 1);
     if (!isRealDevice) showAlert(newNotification.title, newNotification.message);
   };
 
@@ -172,7 +172,7 @@ export default function usePushNotifications() {
         }
       }
     };
-  }, []);
+  }, [userId]); // Add userId as dependency to prevent stale closures
 
   const testNotification = async () => {
     if (!userId) return;
