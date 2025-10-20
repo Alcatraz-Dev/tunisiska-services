@@ -12,9 +12,12 @@ import { LinearGradient } from "expo-linear-gradient";
 import { getPremiumGradient } from "../utils/getPremiumGradient";
 import { showAlert } from "../utils/showAlert";
 import GoogleSignInButton from "../components/GoogleSignInButton";
+import { nativeNotifyAPI } from "../services/nativeNotifyApi";
+import { useUser } from "@clerk/clerk-expo";
 
 export default function SignUpScreen() {
   const { isLoaded, signUp, setActive } = useSignUp();
+  const { user } = useUser();
   const router = useRouter();
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
@@ -48,6 +51,31 @@ export default function SignUpScreen() {
       });
       if (signUpAttempt.status === "complete") {
         await setActive({ session: signUpAttempt.createdSessionId });
+
+        // Send welcome notification to new user
+        if (user?.id) {
+          try {
+            const result = await nativeNotifyAPI.sendNotification({
+              title: "Välkommen till Tunisiska Services!",
+              message: "Tack för att du registrerade dig! Utforska våra tjänster och börja boka.",
+              subID: user.id,
+              pushData: {
+                type: "welcome",
+                userId: user.id,
+                timestamp: new Date().toISOString(),
+              }
+            });
+            console.log("✅ Welcome notification result:", result);
+            if (result.success) {
+              console.log("✅ Welcome notification sent to new user:", user.id);
+            } else {
+              console.warn("⚠️ Welcome notification failed:", result.error);
+            }
+          } catch (error) {
+            console.warn("⚠️ Failed to send welcome notification:", error);
+          }
+        }
+
         router.replace("/");
       } else {
         console.error(JSON.stringify(signUpAttempt, null, 2));

@@ -9,6 +9,7 @@ import { AutoText } from "./ui/AutoText";
 import { showAlert } from "../utils/showAlert";
 import { registerForPushNotificationsAsync } from "../hooks/usePushNotifications";
 import { createNewUser } from "../hooks/useQuery";
+import { nativeNotifyAPI } from "../services/nativeNotifyApi";
 
 type Props = {
   setUserProfile: (data: any) => void;
@@ -121,6 +122,29 @@ export default function GoogleSignInButton({ setUserProfile }: Props) {
             pushToken: token,
           });
           console.log(data);
+
+          // Send welcome notification
+          try {
+            const result = await nativeNotifyAPI.sendNotification({
+              title: "Välkommen till Tunisiska Services!",
+              message: "Tack för att du registrerade dig! Utforska våra tjänster och börja boka.",
+              subID: user.id,
+              pushData: {
+                type: "welcome",
+                userId: user.id,
+                timestamp: new Date().toISOString(),
+              }
+            });
+            console.log("✅ Welcome notification result:", result);
+            if (result.success) {
+              console.log("✅ Welcome notification sent to user:", user.id);
+            } else {
+              console.warn("⚠️ Welcome notification failed:", result.error);
+            }
+          } catch (error) {
+            console.warn("⚠️ Failed to send welcome notification:", error);
+          }
+
           return data;
         }
       }

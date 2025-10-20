@@ -1,16 +1,14 @@
 import { SignedIn, useAuth, useUser } from "@clerk/clerk-expo";
-import {
-  getUnreadNotificationInboxCount,
-  getNotificationInbox,
-} from "native-notify";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Link, useRouter } from "expo-router";
+import { Link, useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import {
+  getNotificationInbox,
+  getUnreadNotificationInboxCount,
+} from "native-notify";
 import { useEffect, useMemo, useState } from "react";
-import { useFocusEffect } from "expo-router";
-import { Image, ScrollView, TouchableOpacity, View, Platform } from "react-native";
-import * as Device from "expo-device";
+import { Image, ScrollView, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AnnouncementsCarousel from "../components/AnnouncementsCarousel";
 import AppFooter from "../components/AppFooter";
@@ -19,11 +17,11 @@ import ServiceCard from "../components/ServiceCard";
 import { useNotifications } from "../context/NotificationContext";
 import { useTheme } from "../context/ThemeContext";
 import { getGreeting } from "../utils/getGreeting";
+import { createUserDirectInSanity } from "../utils/sanityDirect";
 import CategoryTabs from "./CategoryTabs";
 import RedirectIfSignedOut from "./RedirectIfSignedOut";
 import { AutoText } from "./ui/AutoText";
 import Input from "./ui/Input";
-import { createUserDirectInSanity } from "../utils/sanityDirect";
 
 interface UserProfileData {
   firstName: string;
@@ -120,48 +118,26 @@ export default function HomePage() {
   const unCountNotifications = async () => {
     console.log('🔢 Calculating unread notification count...');
 
-    // Check if we're on web/simulator (limited native module support)
-    const isWebOrSimulator = Platform.OS === 'web' || !Device.isDevice;
-    console.log('📱 Is web/simulator:', isWebOrSimulator);
-
-    // For web/simulator, use local state only
-    if (isWebOrSimulator) {
-      try {
-        const [storedRead, storedHidden] = await Promise.all([
-          AsyncStorage.getItem(READ_IDS_KEY),
-          AsyncStorage.getItem(HIDDEN_IDS_KEY),
-        ]);
-        const read = storedRead ? JSON.parse(storedRead) : [];
-        const hidden = storedHidden ? JSON.parse(storedHidden) : [];
-
-        // Use local notifications from context as primary source
-        const localUnreadCount = notifications.filter((n) => !n.read).length;
-        console.log('📊 Local unread count:', localUnreadCount);
-        setUnreadNotificationCount(localUnreadCount);
-
-        // Also check stored unread count from usePushNotifications hook
-        const storedUnreadCount = await AsyncStorage.getItem("unreadCount");
-        if (storedUnreadCount) {
-          const count = Number(storedUnreadCount);
-          // Use the higher count to ensure we don't miss notifications
-          setUnreadNotificationCount(Math.max(localUnreadCount, count));
-        }
-      } catch (error) {
-        console.warn('Error getting unread count in web/simulator:', error);
-        const localUnreadCount = notifications.filter((n) => !n.read).length;
-        setUnreadNotificationCount(localUnreadCount);
-      }
-      return;
-    }
-
-    // For real devices, try Native Notify API first
+    // Always try to get the count, even in Expo Go - just handle failures gracefully
     try {
-      console.log('📱 Real device detected - trying Native Notify API');
+      // Try Native Notify API first (works in Expo Go on device)
+      console.log('📱 Trying Native Notify API for unread count');
       const unreadResp = await getUnreadNotificationInboxCount(
         32172,
         "PNF5T5VibvtV6lj8i7pbil"
       );
-      const count = unreadResp?.data ?? 0;
+
+      let count = 0;
+      if (unreadResp && typeof unreadResp === 'object') {
+        if ('data' in unreadResp) {
+          count = Number(unreadResp.data) || 0;
+        } else if (typeof unreadResp === 'number') {
+          count = unreadResp;
+        }
+      } else if (typeof unreadResp === 'number') {
+        count = unreadResp;
+      }
+
       console.log('📊 Native Notify unread count:', count);
       setUnreadNotificationCount(count);
       return;
@@ -188,12 +164,12 @@ export default function HomePage() {
       const scoped = filterForUser(raw);
       const processed = applyOverlays(scoped, read, hidden);
       const unreadCount = processed.filter((n: any) => !n.read).length;
-      console.log('📊 Fallback unread count:', unreadCount);
+      console.log('📊 Fallback unread count from inbox:', unreadCount);
       setUnreadNotificationCount(unreadCount);
     } catch (error) {
       // Final fallback: use local notification state from context
       const localUnreadCount = notifications.filter((n) => !n.read).length;
-      console.log('📊 Final fallback unread count:', localUnreadCount);
+      console.log('📊 Final fallback unread count from context:', localUnreadCount);
       setUnreadNotificationCount(localUnreadCount);
     }
   };

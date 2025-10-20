@@ -1,5 +1,4 @@
-
-import { Switch, View, Image } from "react-native";
+import { Switch, View, Image, Linking } from "react-native";
 import { useState, useEffect } from "react";
 import * as Location from "expo-location";
 import { useUser } from "@clerk/clerk-expo";
@@ -9,9 +8,9 @@ import icons from "../constants/icons";
 
 export default function DriverToggle({ isDark }: { isDark: boolean }) {
   const [isDriver, setIsDriver] = useState(false);
+  const [locationGranted, setLocationGranted] = useState<boolean | null>(null);
   const { user, isLoaded } = useUser();
 
-  // Load user info from Sanity
   useEffect(() => {
     const loadUserProfile = async () => {
       if (!isLoaded || !user) return;
@@ -29,24 +28,55 @@ export default function DriverToggle({ isDark }: { isDark: boolean }) {
     loadUserProfile();
   }, [isLoaded, user]);
 
-  // Request foreground permission only
+  // Check permission status
+  const checkLocationPermission = async (): Promise<boolean> => {
+    const { status } = await Location.getForegroundPermissionsAsync();
+    setLocationGranted(status === "granted");
+    return status === "granted";
+  };
+
+  // Ask user to grant permission
   const requestLocationPermission = async (): Promise<boolean> => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
+      setLocationGranted(status === "granted");
       if (status !== "granted") {
-        showAlert("Behörighet krävs", "Ge appen platsbehörighet för att fortsätta.");
+        showAlert(
+          "Platstillstånd krävs",
+          "Du måste tillåta platsåtkomst för att aktivera förarläge."
+        );
         return false;
       }
       return true;
-    } catch (error) {
-      console.error("Error requesting location permission:", error);
+    } catch (e) {
+      console.error("Error requesting location permission:", e);
       return false;
     }
   };
 
+  // Open app settings
+  const openSettings = () => {
+    Linking.openSettings().catch(() => {
+      showAlert("Fel", "Kunde inte öppna inställningarna.");
+    });
+  };
+
   const toggleDriverMode = async (value: boolean) => {
-    const hasPermission = await requestLocationPermission();
-    if (!hasPermission) return;
+    const hasPermission = await checkLocationPermission();
+    if (!hasPermission) {
+      const requested = await requestLocationPermission();
+      if (!requested) {
+        showAlert(
+          "Behörighet krävs",
+          "Öppna appinställningarna och ge platsåtkomst manuellt.",
+          [
+            { text: "Avbryt" },
+            { text: "Öppna inställningar", onPress: openSettings },
+          ]
+        );
+        return;
+      }
+    }
 
     try {
       const { client } = await import("@/sanityClient");
@@ -67,12 +97,9 @@ export default function DriverToggle({ isDark }: { isDark: boolean }) {
       }
 
       setIsDriver(value);
-
-      if (value) {
+      if (value)
         showAlert("Förarläge aktiverat", "Platsspårning fungerar i förgrunden.");
-      } else {
-        showAlert("Förarläge inaktiverat", "Platsspårning stoppad.");
-      }
+      else showAlert("Förarläge inaktiverat", "Platsspårning stoppad.");
     } catch (error) {
       console.error("Error toggling driver mode:", error);
       showAlert("Fel", "Kunde inte ändra förarstatus.");

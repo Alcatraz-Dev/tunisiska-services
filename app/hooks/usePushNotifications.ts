@@ -15,7 +15,7 @@ import { NotificationItem } from "../types/notification";
 // Notification handler is now managed in NotificationContext.tsx
 
 export default function usePushNotifications() {
-  const { addNotification, addMultipleNotifications, markAsRead, markAllAsRead } =
+  const { notifications, addNotification, addMultipleNotifications, markAsRead, markAllAsRead } =
     useNotifications();
   const { userId } = useAuth();
   const [expoPushToken, setExpoPushToken] = useState<string>("");
@@ -81,36 +81,37 @@ export default function usePushNotifications() {
       const isWebOrSimulator = Platform.OS === 'web' || !Device.isDevice;
       console.log('📱 Is web/simulator:', isWebOrSimulator);
 
-      if (isWebOrSimulator) {
-        console.log('📱 Running on web/simulator - using local notification state only');
-        // On web/simulator, just ensure we have the latest local count
-        const storedCount = await AsyncStorage.getItem("unreadCount");
-        if (storedCount) {
-          const count = Number(storedCount);
-          setUnreadCount(count);
-        }
-        return;
-      }
-
-      // On real devices (including Expo Go), try Native Notify
-      console.log('📱 Running on real device - attempting Native Notify sync');
-
+      // Always try to sync notifications, even in Expo Go - just handle failures gracefully
       console.log('🔄 Syncing Native Notify inbox...');
       console.log('🔑 Using App ID: 32172, Token: PNF5T5VibvtV6lj8i7pbil');
 
-      const inboxResp = await getNotificationInbox(32172, "PNF5T5VibvtV6lj8i7pbil", 10, 99);
-      console.log('📬 Raw inbox response:', JSON.stringify(inboxResp, null, 2));
+      let inbox: any[] = [];
+      let apiUnreadCount = 0;
 
-      // Handle different API response formats - sometimes direct array, sometimes wrapped in data
-      const inbox = Array.isArray(inboxResp) ? inboxResp : (inboxResp?.data ?? []);
-      console.log('📬 Processed inbox:', inbox.length, 'notifications');
+      try {
+        const inboxResp = await getNotificationInbox(32172, "PNF5T5VibvtV6lj8i7pbil", 50, 0);
+        console.log('📬 Raw inbox response:', JSON.stringify(inboxResp, null, 2));
 
-      if (inbox.length > 0) {
-        console.log('📋 First notification sample:', JSON.stringify(inbox[0], null, 2));
+        // Handle different API response formats - sometimes direct array, sometimes wrapped in data
+        inbox = Array.isArray(inboxResp) ? inboxResp : (inboxResp?.data ?? []);
+        console.log('📬 Processed inbox:', inbox.length, 'notifications');
+
+        if (inbox.length > 0) {
+          console.log('📋 First notification sample:', JSON.stringify(inbox[0], null, 2));
+        }
+      } catch (inboxErr) {
+        console.warn('Failed to fetch inbox, using empty array:', inboxErr);
+        inbox = [];
       }
 
-      const mapped = inbox.map((n: any) => ({
-        id: n.notification_id.toString(),
+      // Filter for current user if we have userId
+      const userFilteredInbox = userId ? inbox.filter((n: any) => {
+        const subId = n.subscriber_id || n.subscriberId || n.user_id || n.userId || n.indie_id || n.indieId || n.sub_id || n.subId;
+        return subId?.toString() === userId?.toString();
+      }) : inbox;
+
+      const mapped = userFilteredInbox.map((n: any) => ({
+        id: n.notification_id?.toString() || n.id?.toString(),
         title: n.title,
         message: n.message,
         type: n.category ?? "default",
@@ -120,43 +121,73 @@ export default function usePushNotifications() {
       }));
 
       console.log('✅ Mapped notifications:', mapped.length);
-      addMultipleNotifications(mapped);
-      saveNotifications(mapped);
+      if (mapped.length > 0) {
+        addMultipleNotifications(mapped);
+        saveNotifications(mapped);
+      }
 
-      // Handle unread count separately with proper error handling
+      // Handle unread count with better error handling
       try {
         console.log('🔢 Getting unread count...');
         const unreadResp = await getUnreadNotificationInboxCount(32172, "PNF5T5VibvtV6lj8i7pbil");
 
         // Handle different API response formats more robustly
-        let count = 0;
         if (unreadResp && typeof unreadResp === 'object') {
           if ('data' in unreadResp) {
-            count = Number(unreadResp.data) || 0;
+            apiUnreadCount = Number(unreadResp.data) || 0;
           } else if (typeof unreadResp === 'number') {
-            count = unreadResp;
+            apiUnreadCount = unreadResp;
           } else {
-            // If it's an object but doesn't have expected structure, log for debugging
             console.warn('Unexpected unread count response format:', unreadResp);
+            apiUnreadCount = 0;
           }
         } else if (typeof unreadResp === 'number') {
-          count = unreadResp;
+          apiUnreadCount = unreadResp;
         }
 
-        console.log('📊 Unread count from API:', count);
-        setUnreadCount(count);
-        await saveUnreadCount(count);
+        console.log('📊 Unread count from API:', apiUnreadCount);
       } catch (unreadErr) {
-        console.warn("Failed to get unread count, using fallback", unreadErr);
+        console.warn("Failed to get unread count from API, using inbox fallback", unreadErr);
         // Fallback: count unread notifications from inbox
-        const unreadCount = mapped.filter((n: any) => !n.read).length;
-        console.log('📊 Fallback unread count:', unreadCount);
-        setUnreadCount(unreadCount);
-        await saveUnreadCount(unreadCount);
+        apiUnreadCount = mapped.filter((n: any) => !n.read).length;
+        console.log('📊 Fallback unread count from inbox:', apiUnreadCount);
       }
+
+      // Always update the unread count, even in Expo Go
+      setUnreadCount(apiUnreadCount);
+      await saveUnreadCount(apiUnreadCount);
+
+      // Update badge count only on real devices
+      if (!isWebOrSimulator) {
+        try {
+          await Notifications.setBadgeCountAsync(apiUnreadCount);
+          console.log('✅ Badge count updated:', apiUnreadCount);
+        } catch (badgeErr) {
+          console.warn('⚠️ Failed to update badge count:', badgeErr);
+        }
+      } else {
+        console.log('📱 Skipping badge count update in Expo Go/simulator');
+      }
+
     } catch (err) {
       console.error("Native Notify sync failed", err);
-      // Don't throw error, just log it to prevent app crashes
+      // Even if sync fails, ensure we have a valid unread count from local storage
+      try {
+        const storedCount = await AsyncStorage.getItem("unreadCount");
+        if (storedCount) {
+          const count = Number(storedCount);
+          setUnreadCount(count);
+          console.log('📊 Using stored unread count as fallback:', count);
+        } else {
+          // Last resort: use local notifications count
+          const localUnreadCount = notifications.filter((n) => !n.read).length;
+          setUnreadCount(localUnreadCount);
+          console.log('📊 Using local notifications count as final fallback:', localUnreadCount);
+        }
+      } catch (fallbackErr) {
+        console.warn('Even fallback failed:', fallbackErr);
+        setUnreadCount(0);
+      }
     }
   };
 
@@ -294,56 +325,34 @@ export default function usePushNotifications() {
     try {
       console.log('🧪 Sending test notification...');
 
-      // For simulators/web, add to local notifications only
-      const isSimulator = Platform.OS === 'web' || !Device.isDevice;
-      if (isSimulator) {
-        console.log('🧪 Simulator detected - adding local test notification with image');
-        const testNotif = {
-          id: `test-${Date.now()}`,
-          title: 'Test Notification with Image',
-          message: 'This is a test notification with an image from the app',
-          type: 'test',
-          read: false,
-          date: new Date().toISOString(),
-          image: 'https://picsum.photos/200/200?random=' + Date.now(), // Random test image
-        };
-        addNotification(testNotif);
-        saveNotifications([testNotif]);
-        const newCount = unreadCount + 1;
-        setUnreadCount(newCount);
-        await saveUnreadCount(newCount);
-
-        // Also show a local notification in simulator
-        try {
-          await Notifications.scheduleNotificationAsync({
-            content: {
-              title: testNotif.title,
-              body: testNotif.message,
-              data: { type: testNotif.type },
-            },
-            trigger: null, // Show immediately
-          });
-          console.log('✅ Local notification shown in simulator');
-        } catch (error) {
-          console.warn('⚠️ Failed to show local notification in simulator:', error);
-        }
-
-        return { success: true, message: 'Local test notification with image added' };
-      }
-
-      // For real devices (including Expo Go on device), send via Native Notify
-      console.log('🧪 Sending via Native Notify for real device');
+      // Always try Native Notify first, even in Expo Go
+      console.log('🧪 Sending via Native Notify');
       const result = await nativeNotifyAPI.sendNotification({
-        title: 'Test Notification with Image',
-        message: 'This is a test notification with an image from the app',
+        title: 'Test Notification',
+        message: 'This is a test notification from the app',
         subID: userId,
         pushData: {
           type: 'test',
           timestamp: new Date().toISOString(),
-          image: 'https://picsum.photos/200/200?random=' + Date.now()
         }
       });
       console.log('🧪 Test notification result:', result);
+
+      // Also add to local notifications for immediate display
+      const testNotif = {
+        id: `test-${Date.now()}`,
+        title: 'Test Notification',
+        message: 'This is a test notification from the app',
+        type: 'test',
+        read: false,
+        date: new Date().toISOString(),
+      };
+      addNotification(testNotif);
+      saveNotifications([testNotif]);
+      const newCount = unreadCount + 1;
+      setUnreadCount(newCount);
+      await saveUnreadCount(newCount);
+
       return result;
     } catch (error) {
       console.error('❌ Test notification failed:', error);
