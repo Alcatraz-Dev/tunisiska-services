@@ -12,9 +12,11 @@ import WalletScreen from "@/app/(home)/profile/wallet";
 import MapOverviewScreen from "@/app/(home)/map/overview";
 import { useLanguage } from "@/app/hooks/useLanguage";
 import { useTranslationText } from "@/app/hooks/useTranslation";
+import { useUser } from "@clerk/clerk-expo";
 const TAB_HEIGHT = 55;
 function WaveTabBar() {
   const { resolvedTheme } = useTheme();
+  const { user } = useUser();
   const isDark = resolvedTheme === "dark";
   const ACTIVE_COLOR_DOT = isDark ? "#1b1b1c" : "#F3F4F6";
   const ACTIVE_COLOR = isDark ? "#F3F4F6" : "#2c2c2e";
@@ -54,17 +56,38 @@ function WaveTabBar() {
     },
     Profile: {
       icon: ({ focused }) => (
-        <Image
-          source={icons.person}
+        <View
           style={{
-            width: 26,
-            height: 26,
-            marginTop: focused ? 8 : 20, // Added space from top of bar
+            width: 36,
+            height: 36,
+            marginTop: focused ? 4 : 16, // Adjusted space from top of bar
             marginBottom: 4, // Space between icon and title
-            tintColor: focused ? ACTIVE_COLOR : INACTIVE_COLOR,
           }}
-          resizeMode="contain"
-        />
+        >
+          {user?.imageUrl ? (
+            <Image
+              source={{ uri: user.imageUrl }}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                borderWidth: focused ? 0 : 1,
+                borderColor: focused ? ACTIVE_COLOR : INACTIVE_COLOR,
+              }}
+              resizeMode="cover"
+            />
+          ) : (
+            <Image
+              source={icons.person}
+              style={{
+                width: 36,
+                height: 36,
+                tintColor: focused ? ACTIVE_COLOR : INACTIVE_COLOR,
+              }}
+              resizeMode="contain"
+            />
+          )}
+        </View>
       ),
       renderTitle: ({ focused, title }) => (
         <Text
