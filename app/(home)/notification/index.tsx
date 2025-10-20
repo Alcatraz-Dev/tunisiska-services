@@ -9,7 +9,14 @@ import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getNotificationInbox } from "native-notify";
-import { FlatList, RefreshControl, TouchableOpacity, View, InteractionManager, Image } from "react-native";
+import {
+  FlatList,
+  RefreshControl,
+  TouchableOpacity,
+  View,
+  InteractionManager,
+  Image,
+} from "react-native";
 import Animated, { FadeInUp, FadeOutDown } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@clerk/clerk-expo";
@@ -39,9 +46,6 @@ let inboxCache: InboxCache | null = null;
 
 // Parse API date format "9-23-2025 2:45AM" to JavaScript Date
 
-
-
-
 export default function Notification() {
   const { notifications, markAllAsRead, markAsRead } = useNotifications();
   const { unreadCount, syncNativeNotifyInbox } = usePushNotifications();
@@ -62,23 +66,50 @@ export default function Notification() {
   const ROW_HEIGHT = 88; // approximate constant row height for getItemLayout
 
   // Scope storage keys by Clerk userId so each user has their own read/delete state
-  const READ_IDS_KEY = useMemo(() => `notification_read_ids:${userId ?? "anon"}`, [userId]);
-  const HIDDEN_IDS_KEY = useMemo(() => `notification_hidden_ids:${userId ?? "anon"}`, [userId]);
+  const READ_IDS_KEY = useMemo(
+    () => `notification_read_ids:${userId ?? "anon"}`,
+    [userId]
+  );
+  const HIDDEN_IDS_KEY = useMemo(
+    () => `notification_hidden_ids:${userId ?? "anon"}`,
+    [userId]
+  );
 
-  const getId = (n: NotificationItem) => ((n.id || n.notification_id) ?? '').toString();
+  const getId = (n: NotificationItem) =>
+    ((n.id || n.notification_id) ?? "").toString();
 
   const filterForUser = (items: any[]): NotificationItem[] => {
     if (!userId) return items as NotificationItem[];
+    // For broadcast notifications (admin notifications), they might not have user-specific IDs
+    // So we return all items if no user-specific filtering is needed
     const keys = [
-      'subscriber_id', 'subscriberId', 'user_id', 'userId', 'indie_id', 'indieId', 'sub_id', 'subId'
+      "subscriber_id",
+      "subscriberId",
+      "user_id",
+      "userId",
+      "indie_id",
+      "indieId",
+      "sub_id",
+      "subId",
     ];
-    const hasAnyKey = items.some((it) => keys.some((k) => it && typeof it === 'object' && k in it));
-    if (!hasAnyKey) return items as NotificationItem[];
-    const filtered = items.filter((it) => keys.some((k) => it?.[k]?.toString?.() === userId?.toString()));
+    const hasAnyKey = items.some((it) =>
+      keys.some((k) => it && typeof it === "object" && k in it)
+    );
+    if (!hasAnyKey) return items as NotificationItem[]; // Return all for broadcast notifications
+    const filtered = items.filter((it) => {
+      // If it's a broadcast notification (no specific user ID), include it
+      const hasUserKey = keys.some((k) => it?.[k] !== undefined);
+      if (!hasUserKey) return true;
+      // Otherwise filter by user ID
+      return keys.some((k) => it?.[k]?.toString?.() === userId?.toString());
+    });
     return filtered as NotificationItem[];
   };
 
-  const applyOverlays = (items: NotificationItem[], opts?: { read?: string[]; hidden?: string[] }) => {
+  const applyOverlays = (
+    items: NotificationItem[],
+    opts?: { read?: string[]; hidden?: string[] }
+  ) => {
     const readSet = new Set(opts?.read ?? readIds);
     const hiddenSet = new Set(opts?.hidden ?? hiddenIds);
     return items
@@ -92,16 +123,22 @@ export default function Notification() {
   const hasUnread = data.some((n) => !n.read);
   // Safely mark an item as read in both local state and context
   const saveReadIds = async (ids: string[]) => {
-    try { await AsyncStorage.setItem(READ_IDS_KEY, JSON.stringify(ids)); } catch {}
+    try {
+      await AsyncStorage.setItem(READ_IDS_KEY, JSON.stringify(ids));
+    } catch {}
   };
   const saveHiddenIds = async (ids: string[]) => {
-    try { await AsyncStorage.setItem(HIDDEN_IDS_KEY, JSON.stringify(ids)); } catch {}
+    try {
+      await AsyncStorage.setItem(HIDDEN_IDS_KEY, JSON.stringify(ids));
+    } catch {}
   };
 
   const markItemAsRead = async (notificationId?: string) => {
     if (!notificationId) return;
     const idStr = notificationId.toString();
-    setData((prev) => prev.map((n) => (getId(n) === idStr ? { ...n, read: true } : n)));
+    setData((prev) =>
+      prev.map((n) => (getId(n) === idStr ? { ...n, read: true } : n))
+    );
     setReadIds((prev) => {
       if (prev.includes(idStr)) return prev;
       const next = [...prev, idStr];
@@ -115,11 +152,21 @@ export default function Notification() {
     // Best-effort: attempt to mark as read in Native Notify using Clerk userId as subscriber ID
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const nn = require('native-notify');
-      const candidates = ['handleRead', 'setNotificationRead', 'markNotificationAsRead', 'readNotificationInbox'];
+      const nn = require("native-notify");
+      const candidates = [
+        "handleRead",
+        "setNotificationRead",
+        "markNotificationAsRead",
+        "readNotificationInbox",
+      ];
       const fn = candidates.map((k) => nn?.[k]).find(Boolean);
-      if (typeof fn === 'function' && userId) {
-        await fn(userId.toString(), notificationId.toString(), APP_ID, APP_TOKEN);
+      if (typeof fn === "function" && userId) {
+        await fn(
+          userId.toString(),
+          notificationId.toString(),
+          APP_ID,
+          APP_TOKEN
+        );
       }
     } catch (e) {
       // silent fail; local overlay already applied
@@ -137,10 +184,14 @@ export default function Notification() {
     // Try remote delete in Native Notify with Clerk userId as subscriber ID
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const nn = require('native-notify');
-      const candidates = ['handleDelete', 'deleteNotificationInbox', 'removeNotificationInbox'];
+      const nn = require("native-notify");
+      const candidates = [
+        "handleDelete",
+        "deleteNotificationInbox",
+        "removeNotificationInbox",
+      ];
       const fn = candidates.map((k) => nn?.[k]).find(Boolean);
-      if (typeof fn === 'function' && userId) {
+      if (typeof fn === "function" && userId) {
         await fn(userId.toString(), idStr, APP_ID, APP_TOKEN);
       }
     } catch (e) {
@@ -155,7 +206,12 @@ export default function Notification() {
     });
   };
 
-  const notiser = async (opts?: { read?: string[]; hidden?: string[]; page?: number; append?: boolean }) => {
+  const notiser = async (opts?: {
+    read?: string[];
+    hidden?: string[];
+    page?: number;
+    append?: boolean;
+  }) => {
     if (loadingRef.current) return;
     loadingRef.current = true;
     try {
@@ -168,14 +224,56 @@ export default function Notification() {
       );
       // Handle the API response structure - it might be response.data or just response
       const notificationData = response?.data || response || [];
-      const typedData: NotificationItem[] = Array.isArray(notificationData) ? notificationData : [];
+      const typedData: NotificationItem[] = Array.isArray(notificationData)
+        ? notificationData.map((n: any) => {
+            let imageUrl =
+              n.image ?? n.image_url ?? n.photo ?? n.picture ?? n.bigPictureURL;
+
+            // Try to extract image from pushData if not found in direct fields
+            if (!imageUrl && n.pushData) {
+              try {
+                const pushData =
+                  typeof n.pushData === "string"
+                    ? JSON.parse(n.pushData)
+                    : n.pushData;
+                imageUrl = pushData.image;
+              } catch (e) {
+                console.warn("Failed to parse pushData for image:", n.pushData);
+              }
+            }
+
+            console.log("Raw notification data:", JSON.stringify(n, null, 2));
+            console.log(
+              "Processing notification:",
+              n.title,
+              "Image URL:",
+              imageUrl
+            );
+            return {
+              id: n.notification_id?.toString() || n.id?.toString(),
+              notification_id: n.notification_id?.toString(),
+              title: n.title,
+              message: n.message,
+              type: n.category ?? n.type ?? "default",
+              category: n.category ?? n.type,
+              read: n.read ?? false,
+              date: n.date ?? n.date_sent ?? new Date().toISOString(),
+              date_sent: n.date_sent ?? n.date,
+              image: imageUrl,
+            };
+          })
+        : [];
       const scoped = filterForUser(typedData);
       const processed = applyOverlays(scoped, opts);
       setData((prev) => (opts?.append ? [...prev, ...processed] : processed));
       if (!opts?.append) {
         setPage(1); // next page after initial load
         // store raw page 0 in cache for instant re-open
-        inboxCache = { userId: userId ?? null, page0Raw: typedData, ts: Date.now() };
+        inboxCache = {
+          userId: userId ?? null,
+          page0Raw: typedData,
+          ts: Date.now(),
+        };
       } else {
         setPage((p) => p + 1);
       }
@@ -189,7 +287,9 @@ export default function Notification() {
 
   // Defer icons to after interactions to minimize mount jank
   useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => setIconsReady(true));
+    const task = InteractionManager.runAfterInteractions(() =>
+      setIconsReady(true)
+    );
     return () => {
       // @ts-ignore: cancel might not exist on web
       if ((task as any)?.cancel) (task as any).cancel();
@@ -209,7 +309,10 @@ export default function Notification() {
         setReadIds(read);
         setHiddenIds(hidden);
         // Use cache if fresh (< 2 minutes) and user matches
-        const fresh = inboxCache && inboxCache.userId === (userId ?? null) && Date.now() - inboxCache.ts < 120000;
+        const fresh =
+          inboxCache &&
+          inboxCache.userId === (userId ?? null) &&
+          Date.now() - inboxCache.ts < 120000;
         if (fresh) {
           const scoped = filterForUser(inboxCache!.page0Raw);
           setData(applyOverlays(scoped, { read, hidden }));
@@ -223,7 +326,7 @@ export default function Notification() {
         await notiser({ read: [], hidden: [], page: 0, append: false });
       }
     })();
-  }, [READ_IDS_KEY, HIDDEN_IDS_KEY , userId]);
+  }, [READ_IDS_KEY, HIDDEN_IDS_KEY, userId]);
   const notificationConfig: Record<
     string,
     { icon: keyof typeof Ionicons.glyphMap; color: string }
@@ -243,95 +346,131 @@ export default function Notification() {
     default: { icon: "notifications-outline", color: "#3B82F6" },
   };
 
-  const renderItem = useCallback(({ item, index }: { item: NotificationItem; index: number }) => {
-    const { icon, color } =
-      notificationConfig[item.type || item.category || 'default'] || notificationConfig.default;
+  const renderItem = useCallback(
+    ({ item, index }: { item: NotificationItem; index: number }) => {
+      const { icon, color } =
+        notificationConfig[item.type || item.category || "default"] ||
+        notificationConfig.default;
 
-    const handlePress = () => {
-      if (!item.read) {
-        const notificationId = item.id || item.notification_id;
-        if (notificationId) {
-          markItemAsRead(notificationId);
+      const handlePress = () => {
+        if (!item.read) {
+          const notificationId = item.id || item.notification_id;
+          if (notificationId) {
+            markItemAsRead(notificationId);
+          }
         }
-      }
-    };
+      };
 
-    return (
-      <Animated.View
-        key={item.id || item.notification_id}
-        entering={FadeInUp}
-        exiting={FadeOutDown}
-        className="flex-row items-start gap-3 py-2"
-      >
-        <TouchableOpacity
-          className="flex-1 flex-row items-start p-2"
-          onPress={handlePress}
-          onLongPress={() => deleteItem(item.id || item.notification_id)}
-          delayLongPress={300}
+      return (
+        <Animated.View
+          key={item.id || item.notification_id}
+          entering={FadeInUp}
+          exiting={FadeOutDown}
+          className="flex-row items-start gap-3 py-2"
         >
-          {iconsReady ? (
-            <Ionicons
-              name={icon}
-              size={22}
-              color={item.read ? "#A3A3A3" : color}
-              style={{ marginRight: 12, marginTop: 12 }}
-            />
-          ) : (
-            <View style={{ width: 22, height: 22, marginRight: 12, marginTop: 12 }} />
-          )}
-          <View className="flex-1 mx-1 my-2">
-            <AutoText
-              className={`text-base font-bold capitalize ${
-                isDark ? "text-white" : "text-gray-900"
-              }`}
-            >
-              {item.title || 'No Title'}
-            </AutoText>
-            <AutoText
-              className={`text-sm mt-1 ${
-                isDark ? "text-gray-300" : "text-gray-600"
-              }`}
-            >
-              {item.message || 'No Message'}
-            </AutoText>
+          <TouchableOpacity
+            className="flex-1 flex-row items-start p-2 "
+            onPress={handlePress}
+            onLongPress={() => deleteItem(item.id || item.notification_id)}
+            delayLongPress={300}
+          >
+            {iconsReady ? (
+              <Ionicons
+                name={icon}
+                size={22}
+                color={item.read ? "#A3A3A3" : color}
+                style={{ marginRight: 12, marginTop: 12 }}
+              />
+            ) : (
+              <View
+                style={{
+                  width: 22,
+                  height: 22,
+                  marginRight: 12,
+                  marginTop: 12,
+                }}
+              />
+            )}
+            <View className="flex-1 mx-1 my-2">
+              <AutoText
+                className={`text-base font-bold capitalize ${
+                  isDark ? "text-white" : "text-gray-900"
+                }`}
+              >
+                {item.title || "No Title"}
+              </AutoText>
+              <AutoText
+                className={`text-sm mt-1 ${
+                  isDark ? "text-gray-300" : "text-gray-600"
+                }`}
+              >
+                {item.message || "No Message"}
+              </AutoText>
+              <TranslatableDateText
+                dateString={item.date || item.date_sent}
+                className={`text-xs mt-3 ${
+                  isDark ? "text-gray-400" : "text-gray-500"
+                }`}
+              />
+            </View>
+          </TouchableOpacity>
+
+          <View className="flex-row items-start mt-3 ">
             {/* Display image if available */}
-            {item.image && (
+            {item.image && item.image.trim() !== "" && (
               <Image
                 source={{ uri: item.image }}
                 style={{
                   width: 60,
                   height: 60,
                   borderRadius: 8,
-                  marginTop: 8,
-                  resizeMode: 'cover'
+                  resizeMode: "cover",
+                  borderWidth: 1,
+                  borderColor: isDark ? "#374151" : "#e5e7eb",
+                }}
+                onLoadStart={() => console.log("Loading image:", item.image)}
+                onLoad={() =>
+                  console.log("Image loaded successfully:", item.image)
+                }
+                onError={(error) => {
+                  console.warn(
+                    "Failed to load notification image:",
+                    item.image,
+                    error
+                  );
                 }}
               />
             )}
-            <TranslatableDateText
-              dateString={item.date || item.date_sent}
-              className={`text-xs mt-3 ${
-                isDark ? "text-gray-400" : "text-gray-500"
-              }`}
-            />
           </View>
-        </TouchableOpacity>
-        <TouchableOpacity
-          accessibilityLabel="Delete notification"
-          onPress={() => deleteItem(item.id || item.notification_id)}
-          className="p-3"
-        >
-          <Ionicons
-            name="trash-outline"
-            size={20}
-            color={isDark ? "#9CA3AF" : "#6B7280"}
-          />
-        </TouchableOpacity>
-      </Animated.View>
-    );
-  }, [isDark, markItemAsRead, deleteItem]);
+          <TouchableOpacity
+            accessibilityLabel="Delete notification"
+            onPress={() => deleteItem(item.id || item.notification_id)}
+            className=""
+          >
+            <Ionicons
+              name="trash-outline"
+              size={18}
+              color={isDark ? "#9CA3AF" : "#6B7280"}
+            />
+          </TouchableOpacity>
+        </Animated.View>
+      );
+    },
+    [isDark, markItemAsRead, deleteItem]
+  );
 
-  const keyExtractor = useCallback((item: any, index: number) => `${item.id || item.notification_id || index}`, []);
-  const getItemLayout = useCallback((_: any, index: number) => ({ length: ROW_HEIGHT, offset: ROW_HEIGHT * index, index }), []);
+  const keyExtractor = useCallback(
+    (item: any, index: number) => `${item.id || item.notification_id || index}`,
+    []
+  );
+  const getItemLayout = useCallback(
+    (_: any, index: number) => ({
+      length: ROW_HEIGHT,
+      offset: ROW_HEIGHT * index,
+      index,
+    }),
+    []
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -347,7 +486,6 @@ export default function Notification() {
       markAsRead(lastId);
     }
   };
-
 
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
@@ -383,10 +521,9 @@ export default function Notification() {
             <TouchableOpacity
               onPress={() => {
                 // Mark all as read locally and in context
-                const allIds = Array.from(new Set([
-                  ...readIds,
-                  ...data.map((n) => getId(n)),
-                ]));
+                const allIds = Array.from(
+                  new Set([...readIds, ...data.map((n) => getId(n))])
+                );
                 setReadIds(allIds);
                 saveReadIds(allIds);
                 setData((prev) => prev.map((n) => ({ ...n, read: true })));
@@ -399,24 +536,31 @@ export default function Notification() {
               </AutoText>
             </TouchableOpacity>
           )}
-
         </View>
       </View>
 
       <View className="flex-1 px-6 mt-5">
-        {(data.length === 0 && notifications.length === 0) ? (
+        {data.length === 0 && notifications.length === 0 ? (
           <View className="flex-1 justify-center items-center">
             <Ionicons
               name="notifications-off-outline"
-              size={48}
-              color={isDark ? "#9CA3AF" : "#6B7280"}
+              size={64}
+              color={isDark ? "#6B7280" : "#9CA3AF"}
             />
             <AutoText
-              className={`mt-4 text-base ${
-                isDark ? "text-gray-400" : "text-gray-600"
+              className={`mt-4 text-lg font-medium ${
+                isDark ? "text-gray-300" : "text-gray-700"
               }`}
             >
-              Inga notifikationer just nu
+              Inga notifikationer
+            </AutoText>
+            <AutoText
+              className={`mt-2 text-sm text-center px-8 ${
+                isDark ? "text-gray-400" : "text-gray-500"
+              }`}
+            >
+              Du har inga notifikationer just nu. Kom tillbaka senare för att se
+              nya uppdateringar.
             </AutoText>
           </View>
         ) : (

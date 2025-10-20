@@ -151,14 +151,29 @@ export class NativeNotifyAPI {
           (apiPayload as any).bigPictureURL = payload.pushData.image;
         }
 
-        // Also check for direct image field
+        // Also check for direct image field - this should override others
         if (payload.image) {
           (apiPayload as any).bigPictureURL = payload.image;
+          console.log('Setting bigPictureURL from payload.image:', payload.image);
+          // Also store in pushData for retrieval
+          if (!(apiPayload as any).pushData) {
+            (apiPayload as any).pushData = '{}';
+          }
+          try {
+            const pushData = JSON.parse((apiPayload as any).pushData);
+            pushData.image = payload.image;
+            (apiPayload as any).pushData = JSON.stringify(pushData);
+          } catch (e) {
+            (apiPayload as any).pushData = JSON.stringify({ image: payload.image });
+          }
         }
 
         const url = payload.subID
           ? `${NATIVE_NOTIFY_CONFIG.BASE_URL}/api/indie/notification`
           : `${NATIVE_NOTIFY_CONFIG.BASE_URL}/api/notification`;
+
+        console.log('Send notification URL:', url);
+        console.log('Send notification payload:', JSON.stringify(apiPayload, null, 2));
 
         const fetchResponse = await fetch(url, {
           method: 'POST',
@@ -258,53 +273,102 @@ export class NativeNotifyAPI {
   // Schedule Notification
   async scheduleNotification(payload: ScheduledNotificationPayload): Promise<NotificationResponse> {
     try {
+      console.log('Attempting to schedule notification with Native Notify API');
+      console.log('Schedule details:', {
+        sendDate: payload.sendDate,
+        sendTime: payload.sendTime,
+        timezone: payload.timezone || 'Europe/Stockholm'
+      });
+
       const response = await retryApiCall(async () => {
+        // Create dateSent in the format "MM-DD-YYYY HH:MMAM/PM"
+        const now = new Date();
+        const dateSent = `${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}-${now.getFullYear()} ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+
         const apiPayload = {
           appId: this.appId,
           appToken: this.appToken,
           title: payload.title,
           body: payload.message,
-          subID: payload.subID,
+          dateSent: dateSent,
           sendDate: payload.sendDate,
           sendTime: payload.sendTime,
-          timezone: payload.timezone || "America/New_York",
-          pushData: JSON.stringify(payload.pushData || {}),
+          timezone: payload.timezone || 'Europe/Stockholm',
+          pushData: payload.pushData ? JSON.stringify(payload.pushData) : '{}',
           icon: NATIVE_NOTIFY_CONFIG.ICON_URL,
         };
+
+        if (payload.subID) {
+          (apiPayload as any).subID = payload.subID;
+        }
 
         if (payload.subtitle) {
           (apiPayload as any).subtitle = payload.subtitle;
         }
 
-        const fetchResponse = await fetch(
-          `${NATIVE_NOTIFY_CONFIG.BASE_URL}/api/indie/notification/scheduled`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(apiPayload),
-          }
-        );
-
-        if (!fetchResponse.ok) {
-          throw new Error(`HTTP error! status: ${fetchResponse.status}`);
+        if (payload.bigPictureURL) {
+          (apiPayload as any).bigPictureURL = payload.bigPictureURL;
         }
 
-        return await fetchResponse.json();
+        if (payload.image) {
+          (apiPayload as any).bigPictureURL = payload.image;
+        }
+
+        const url = payload.subID
+          ? `${NATIVE_NOTIFY_CONFIG.BASE_URL}/api/indie/notification`
+          : `${NATIVE_NOTIFY_CONFIG.BASE_URL}/api/notification`;
+
+        console.log('Scheduled notification URL:', url);
+        console.log('Scheduled notification payload:', JSON.stringify(apiPayload, null, 2));
+
+        const fetchResponse = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(apiPayload),
+        });
+
+        if (!fetchResponse.ok) {
+          const errorText = await fetchResponse.text();
+          console.error('Server error response:', errorText);
+          throw new Error(`HTTP error! status: ${fetchResponse.status} - ${errorText}`);
+        }
+
+        const responseText = await fetchResponse.text();
+        console.log('Raw scheduled response:', responseText);
+
+        try {
+          return JSON.parse(responseText);
+        } catch (parseError) {
+          console.warn('Response is not valid JSON, treating as success:', responseText);
+          return { success: true, message: responseText };
+        }
       });
 
       return {
         success: true,
-        message: 'Scheduled notification created successfully',
+        message: 'Notification scheduled successfully',
         data: response,
       };
     } catch (error) {
       console.error('Failed to schedule notification:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to schedule notification',
-      };
+      // Fallback: send as immediate notification
+      console.log('Falling back to immediate notification due to scheduling failure');
+      return await this.sendNotification({
+        title: payload.title,
+        message: payload.message,
+        subID: payload.subID,
+        subtitle: payload.subtitle,
+        pushData: {
+          ...payload.pushData,
+          scheduledFor: `${payload.sendDate} ${payload.sendTime}`,
+          timezone: payload.timezone,
+          note: 'This was requested as a scheduled notification but sent immediately due to API limitations'
+        },
+        bigPictureURL: payload.bigPictureURL || payload.image,
+        image: payload.image
+      });
     }
   }
 

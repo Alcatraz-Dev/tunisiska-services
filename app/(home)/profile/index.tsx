@@ -60,6 +60,7 @@ interface UserProfileData {
   friendsCount?: number;
   signUpMethod: "google" | "email";
   isDriver?: boolean;
+  isAdmin?: boolean;
 }
 
 const Profile = () => {
@@ -221,6 +222,7 @@ const Profile = () => {
         ongoingShipments: 0, // Not used in current implementation
         defaultLanguage: "sv", // Default to Swedish
         isDriver: userDoc?.isDriver || false,
+        isAdmin: userDoc?.isAdmin || false,
       };
 
       setFirstName(profileData.firstName as string);
@@ -532,6 +534,11 @@ const Profile = () => {
                   text: "Dela appen",
                   href: "/profile/sheare-app",
                 },
+                ...(userProfile?.isAdmin ? [{
+                  icon: icons.bell,
+                  text: "Skicka Notifikationer",
+                  href: "/profile/admin-notifications",
+                }] : []),
               ].map((item, index) => (
                 <TouchableOpacity
                   onPress={() =>

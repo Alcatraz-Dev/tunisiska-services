@@ -79,6 +79,13 @@ export default defineType({
       type: 'geopoint',
       hidden: ({parent}) => !parent?.isDriver, // only relevant for drivers
     }),
+    // Add admin field
+    defineField({
+      name: 'isAdmin',
+      title: 'Is Admin',
+      type: 'boolean',
+      initialValue: false,
+    }),
   ],
   preview: {
     select: {

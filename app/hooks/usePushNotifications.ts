@@ -117,7 +117,7 @@ export default function usePushNotifications() {
         type: n.category ?? "default",
         read: n.read ?? false,
         date: n.date ?? n.date_sent ?? new Date().toISOString(),
-        image: n.image ?? n.image_url ?? n.photo ?? n.picture,
+        image: n.image ?? n.image_url ?? n.photo ?? n.picture ?? n.bigPictureURL,
       }));
 
       console.log('✅ Mapped notifications:', mapped.length);
@@ -132,17 +132,25 @@ export default function usePushNotifications() {
         const unreadResp = await getUnreadNotificationInboxCount(32172, "PNF5T5VibvtV6lj8i7pbil");
 
         // Handle different API response formats more robustly
-        if (unreadResp && typeof unreadResp === 'object') {
-          if ('data' in unreadResp) {
-            apiUnreadCount = Number(unreadResp.data) || 0;
+        if (unreadResp !== null && unreadResp !== undefined) {
+          if (typeof unreadResp === 'object' && unreadResp !== null) {
+            if ('data' in unreadResp && unreadResp.data !== undefined) {
+              apiUnreadCount = Number(unreadResp.data) || 0;
+            } else if (typeof unreadResp === 'number') {
+              apiUnreadCount = unreadResp;
+            } else {
+              console.warn('Unexpected unread count response format:', unreadResp);
+              apiUnreadCount = 0;
+            }
           } else if (typeof unreadResp === 'number') {
             apiUnreadCount = unreadResp;
           } else {
-            console.warn('Unexpected unread count response format:', unreadResp);
+            console.warn('Unexpected unread count response type:', typeof unreadResp, unreadResp);
             apiUnreadCount = 0;
           }
-        } else if (typeof unreadResp === 'number') {
-          apiUnreadCount = unreadResp;
+        } else {
+          console.warn('Unread count response is null or undefined');
+          apiUnreadCount = 0;
         }
 
         console.log('📊 Unread count from API:', apiUnreadCount);
