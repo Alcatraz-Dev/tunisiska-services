@@ -11,25 +11,7 @@ import { useEffect, useState } from "react";
 import { Image, ScrollView, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { client } from "@/sanityClient";
-
-type NotificationType =
-  | "message"
-  | "booking"
-  | "warning"
-  | "info"
-  | "success"
-  | "error"
-  | "offer"
-  | "delivery"
-  | "service"
-  | "security"
-  | "review"
-  | "system"
-  | "update"
-  | "announcement"
-  | "maintenance"
-  | "promotion"
-  | "general";
+import { NotificationType, NOTIFICATION_TYPE_CONFIGS } from "@/app/types/notification";
 
 export default function AdminNotificationsScreen() {
   const { resolvedTheme } = useTheme();
@@ -196,9 +178,11 @@ export default function AdminNotificationsScreen() {
         const selectedAnnouncementData = announcements.find(
           (a) => a.slug === selectedAnnouncement
         );
-        notificationData.pushData.route = `/(home)/announcements/${selectedAnnouncement}`;
-        console.log("Setting route to:", notificationData.pushData.route);
-        notificationData.pushData.announcementSlug = selectedAnnouncement;
+        const routeSlug = typeof selectedAnnouncement === 'string' ? selectedAnnouncement : (selectedAnnouncement as any)?.current || String(selectedAnnouncement);
+        notificationData.pushData.route = `/(home)/announcements/${routeSlug}`;
+        console.log("Setting route to:", notificationData.pushData.route, "from selectedAnnouncement:", selectedAnnouncement, "routeSlug:", routeSlug);
+        const announcementSlug = typeof selectedAnnouncement === 'string' ? selectedAnnouncement : (selectedAnnouncement as any)?.current || String(selectedAnnouncement);
+        notificationData.pushData.announcementSlug = announcementSlug;
         notificationData.pushData.announcementTitle = selectedAnnouncementData?.title || "";
 
         // Use the announcement's media (image or video) for the notification
@@ -357,93 +341,14 @@ export default function AdminNotificationsScreen() {
               Typ av notifikation
             </AutoText>
             <View className="flex-row flex-wrap gap-2 mb-4">
-              {[
-                {
-                  value: "general",
-                  label: "Allmänt",
-                  icon: "notifications-outline",
-                },
-                {
-                  value: "message",
-                  label: "Meddelande",
-                  icon: "chatbubble-ellipses-outline",
-                },
-                {
-                  value: "booking",
-                  label: "Bokning",
-                  icon: "calendar-outline",
-                },
-                {
-                  value: "warning",
-                  label: "Varning",
-                  icon: "warning-outline",
-                },
-                {
-                  value: "info",
-                  label: "Info",
-                  icon: "information-circle-outline",
-                },
-                {
-                  value: "success",
-                  label: "Framgång",
-                  icon: "checkmark-circle-outline",
-                },
-                {
-                  value: "error",
-                  label: "Fel",
-                  icon: "close-circle-outline",
-                },
-                {
-                  value: "offer",
-                  label: "Erbjudande",
-                  icon: "pricetag-outline",
-                },
-                {
-                  value: "delivery",
-                  label: "Leverans",
-                  icon: "cube-outline",
-                },
-                {
-                  value: "service",
-                  label: "Service",
-                  icon: "construct-outline",
-                },
-                {
-                  value: "security",
-                  label: "Säkerhet",
-                  icon: "lock-closed-outline",
-                },
-                {
-                  value: "review",
-                  label: "Recension",
-                  icon: "star-outline",
-                },
-                {
-                  value: "system",
-                  label: "System",
-                  icon: "settings-outline",
-                },
-                {
-                  value: "update",
-                  label: "Uppdatering",
-                  icon: "refresh-outline",
-                },
-                {
-                  value: "announcement",
-                  label: "Annons",
-                  icon: "megaphone-outline",
-                },
-                {
-                  value: "maintenance",
-                  label: "Underhåll",
-                  icon: "construct-outline",
-                },
-                {
-                  value: "promotion",
-                  label: "Kampanj",
-                  icon: "pricetag-outline",
-                },
-              ].map((type) => (
+              {(Object.keys(NOTIFICATION_TYPE_CONFIGS) as NotificationType[]).map((type) => {
+                const config = NOTIFICATION_TYPE_CONFIGS[type];
+                return {
+                  value: type,
+                  label: config.label,
+                  icon: config.icon,
+                };
+              }).map((type) => (
                 <TouchableOpacity
                   key={type.value}
                   onPress={() =>

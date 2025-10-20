@@ -6,10 +6,10 @@ import { showAlert } from "@/app/utils/showAlert";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// Conditionally import getNotificationInbox to prevent crashes in Expo Go
+// Conditionally import getNotificationInbox
 const getNotificationInbox = (() => {
   try {
     return require("native-notify").getNotificationInbox;
@@ -17,6 +17,7 @@ const getNotificationInbox = (() => {
     return null;
   }
 })();
+
 import {
   FlatList,
   RefreshControl,
@@ -24,40 +25,26 @@ import {
   View,
   InteractionManager,
   Image,
+  ActivityIndicator,
 } from "react-native";
 import VideoPlayer from "@/app/components/VideoPlayer";
 import Animated, { FadeInUp, FadeOutDown } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@clerk/clerk-expo";
 import { TranslatableDateText } from "@/app/utils/dateFormat";
+import {
+  NOTIFICATION_TYPE_CONFIGS,
+  NotificationItem,
+  NotificationType,
+} from "@/app/types/notification";
 
-// Type definitions for notifications
-interface NotificationItem {
-  id?: string;
-  notification_id?: string;
-  title: string;
-  message: string;
-  type?: string;
-  category?: string;
-  read?: boolean;
-  date?: string;
-  date_sent?: string;
-  image?: string;
-  route?: string;
-  screenImage?: string;
-  mediaType?: string;
-  videoUrl?: string;
-}
-
-// Lightweight in-memory cache for first page per user (session-scoped)
+// In-memory cache
 interface InboxCache {
   userId: string | null;
   page0Raw: NotificationItem[];
   ts: number;
 }
 let inboxCache: InboxCache | null = null;
-
-// Parse API date format "9-23-2025 2:45AM" to JavaScript Date
 
 export default function Notification() {
   const { notifications, markAllAsRead, markAsRead } = useNotifications();
@@ -68,17 +55,19 @@ export default function Notification() {
   const isDark = resolvedTheme === "dark";
   const router = useRouter();
   const { userId } = useAuth();
+
   const [refreshing, setRefreshing] = useState(false);
   const [data, setData] = useState<NotificationItem[]>([]);
   const [readIds, setReadIds] = useState<string[]>([]);
   const [hiddenIds, setHiddenIds] = useState<string[]>([]);
   const [iconsReady, setIconsReady] = useState(false);
+  const [loading, setLoading] = useState(true);
+
   const PAGE_SIZE = 20;
   const [page, setPage] = useState(0);
   const loadingRef = useRef(false);
-  const ROW_HEIGHT = 88; // approximate constant row height for getItemLayout
+  const ROW_HEIGHT = 88;
 
-  // Scope storage keys by Clerk userId so each user has their own read/delete state
   const READ_IDS_KEY = useMemo(
     () => `notification_read_ids:${userId ?? "anon"}`,
     [userId]
@@ -93,8 +82,6 @@ export default function Notification() {
 
   const filterForUser = (items: any[]): NotificationItem[] => {
     if (!userId) return items as NotificationItem[];
-    // For broadcast notifications (admin notifications), they might not have user-specific IDs
-    // So we return all items if no user-specific filtering is needed
     const keys = [
       "subscriber_id",
       "subscriberId",
@@ -108,29 +95,18 @@ export default function Notification() {
     const hasAnyKey = items.some((it) =>
       keys.some((k) => it && typeof it === "object" && k in it)
     );
-    if (!hasAnyKey) return items as NotificationItem[]; // Return all for broadcast notifications
-
-    // For admin notifications, check if it's a broadcast by looking at the type/category
+    if (!hasAnyKey) return items as NotificationItem[];
     const isBroadcast = items.some((it) =>
-      it?.type === "admin_broadcast" ||
-      it?.category === "admin_broadcast" ||
-      it?.pushData?.type === "admin_broadcast" ||
-      it?.pushData?.type === "announcement"
+      ["admin_broadcast", "announcement"].includes(
+        it?.type || it?.category || it?.pushData?.type
+      )
     );
-
-    if (isBroadcast) {
-      // For broadcast notifications, return all items for all users
-      return items as NotificationItem[];
-    }
-
-    const filtered = items.filter((it) => {
-      // If it's a broadcast notification (no specific user ID), include it
+    if (isBroadcast) return items as NotificationItem[];
+    return items.filter((it) => {
       const hasUserKey = keys.some((k) => it?.[k] !== undefined);
       if (!hasUserKey) return true;
-      // Otherwise filter by user ID
       return keys.some((k) => it?.[k]?.toString?.() === userId?.toString());
-    });
-    return filtered as NotificationItem[];
+    }) as NotificationItem[];
   };
 
   const applyOverlays = (
@@ -141,14 +117,12 @@ export default function Notification() {
     const hiddenSet = new Set(opts?.hidden ?? hiddenIds);
     return items
       .filter((n) => !hiddenSet.has(getId(n)))
-      .map((n) => {
-        const id = getId(n);
-        return { ...n, read: n.read || readSet.has(id) } as NotificationItem;
-      });
+      .map(
+        (n) =>
+          ({ ...n, read: n.read || readSet.has(getId(n)) }) as NotificationItem
+      );
   };
 
-  const hasUnread = data.some((n) => !n.read);
-  // Safely mark an item as read in both local state and context
   const saveReadIds = async (ids: string[]) => {
     try {
       await AsyncStorage.setItem(READ_IDS_KEY, JSON.stringify(ids));
@@ -175,11 +149,8 @@ export default function Notification() {
     try {
       markAsRead(notificationId);
     } catch {}
-
-    // Best-effort: attempt to mark as read in Native Notify using Clerk userId as subscriber ID
     try {
       if (getNotificationInbox) {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const nn = require("native-notify");
         const candidates = [
           "handleRead",
@@ -188,32 +159,18 @@ export default function Notification() {
           "readNotificationInbox",
         ];
         const fn = candidates.map((k) => nn?.[k]).find(Boolean);
-        if (typeof fn === "function" && userId) {
-          await fn(
-            userId.toString(),
-            notificationId.toString(),
-            APP_ID,
-            APP_TOKEN
-          );
-        }
+        if (typeof fn === "function" && userId)
+          await fn(userId.toString(), idStr, APP_ID, APP_TOKEN);
       }
-    } catch (e) {
-      // silent fail; local overlay already applied
-    }
+    } catch {}
   };
 
-  // Locally delete an item from the inbox list
-  // If you later want to delete from the remote inbox (Native Notify),
-  // you can call the provider's delete endpoint here before updating state.
   const deleteItem = async (notificationId?: string) => {
     if (!notificationId) return;
     const idStr = notificationId.toString();
     setData((prev) => prev.filter((n) => getId(n) !== idStr));
-
-    // Try remote delete in Native Notify with Clerk userId as subscriber ID
     try {
       if (getNotificationInbox) {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const nn = require("native-notify");
         const candidates = [
           "handleDelete",
@@ -221,14 +178,10 @@ export default function Notification() {
           "removeNotificationInbox",
         ];
         const fn = candidates.map((k) => nn?.[k]).find(Boolean);
-        if (typeof fn === "function" && userId) {
+        if (typeof fn === "function" && userId)
           await fn(userId.toString(), idStr, APP_ID, APP_TOKEN);
-        }
       }
-    } catch (e) {
-      // ignore network/SDK errors; we still hide locally
-    }
-
+    } catch {}
     setHiddenIds((prev) => {
       if (prev.includes(idStr)) return prev;
       const next = [...prev, idStr];
@@ -245,67 +198,62 @@ export default function Notification() {
   }) => {
     if (loadingRef.current) return;
     loadingRef.current = true;
+    if (!opts?.append) setLoading(true); // Show loading only for initial load
     try {
       const currentPage = opts?.page ?? 0;
-      const response = getNotificationInbox ? await getNotificationInbox(
-        APP_ID,
-        APP_TOKEN,
-        PAGE_SIZE,
-        currentPage * PAGE_SIZE
-      ) : [];
-      // Handle the API response structure - it might be response.data or just response
+      const response = getNotificationInbox
+        ? await getNotificationInbox(
+            APP_ID,
+            APP_TOKEN,
+            PAGE_SIZE,
+            currentPage * PAGE_SIZE
+          )
+        : [];
       const notificationData = response?.data || response || [];
       const typedData: NotificationItem[] = Array.isArray(notificationData)
         ? notificationData.map((n: any) => {
             let imageUrl =
               n.image ?? n.image_url ?? n.photo ?? n.picture ?? n.bigPictureURL;
-
-            // Try to extract image from pushData if not found in direct fields
-            if (!imageUrl && n.pushData) {
+            let screenImageUrl = imageUrl,
+              routeUrl = undefined,
+              mediaType = "image",
+              videoUrl = undefined;
+            if (n.pushData) {
               try {
                 const pushData =
                   typeof n.pushData === "string"
                     ? JSON.parse(n.pushData)
                     : n.pushData;
-                imageUrl = pushData.image;
-              } catch (e) {
-                console.warn("Failed to parse pushData for image:", n.pushData);
-              }
-            }
-
-            console.log("Raw notification data:", JSON.stringify(n, null, 2));
-            console.log(
-              "Processing notification:",
-              n.title,
-              "Image URL:",
-              imageUrl
-            );
-
-            // Extract screenImage, route, and media info from pushData
-            let screenImageUrl = imageUrl;
-            let routeUrl = undefined;
-            let mediaType = "image";
-            let videoUrl = undefined;
-            if (n.pushData) {
-              try {
-                const pushData = typeof n.pushData === "string" ? JSON.parse(n.pushData) : n.pushData;
-                screenImageUrl = pushData.screenImage || pushData.image || imageUrl;
+                console.log("📦 Push data:", pushData);
+                screenImageUrl =
+                  pushData.screenImage || pushData.image || imageUrl;
                 routeUrl = pushData.route;
                 mediaType = pushData.mediaType || "image";
                 videoUrl = pushData.videoUrl;
-                console.log("Extracted from pushData - screenImage:", screenImageUrl, "route:", routeUrl, "mediaType:", mediaType, "videoUrl:", videoUrl);
-                console.log("Full pushData:", JSON.stringify(pushData, null, 2));
+
+                // Extract the real notification type from pushData if available
+                if (
+                  pushData.notificationType &&
+                  NOTIFICATION_TYPE_CONFIGS.hasOwnProperty(
+                    pushData.notificationType
+                  )
+                ) {
+                  n.type = pushData.notificationType;
+                  console.log(
+                    "🔄 Updated notification type from pushData:",
+                    n.type
+                  );
+                }
               } catch (e) {
-                console.warn("Failed to parse pushData:", n.pushData);
+                console.warn("Failed to parse pushData:", n.pushData, e);
               }
             }
-
             return {
               id: n.notification_id?.toString() || n.id?.toString(),
               notification_id: n.notification_id?.toString(),
               title: n.title,
               message: n.message,
-              type: n.category ?? n.type ?? "default",
+              type: n.category ?? n.type ?? "general",
               category: n.category ?? n.type,
               read: n.read ?? false,
               date: n.date ?? n.date_sent ?? new Date().toISOString(),
@@ -313,48 +261,40 @@ export default function Notification() {
               image: imageUrl,
               screenImage: screenImageUrl,
               route: routeUrl,
-              mediaType: mediaType,
-              videoUrl: videoUrl,
+              mediaType,
+              videoUrl,
             };
           })
         : [];
-
-      // For broadcast notifications (admin notifications), include all items
-      // For user-specific notifications, filter by user ID
       const scoped = filterForUser(typedData);
       const processed = applyOverlays(scoped, opts);
       setData((prev) => (opts?.append ? [...prev, ...processed] : processed));
       if (!opts?.append) {
-        setPage(1); // next page after initial load
-        // store raw page 0 in cache for instant re-open
+        setPage(1);
         inboxCache = {
           userId: userId ?? null,
           page0Raw: typedData,
           ts: Date.now(),
         };
-      } else {
-        setPage((p) => p + 1);
-      }
+      } else setPage((p) => p + 1);
     } catch (error) {
       console.error("Error fetching notifications:", error);
-      if (!opts?.append) setData([] as NotificationItem[]);
+      if (!opts?.append) setData([]);
     } finally {
       loadingRef.current = false;
+      if (!opts?.append) setLoading(false); // Hide loading after initial load completes
     }
   };
 
-  // Defer icons to after interactions to minimize mount jank
   useEffect(() => {
     const task = InteractionManager.runAfterInteractions(() =>
       setIconsReady(true)
     );
     return () => {
-      // @ts-ignore: cancel might not exist on web
       if ((task as any)?.cancel) (task as any).cancel();
     };
   }, []);
 
-  // Load local read/delete overlays from storage per user, then fetch inbox
   useEffect(() => {
     (async () => {
       try {
@@ -366,7 +306,6 @@ export default function Notification() {
         const hidden = storedHidden ? JSON.parse(storedHidden) : [];
         setReadIds(read);
         setHiddenIds(hidden);
-        // Use cache if fresh (< 2 minutes) and user matches
         const fresh =
           inboxCache &&
           inboxCache.userId === (userId ?? null) &&
@@ -375,9 +314,7 @@ export default function Notification() {
           const scoped = filterForUser(inboxCache!.page0Raw);
           setData(applyOverlays(scoped, { read, hidden }));
           setPage(1);
-        } else {
-          await notiser({ read, hidden, page: 0, append: false });
-        }
+        } else await notiser({ read, hidden, page: 0, append: false });
       } catch {
         setReadIds([]);
         setHiddenIds([]);
@@ -385,59 +322,69 @@ export default function Notification() {
       }
     })();
   }, [READ_IDS_KEY, HIDDEN_IDS_KEY, userId]);
-  const notificationConfig: Record<
-    string,
-    { icon: keyof typeof Ionicons.glyphMap; color: string }
-  > = {
-    message: { icon: "chatbubble-ellipses-outline", color: "#3B82F6" },
-    booking: { icon: "calendar-outline", color: "#8B5CF6" },
-    warning: { icon: "warning-outline", color: "#F59E0B" },
-    info: { icon: "information-circle-outline", color: "#0EA5E9" },
-    success: { icon: "checkmark-circle-outline", color: "#10B981" },
-    error: { icon: "close-circle-outline", color: "#EF4444" },
-    offer: { icon: "pricetag-outline", color: "#F472B6" },
-    delivery: { icon: "cube-outline", color: "#FBBF24" },
-    service: { icon: "construct-outline", color: "#60A5FA" },
-    security: { icon: "lock-closed-outline", color: "#F97316" },
-    review: { icon: "star-outline", color: "#14B8A6" },
-    system: { icon: "settings-outline", color: "#A78BFA" },
-    update: { icon: "refresh-outline", color: "#06B6D4" },
-    announcement: { icon: "megaphone-outline", color: "#F59E0B" },
-    maintenance: { icon: "construct-outline", color: "#EF4444" },
-    promotion: { icon: "pricetag-outline", color: "#EC4899" },
-    general: { icon: "notifications-outline", color: "#3B82F6" },
-    default: { icon: "notifications-outline", color: "#3B82F6" },
+
+  // Reusable function for icons
+  const resolveIcon = (item: NotificationItem) => {
+    let type: NotificationType = "general";
+
+    // Priority: route-based detection (announcements), then type field, then category field
+    if (item.route?.includes("announcements")) {
+      type = "announcement";
+    } else if (
+      item.type &&
+      NOTIFICATION_TYPE_CONFIGS.hasOwnProperty(item.type)
+    ) {
+      type = item.type as NotificationType;
+    } else if (
+      item.category &&
+      NOTIFICATION_TYPE_CONFIGS.hasOwnProperty(item.category)
+    ) {
+      type = item.category as NotificationType;
+    }
+
+    // For admin notifications, check if we can determine the real type from pushData
+    if (
+      type === "general" &&
+      (item.type === ("admin_broadcast" as any) ||
+        item.category === ("admin_broadcast" as any))
+    ) {
+      // Admin broadcasts might have the real type in pushData
+      console.log(
+        "Admin broadcast detected, checking for real notification type"
+      );
+    }
+
+    console.log("🎨 Icon resolution for:", item.title, {
+      route: item.route,
+      itemType: item.type,
+      itemCategory: item.category,
+      resolvedType: type,
+      hasConfig: NOTIFICATION_TYPE_CONFIGS.hasOwnProperty(type),
+    });
+
+    const { icon, color } = NOTIFICATION_TYPE_CONFIGS[type];
+    return { icon, color };
   };
 
   const renderItem = useCallback(
     ({ item, index }: { item: NotificationItem; index: number }) => {
-      // Determine notification type - check pushData first, then item properties
-      let notificationType = "general";
-      if (item.route?.includes("announcements")) {
-        notificationType = "announcement";
-      } else if (item.type) {
-        notificationType = item.type;
-      } else if (item.category) {
-        notificationType = item.category;
-      }
-
-      const { icon, color } =
-        notificationConfig[notificationType] ||
-        notificationConfig.default;
-
+      const { icon, color } = resolveIcon(item);
+      console.log(
+        "🎨 Rendering notification:",
+        item.title,
+        "with icon:",
+        icon,
+        "color:",
+        color
+      );
       const handlePress = () => {
-        if (!item.read) {
-          const notificationId = item.id || item.notification_id;
-          if (notificationId) {
-            markItemAsRead(notificationId);
-          }
-        }
-
-        // Navigate to route if specified (for announcements)
-        if (item.route) {
-          console.log("Navigating to route:", item.route);
-          router.push(item.route as any);
-        }
+        if (!item.read) markItemAsRead(item.id || item.notification_id);
+        if (item.route)
+          router.push(
+            typeof item.route === "string"
+              ? item.route
+              : (String(item.route) as any)
+          );
       };
 
       return (
@@ -447,20 +394,22 @@ export default function Notification() {
           exiting={FadeOutDown}
           className="flex-row items-start gap-3 py-2 my-2"
           style={{
-            borderBottomWidth: index < data.length - 1 ? 1 : 0,
-            borderBottomColor: isDark ? "#374151" : "#e5e7eb",
+            borderBottomWidth: index < data.length - 1 ? 0.5 : 0,
+            borderBottomColor: isDark
+              ? "rgba(255,255,255,0.1)"
+              : "rgba(0,0,0,0.1)",
           }}
         >
           <TouchableOpacity
-            className="flex-1 flex-row items-start p-2 "
+            className="flex-1 flex-row items-start p-2"
             onPress={handlePress}
             onLongPress={() => deleteItem(item.id || item.notification_id)}
             delayLongPress={300}
           >
             {iconsReady ? (
               <Ionicons
-                name={icon}
-                size={22}
+                name={icon as keyof typeof Ionicons.glyphMap}
+                size={20}
                 color={item.read ? "#A3A3A3" : color}
                 style={{ marginRight: 12, marginTop: 12 }}
               />
@@ -476,106 +425,73 @@ export default function Notification() {
             )}
             <View className="flex-1 mx-1 my-3">
               <AutoText
-                className={`text-sm font-bold capitalize my-1 ${
-                  isDark ? "text-white" : "text-gray-900"
-                }`}
+                className={`text-sm font-bold capitalize my-1 ${isDark ? "text-white" : "text-gray-900"}`}
               >
                 {item.title || "No Title"}
               </AutoText>
               <AutoText
-                className={`text-xs mt-1 ${
-                  isDark ? "text-gray-300" : "text-gray-600"
-                }`}
+                className={`text-xs mt-1 ${isDark ? "text-gray-300" : "text-gray-600"}`}
               >
                 {item.message || "No Message"}
               </AutoText>
               <TranslatableDateText
                 dateString={item.date || item.date_sent}
-                className={`text-[9px] mt-3 ${
-                  isDark ? "text-gray-400" : "text-gray-500"
-                }`}
+                className={`text-[9px] mt-3 ${isDark ? "text-gray-400" : "text-gray-500"}`}
               />
             </View>
           </TouchableOpacity>
-
-          <View className="flex-row items-start mt-3 ">
-            {/* Display image/video preview for announcements */}
-            {((item.screenImage && item.screenImage.trim() !== "") ||
-              (item.image && item.image.trim() !== "") ||
-              (item.videoUrl && item.videoUrl.trim() !== "")) && (
-              <View className="relative">
-                {/* For videos, show the actual video playing */}
-                {item.mediaType === "video" && item.videoUrl ? (
-                  <View
-                    style={{
-                      width: 70,
-                      height: 70,
-                      borderRadius: 8,
-                      borderWidth: 1,
-                      borderColor: isDark ? "#374151" : "#e5e7eb",
-                      overflow: "hidden",
-                    }}
-                  >
-                    <VideoPlayer
-                      uri={item.videoUrl}
-                      muted={true}
-                      aspectRatio={1} // Square aspect ratio for thumbnail
-                    />
-                  </View>
-                ) : item.mediaType === "video" ? (
-                  /* Fallback for videos without URL: show video icon */
-                  <View
-                    style={{
-                       width: 70,
-                      height: 70,
-                      borderRadius: 8,
-                      borderWidth: 1,
-                      borderColor: isDark ? "#374151" : "#e5e7eb",
-                      backgroundColor: isDark ? "#1f2937" : "#f9fafb",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Ionicons
-                      name="videocam"
-                      size={24}
-                      color={isDark ? "#9ca3af" : "#6b7280"}
-                    />
-                  </View>
-                ) : (
-                  /* For images, show the image directly */
-                  <Image
-                    source={{
-                      uri: item.screenImage || item.image
-                    }}
-                    style={{
-                      width: 60,
-                      height: 60,
-                      borderRadius: 8,
-                      resizeMode: "cover",
-                      borderWidth: 1,
-                      borderColor: isDark ? "#374151" : "#e5e7eb",
-                    }}
-                    onLoadStart={() => console.log("Loading notification image:", item.screenImage || item.image)}
-                    onLoad={() =>
-                      console.log("Image loaded successfully:", item.screenImage || item.image)
-                    }
-                    onError={(error) => {
-                      console.warn(
-                        "Failed to load notification image:",
-                        item.screenImage || item.image,
-                        error
-                      );
-                    }}
+          {(item.screenImage || item.image || item.videoUrl) && (
+            <View className="relative">
+              {item.mediaType === "video" && item.videoUrl ? (
+                <View
+                  style={{
+                    width: 70,
+                    height: 70,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: isDark ? "#374151" : "#e5e7eb",
+                    overflow: "hidden",
+                  }}
+                >
+                  <VideoPlayer uri={item.videoUrl} muted aspectRatio={1} />
+                </View>
+              ) : item.mediaType === "video" ? (
+                <View
+                  style={{
+                    width: 70,
+                    height: 70,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: isDark ? "#374151" : "#e5e7eb",
+                    backgroundColor: isDark ? "#1f2937" : "#f9fafb",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Ionicons
+                    name="videocam"
+                    size={24}
+                    color={isDark ? "#9ca3af" : "#6b7280"}
                   />
-                )}
-              </View>
-            )}
-          </View>
+                </View>
+              ) : (
+                <Image
+                  source={{ uri: item.screenImage || item.image }}
+                  style={{
+                    width: 60,
+                    height: 60,
+                    borderRadius: 8,
+                    resizeMode: "cover",
+                    borderWidth: 1,
+                    borderColor: isDark ? "#374151" : "#e5e7eb",
+                  }}
+                />
+              )}
+            </View>
+          )}
           <TouchableOpacity
             accessibilityLabel="Delete notification"
             onPress={() => deleteItem(item.id || item.notification_id)}
-            className=""
           >
             <Ionicons
               name="trash-outline"
@@ -586,7 +502,7 @@ export default function Notification() {
         </Animated.View>
       );
     },
-    [isDark, markItemAsRead, deleteItem, data.length]
+    [iconsReady, isDark, data.length]
   );
 
   const keyExtractor = useCallback(
@@ -604,19 +520,21 @@ export default function Notification() {
 
   const onRefresh = async () => {
     setRefreshing(true);
+    setLoading(true); // Show loading during refresh
     await notiser({ page: 0, append: false });
     setRefreshing(false);
+    setLoading(false); // Hide loading after refresh
     showAlert("Uppdaterad", "Notifikationerna har uppdaterats");
-  };
-
-  const markLastNotification = () => {
-    if (notifications.length === 0) return;
-    const lastId = notifications[notifications.length - 1].id;
-    if (lastId) {
-      markAsRead(lastId);
+    if (unreadCount > 0) {
+      syncNativeNotifyInbox();
     }
   };
-
+  const hasUnread = data.some((n) => !n.read);
+  useEffect(() => {
+    if (unreadCount > 0) {
+      syncNativeNotifyInbox();
+    }
+  }, [unreadCount, syncNativeNotifyInbox]);
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
       <View className="px-6 py-4 relative">
@@ -632,16 +550,12 @@ export default function Notification() {
         </TouchableOpacity>
         <View className="items-center">
           <AutoText
-            className={`text-2xl font-bold mt-1 ${
-              isDark ? "text-white" : "text-gray-900"
-            }`}
+            className={`text-2xl font-bold mt-1 ${isDark ? "text-white" : "text-gray-900"}`}
           >
             Notifikationer
           </AutoText>
           <AutoText
-            className={`text-center text-sm mt-5 mb-2 ${
-              isDark ? "text-gray-400" : "text-gray-600"
-            }`}
+            className={`text-center text-sm mt-5 mb-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}
           >
             Här hittar du alla dina senaste aviseringar
           </AutoText>
@@ -650,7 +564,6 @@ export default function Notification() {
           {hasUnread && (
             <TouchableOpacity
               onPress={() => {
-                // Mark all as read locally and in context
                 const allIds = Array.from(
                   new Set([...readIds, ...data.map((n) => getId(n))])
                 );
@@ -670,7 +583,19 @@ export default function Notification() {
       </View>
 
       <View className="flex-1 px-6 mt-5">
-        {data.length === 0 && notifications.length === 0 ? (
+        {loading ? (
+          <View className="flex-1 justify-center items-center">
+            <ActivityIndicator
+              size="small"
+              color={isDark ? "#9CA3AF" : "#6B7280"}
+            />
+            <AutoText
+              className={`mt-4 text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}
+            >
+              Laddar notifikationer...
+            </AutoText>
+          </View>
+        ) : data.length === 0 && notifications.length === 0 ? (
           <View className="flex-1 justify-center items-center">
             <Ionicons
               name="notifications-off-outline"
@@ -678,16 +603,12 @@ export default function Notification() {
               color={isDark ? "#6B7280" : "#9CA3AF"}
             />
             <AutoText
-              className={`mt-4 text-lg font-medium ${
-                isDark ? "text-gray-300" : "text-gray-700"
-              }`}
+              className={`mt-4 text-lg font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}
             >
               Inga notifikationer
             </AutoText>
             <AutoText
-              className={`mt-2 text-sm text-center px-8 ${
-                isDark ? "text-gray-400" : "text-gray-500"
-              }`}
+              className={`mt-2 text-sm text-center px-8 ${isDark ? "text-gray-400" : "text-gray-500"}`}
             >
               Du har inga notifikationer just nu. Kom tillbaka senare för att se
               nya uppdateringar.
@@ -708,13 +629,10 @@ export default function Notification() {
             removeClippedSubviews
             getItemLayout={getItemLayout}
             onEndReachedThreshold={0.3}
-            onEndReached={() => {
-              notiser({ page, append: true });
-            }}
+            onEndReached={() => notiser({ page, append: true })}
           />
         )}
       </View>
-
       <StatusBar style={isDark ? "light" : "dark"} />
     </SafeAreaView>
   );
