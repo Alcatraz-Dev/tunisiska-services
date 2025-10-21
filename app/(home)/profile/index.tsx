@@ -534,11 +534,15 @@ const Profile = () => {
                   text: "Dela appen",
                   href: "/profile/sheare-app",
                 },
-                ...(userProfile?.isAdmin ? [{
-                  icon: icons.bell,
-                  text: "Skicka Notifikationer",
-                  href: "/profile/admin-notifications",
-                }] : []),
+                ...(userProfile?.isAdmin
+                  ? [
+                      {
+                        icon: icons.bell,
+                        text: "Skicka Notifikationer",
+                        href: "/profile/admin-notifications",
+                      },
+                    ]
+                  : []),
               ].map((item, index) => (
                 <TouchableOpacity
                   onPress={() =>
@@ -598,7 +602,7 @@ const Profile = () => {
               {/* Theme Toggle */}
               <ThemeToggle />
               {/* Driver Mode Toggle */}
-              <DriverToggle isDark={isDark} />
+              {userProfile?.isDriver && <DriverToggle isDark={isDark} />}
             </View>
           </View>
           {/* Support */}

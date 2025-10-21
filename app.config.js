@@ -77,7 +77,7 @@ module.exports = {
       ],
       config: {
         googleMaps: {
-          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY_HERE"
+          "apiKey": "AIzaSyD15X03HjphQz3p4GLrooYrIKsBxcxW4s0"
         }
       },
     },
@@ -173,7 +173,7 @@ module.exports = {
         ? process.env.EXPO_PUBLIC_SERVER_URL || 'http://localhost:3000'
         : 'https://tunisiska-services-app.expo.app',
       // Add server configuration for real devices
-      serverUrl: process.env.NODE_ENV === 'development' ? process.env.EXPO_PUBLIC_SERVER_URL || 'http://192.168.8.116:3000' : 'https://tunisiska-services-app.expo.app',
+      serverUrl: process.env.NODE_ENV === 'development' ? process.env.EXPO_PUBLIC_SERVER_URL || 'http://localhost:3000' : 'https://tunisiska-services-app.expo.app',
     },
     runtimeVersion: {
       policy: 'appVersion'

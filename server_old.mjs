@@ -9,12 +9,7 @@ dotenv.config();
 const app = express();
 
 const PORT = process.env.PORT || 3000;
-// ⚠️ Use server-side secret key (not EXPO_PUBLIC)
-const STRIPE_SECRET_KEY = process.env.EXPO_PUBLIC_STRIPE_SECRET_KEY;
-if (!STRIPE_SECRET_KEY) {
-  console.error("❌ STRIPE_SECRET_KEY is missing in .env");
-  process.exit(1);
-}
+const STRIPE_SECRET_KEY = process.env.EXPO_PUBLIC_STRIPE_SECRET_KEY || "sk_test_dummy";
 
 console.log("🔄 Starting Stripe Payment Server...");
 
@@ -67,19 +62,19 @@ app.post("/api/update-user-points", async (req, res) => {
 
     // Get recipient's current data
     const recipientUser = await clerkClient.users.getUser(userId);
-    const recipientCurrentPoints = (recipientUser.unsafeMetadata)?.points || 0;
+    const recipientCurrentPoints = (recipientUser.unsafeMetadata )?.points || 0;
     const recipientNewPoints = recipientCurrentPoints + pointsToAdd;
 
     // Update recipient's points
     await clerkClient.users.updateUser(userId, {
       unsafeMetadata: {
-        ...(recipientUser.unsafeMetadata),
+        ...(recipientUser.unsafeMetadata ),
         points: recipientNewPoints,
       }
     });
 
     // Add transaction record for recipient
-    const recipientTransactions = (recipientUser.unsafeMetadata)?.transactions || [];
+    const recipientTransactions = (recipientUser.unsafeMetadata )?.transactions || [];
     recipientTransactions.unshift({
       id: `received_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       type: "earned",
@@ -93,7 +88,7 @@ app.post("/api/update-user-points", async (req, res) => {
 
     await clerkClient.users.updateUser(userId, {
       unsafeMetadata: {
-        ...(recipientUser.unsafeMetadata),
+        ...(recipientUser.unsafeMetadata ),
         transactions: limitedTransactions,
       }
     });
@@ -102,19 +97,19 @@ app.post("/api/update-user-points", async (req, res) => {
     if (senderId && pointsToAdd > 0) {
       try {
         const senderUser = await clerkClient.users.getUser(senderId);
-        const senderCurrentPoints = (senderUser.unsafeMetadata)?.points || 0;
+        const senderCurrentPoints = (senderUser.unsafeMetadata )?.points || 0;
         const senderNewPoints = senderCurrentPoints - pointsToAdd;
 
         // Update sender's points
         await clerkClient.users.updateUser(senderId, {
           unsafeMetadata: {
-            ...(senderUser.unsafeMetadata),
+            ...(senderUser.unsafeMetadata ),
             points: senderNewPoints,
           }
         });
 
         // Add transaction record for sender
-        const senderTransactions = (senderUser.unsafeMetadata)?.transactions || [];
+        const senderTransactions = (senderUser.unsafeMetadata )?.transactions || [];
         senderTransactions.unshift({
           id: `transfer_sent_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           type: "spent",
@@ -128,7 +123,7 @@ app.post("/api/update-user-points", async (req, res) => {
 
         await clerkClient.users.updateUser(senderId, {
           unsafeMetadata: {
-            ...(senderUser.unsafeMetadata),
+            ...(senderUser.unsafeMetadata ),
             transactions: limitedSenderTransactions,
           }
         });
@@ -289,106 +284,6 @@ app.post("/create-checkout-session", async (req, res) => {
   } catch (err) {
     console.error("❌ [SERVER] Checkout session error:", err);
     res.status(500).json({ error: err.message });
-  }
-});
-
-// Expo Push Notification helper
-import pkg from 'expo-server-sdk';
-const { Expo, ExpoPushMessage, ExpoPushToken } = pkg;
-
-// Initialize Expo SDK
-const expo = new Expo();
-
-// API endpoint for sending Expo push notifications with images
-app.post("/api/send-expo-notification", async (req, res) => {
-  try {
-    const { expoPushToken, title, message, image, data } = req.body;
-
-    if (!expoPushToken || !title || !message) {
-      return res.status(400).json({
-        error: 'Missing required fields: expoPushToken, title, message'
-      });
-    }
-
-    // Check if the token is valid
-    if (!Expo.isExpoPushToken(expoPushToken)) {
-      return res.status(400).json({
-        error: 'Invalid Expo push token'
-      });
-    }
-
-    // Create the notification message
-    const notificationMessage = {
-      to: expoPushToken,
-      sound: 'default',
-      title: title,
-      body: message,
-      data: data || {},
-      // Add image support for Expo Go
-      ...(image && { image: image }),
-    };
-
-    console.log('📤 Sending Expo notification:', {
-      token: expoPushToken.substring(0, 20) + '...',
-      title,
-      message,
-      hasImage: !!image,
-      image: image ? image.substring(0, 50) + '...' : null
-    });
-
-    // Send the notification
-    const chunks = expo.chunkPushNotifications([notificationMessage]);
-    const tickets = [];
-
-    for (let chunk of chunks) {
-      try {
-        const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
-        tickets.push(...ticketChunk);
-        console.log('✅ Notification chunk sent successfully');
-      } catch (error) {
-        console.error('❌ Error sending notification chunk:', error);
-        return res.status(500).json({
-          error: 'Failed to send notification',
-          details: error.message
-        });
-      }
-    }
-
-    // Check for any errors in the tickets
-    const errors = [];
-    for (let ticket of tickets) {
-      if (ticket.status === 'error') {
-        errors.push({
-          token: expoPushToken,
-          message: ticket.message,
-          details: ticket.details
-        });
-      }
-    }
-
-    if (errors.length > 0) {
-      console.warn('⚠️ Some notifications failed:', errors);
-      return res.status(207).json({
-        success: false,
-        message: 'Some notifications failed to send',
-        errors,
-        tickets
-      });
-    }
-
-    console.log('✅ All notifications sent successfully');
-    res.json({
-      success: true,
-      message: 'Notification sent successfully',
-      tickets
-    });
-
-  } catch (error) {
-    console.error('❌ Error in send-expo-notification endpoint:', error);
-    res.status(500).json({
-      error: 'Internal server error',
-      details: error.message
-    });
   }
 });
 

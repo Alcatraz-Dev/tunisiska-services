@@ -58,8 +58,8 @@ function WaveTabBar() {
       icon: ({ focused }) => (
         <View
           style={{
-            width: 36,
-            height: 36,
+            width: focused ? 50 : 36,
+            height: focused ? 50 : 36,
             marginTop: focused ? 4 : 16, // Adjusted space from top of bar
             marginBottom: 4, // Space between icon and title
           }}
@@ -68,9 +68,9 @@ function WaveTabBar() {
             <Image
               source={{ uri: user.imageUrl }}
               style={{
-                width: 36,
-                height: 36,
-                borderRadius: 18,
+                width: focused ? 50 : 36,
+                height: focused ? 50 : 36,
+                borderRadius: focused ? 25 : 18,
                 borderWidth: focused ? 0 : 1,
                 borderColor: focused ? ACTIVE_COLOR : INACTIVE_COLOR,
               }}
@@ -80,8 +80,8 @@ function WaveTabBar() {
             <Image
               source={icons.person}
               style={{
-                width: 36,
-                height: 36,
+                width: focused ? 50 : 36,
+                height: focused ? 50 : 36,
                 tintColor: focused ? ACTIVE_COLOR : INACTIVE_COLOR,
               }}
               resizeMode="contain"

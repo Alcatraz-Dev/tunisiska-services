@@ -9,12 +9,7 @@ dotenv.config();
 const app = express();
 
 const PORT = process.env.PORT || 3000;
-// ⚠️ Use server-side secret key (not EXPO_PUBLIC)
-const STRIPE_SECRET_KEY = process.env.EXPO_PUBLIC_STRIPE_SECRET_KEY;
-if (!STRIPE_SECRET_KEY) {
-  console.error("❌ STRIPE_SECRET_KEY is missing in .env");
-  process.exit(1);
-}
+const STRIPE_SECRET_KEY = process.env.EXPO_PUBLIC_STRIPE_SECRET_KEY || "sk_test_dummy";
 
 console.log("🔄 Starting Stripe Payment Server...");
 
@@ -293,8 +288,7 @@ app.post("/create-checkout-session", async (req, res) => {
 });
 
 // Expo Push Notification helper
-import pkg from 'expo-server-sdk';
-const { Expo, ExpoPushMessage, ExpoPushToken } = pkg;
+import { Expo, ExpoPushMessage, ExpoPushToken } from 'expo-server-sdk';
 
 // Initialize Expo SDK
 const expo = new Expo();
@@ -415,4 +409,27 @@ if (process.env.NODE_ENV !== 'production') {
       process.exit(0);
     });
   });
+}
+// Example code to send a push notification with an image using Expo SDK
+let imageUrl = (notification.request.content.data)?.image;
+if (!imageUrl && pushData) {
+  imageUrl = pushData.image;
+}
+const notificationMessage = {
+  to: expoPushToken,
+  sound: 'default',
+  title: title,
+  body: message,
+  data: data || {},
+  ...(image && { image: image }),
+};
+
+let chunks = expo.chunkPushNotifications(notificationMessage);
+for (let chunk of chunks) {
+  try {
+    let receipts = await expo.sendPushNotificationsAsync(chunk);
+    console.log(receipts);
+  } catch (error) {
+    console.error(error);
+  }
 }

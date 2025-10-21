@@ -51,32 +51,22 @@ export default function PaymentStripeJS({
       setLoading(true);
 
       // Create checkout session on your server
-      const serverUrl = "http://localhost:3000";
+      const serverUrl =
+        process.env.EXPO_PUBLIC_SERVER_URL || "http://localhost:3000";
       const response = await fetch(`${serverUrl}/create-checkout-session`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          amount: Math.round(amount * 100), // Convert to cents
+          amount: amount , // Convert to cents
           currency: "sek",
-          points: points || Math.round(amount * 10),
+          points: points || amount ,
         }),
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("❌ [PAYMENT] Server error details:", errorText);
-        console.error("❌ [PAYMENT] Response status:", response.status);
-        console.error("❌ [PAYMENT] Response statusText:", response.statusText);
-        console.error("❌ [PAYMENT] Request URL:", `${serverUrl}/create-checkout-session`);
-        console.error("❌ [PAYMENT] Request body:", JSON.stringify({
-          amount: Math.round(amount * 100),
-          currency: "sek",
-          points: points || Math.round(amount * 10),
-        }));
-        showAlert("Server Error", `Status: ${response.status}\nDetails: ${errorText}`);
-        return;
+        throw new Error("Failed to create checkout session");
       }
 
       const data = await response.json();
