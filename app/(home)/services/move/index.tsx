@@ -699,7 +699,7 @@ export default function Move() {
               isDark={isDark}
               service="Flytt"
               customText={`Betala ${getFinalPrice()} SEK för Flytt`}
-              customClassName="mb-10 text-lg font-semibold"
+             
               customStyle={{
                 backgroundColor: isDark ? "#1e1e1e" : "#ffffff",
                 borderWidth: 1,
@@ -716,7 +716,7 @@ export default function Move() {
               onPress={() => createMoveOrder()}
               disabled={isLoading || !customerName.trim() || !customerPhone.trim() || !pickup.trim() || !dropoff.trim() || !numPersons.trim() || parseInt(numPersons) < 1 || !numItems.trim() || parseInt(numItems) < 1 || selectedCategories.length === 0}
             >
-              <AutoText className="text-white font-semibold text-lg">
+              <AutoText className="text-center mt-2  text-white font-semibold text-base">
                 {isLoading ? "Skapar beställning..." : 'Bekräfta flyttbokning'}
               </AutoText>
             </TouchableOpacity>
@@ -728,7 +728,7 @@ export default function Move() {
               size={16}
               color={isDark ? "#9CA3AF" : "#6B7280"}
             />
-            <AutoText className={`text-sm ml-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+            <AutoText className={`text-xs text-center ml-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
               Säker betalning • 24/7 support • Professionella flyttare
             </AutoText>
           </View>

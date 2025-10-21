@@ -53,7 +53,7 @@ export default function PaymentStripeJS({
       setLoading(true);
 
       // Create checkout session on your server
-      const serverUrl = getServerURL();
+      const serverUrl = await getServerURL();
         // process.env.EXPO_PUBLIC_SERVER_URL || "http://localhost:3000";
       const response = await fetch(`${serverUrl}/create-checkout-session`, {
         method: "POST",

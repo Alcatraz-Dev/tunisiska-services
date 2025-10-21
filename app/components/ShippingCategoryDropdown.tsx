@@ -73,6 +73,7 @@ export default function ShippingCategoryCheckbox({
             <TouchableOpacity
               key={item}
               onPress={() => toggleCategory(item)}
+            
               className="p-4 flex-row items-center justify-between border-b border-gray-200"
             >
               <AutoText className={`${isDark ? "text-white" : "text-black"}`}>

@@ -220,21 +220,17 @@ export default function PaymentStripeJS({
                 ? "#1e1e1e"
                 : "#f3f4f6"
               : !isWallet
-                ? isDark
-                  ? "#2563EB" // Blue for wallet dark mode
-                  : "#3B82F6" // Blue for wallet light mode
-                : "#d1d5db", // Gray for services
+                ? "#3B82F6" // Blue for services
+                : "#d1d5db", // Gray for wallet
           },
           customStyle,
         ]}
       >
         {loading ? (
           <View
-            className={`w-full rounded-2xl ${
+            className={`w-full rounded-2xl  ${
               !isWallet
-                ? isDark
-                  ? "bg-blue-600" // Blue background for wallet loading
-                  : "bg-blue-500"
+                ? "bg-blue-500"
                 : isDark
                 ? "bg-dark-card"
                 : "bg-light-card"
@@ -266,10 +262,8 @@ export default function PaymentStripeJS({
           <View
             className={`w-full rounded-2xl ${
               !isWallet
-                ? isDark 
-                  ? "bg-blue-600" // Blue background for wallet
-                  : "bg-blue-500"
-                : isDark 
+                ? "bg-blue-500"
+                : isDark
                 ? "bg-dark-card"
                 : "bg-light-card"
             } py-5`}
@@ -286,7 +280,7 @@ export default function PaymentStripeJS({
             {customText ? (
               <AutoText
                 className={` text-center mt-2 ${
-                  !isWallet ? "text-white font-bold text-sm" : isDark ? "text-white text-xs font-semibold" : "text-black text-xs font-semibold"
+                  !isWallet ? "text-white font-semibold text-[13px] " : isDark ? "text-white text-xs font-semibold" : "text-black text-xs font-semibold"
                 }`}
                 style={{ letterSpacing: 0.5 }}
               >
@@ -296,7 +290,7 @@ export default function PaymentStripeJS({
               <>
                 <AutoText
                   className={`text-xs font-medium text-center mt-2 ${
-                    !isWallet ? "text-white font-bold text-sm" : isDark ? "text-white text-xs font-medium " : "text-black text-xs font-medium "
+                    !isWallet ? "text-white font-semibold text-[13px]  " : isDark ? "text-white text-xs font-medium " : "text-black text-xs font-medium "
                   }`}
                   style={{ letterSpacing: 0.5 }}
                 >
@@ -304,7 +298,7 @@ export default function PaymentStripeJS({
                 </AutoText>
                 <AutoText
                   className={`text-center mt-2 ${
-                    !isWallet ? "text-white  font-bold text-sm" : isDark ? "text-white text-xs font-semibold " : "text-black text-xs font-semibold "
+                    !isWallet ? "text-white font-semibold text-[13px] " : isDark ? "text-white text-xs font-semibold " : "text-black text-xs font-semibold "
                   }`}
                   style={{ letterSpacing: 0.5 }}
                 >

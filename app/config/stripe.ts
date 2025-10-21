@@ -73,7 +73,7 @@ export const checkServerHealth = async (url: string): Promise<boolean> => {
 
 // Get the best available server URL
 export const getBestServerURL = async (): Promise<string> => {
-  const primaryUrl = getServerURL();
+  const primaryUrl = await getServerURL();
 
   // Check if primary URL is reachable
   if (await checkServerHealth(primaryUrl)) {

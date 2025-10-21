@@ -978,9 +978,7 @@ export default function MoveCleaning() {
               isDark={isDark}
               service="Flytt & Städning"
               customText={`Betala ${getFinalPrice()} SEK för Flytt & Städning`}
-              customClassName={`w-full rounded-xl p-4 items-center ${
-                isDark ? "bg-dark-card" : "bg-light-card"
-              }`}
+           
               customStyle={{
                 backgroundColor: isDark ? "#1e1e1e" : "#ffffff",
                 borderWidth: 1,
@@ -997,7 +995,7 @@ export default function MoveCleaning() {
               onPress={createMoveCleaningOrder}
               disabled={isLoading || !customerName.trim() || !customerPhone.trim() || !pickup.trim() || !dropoff.trim() || !numPersons.trim() || parseInt(numPersons) < 1 || !numItems.trim() || parseInt(numItems) < 1 || selectedCategories.length === 0 || cleaningAreas.length === 0}
             >
-              <AutoText className="text-white font-semibold text-lg">
+               <AutoText className="text-center mt-2  text-white font-semibold text-base">
                 {isLoading ? "Skapar beställning..." : 'Bekräfta flytt & städning'}
               </AutoText>
             </TouchableOpacity>
@@ -1009,7 +1007,7 @@ export default function MoveCleaning() {
               size={16}
               color={isDark ? "#9CA3AF" : "#6B7280"}
             />
-            <AutoText className={`text-sm ml-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+            <AutoText className={`text-xs ml-2 text-center  ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
               Säker betalning • 24/7 support • Professionella flyttare & städare
             </AutoText>
           </View>

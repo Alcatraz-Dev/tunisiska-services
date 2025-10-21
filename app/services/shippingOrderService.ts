@@ -63,8 +63,7 @@ export class ShippingOrderService {
 
       // Update shipping schedule capacity
       if (orderData.scheduledDateTime) {
-        const scheduleDate = new Date(orderData.scheduledDateTime).toISOString().split('T')[0];
-        await this.updateShippingScheduleCapacity(scheduleDate, orderData.packageDetails.weight);
+        await this.updateShippingScheduleCapacity(orderData.scheduledDateTime, orderData.packageDetails.weight);
       }
 
       return { success: true, order: result };
@@ -78,30 +77,60 @@ export class ShippingOrderService {
   }
 
   // Update shipping schedule capacity when order is created
-  static async updateShippingScheduleCapacity(scheduleDate: string, weightUsed: number): Promise<void> {
+  static async updateShippingScheduleCapacity(scheduledDateTime: string, weightUsed: number): Promise<void> {
     try {
-      console.log('📦 Updating shipping schedule capacity for date:', scheduleDate, 'weight used:', weightUsed);
+      console.log('📦 Updating shipping schedule capacity for datetime:', scheduledDateTime, 'weight used:', weightUsed);
 
-      // Find available schedules for the date
+      // Parse the scheduled date and time
+      const scheduledDate = new Date(scheduledDateTime);
+      const scheduleDate = scheduledDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+      const scheduleTime = scheduledDate.toTimeString().split(' ')[0]; // HH:MM:SS format
+
+      console.log('📦 Looking for schedule on date:', scheduleDate, 'around time:', scheduleTime);
+
+      // Find available schedules for the date and time
       const schedules = await client.fetch(
         `*[_type == "shippingSchedule" && date == $scheduleDate && status == "available"]`,
         { scheduleDate }
       );
 
+      console.log('📦 Found', schedules.length, 'available schedules for date:', scheduleDate);
+
       if (schedules.length > 0) {
-        // Update the first available schedule's capacity
-        const schedule = schedules[0];
-        const newAvailableCapacity = Math.max(0, (schedule.availableCapacity || schedule.capacity) - weightUsed);
+        // Find the schedule that matches the time closest to the scheduled time
+        let bestMatch = schedules[0];
+        let smallestTimeDiff = Infinity;
+
+        for (const schedule of schedules) {
+          if (schedule.departureTime) {
+            const scheduleDeparture = new Date(schedule.departureTime);
+            const timeDiff = Math.abs(scheduleDeparture.getTime() - scheduledDate.getTime());
+            if (timeDiff < smallestTimeDiff) {
+              smallestTimeDiff = timeDiff;
+              bestMatch = schedule;
+            }
+          }
+        }
+
+        console.log('📦 Best matching schedule:', bestMatch._id, 'with departure time:', bestMatch.departureTime);
+
+        // Update the best matching schedule's capacity
+        const currentCapacity = bestMatch.availableCapacity || bestMatch.capacity || 0;
+        const newAvailableCapacity = Math.max(0, currentCapacity - weightUsed);
+
+        console.log('📦 Updating capacity from', currentCapacity, 'kg to', newAvailableCapacity, 'kg');
 
         await client
-          .patch(schedule._id)
+          .patch(bestMatch._id)
           .set({
             availableCapacity: newAvailableCapacity,
             status: newAvailableCapacity <= 0 ? 'full' : 'available'
           })
           .commit();
 
-        console.log('✅ Shipping schedule capacity updated');
+        console.log('✅ Shipping schedule capacity updated successfully');
+      } else {
+        console.log('⚠️ No available shipping schedules found for the selected date and time');
       }
     } catch (error: any) {
       console.error('💥 Error updating shipping schedule capacity:', error);
@@ -237,60 +266,8 @@ export class ShippingOrderService {
     insuranceValue?: number,
     scheduledDateTime?: string
   ): number {
-    // Swedish shipping pricing based on industry standards
-    const BASE_FARE = 80; // SEK - Basic starting fee
-    const PRICE_PER_KG = 25; // SEK per kilogram
-    const MINIMUM_FARE = 120; // SEK - Minimum charge
-
-    let totalPrice = BASE_FARE;
-
-    // Weight-based pricing
-    if (weight > 0) {
-      totalPrice += weight * PRICE_PER_KG;
-    }
-
-    // Apply minimum fare
-    totalPrice = Math.max(totalPrice, MINIMUM_FARE);
-
-    // Shipping speed multipliers
-    switch (shippingSpeed) {
-      case 'express':
-        totalPrice *= 1.5; // 50% surcharge for express
-        break;
-      case 'overnight':
-        totalPrice *= 2; // 100% surcharge for overnight
-        break;
-      default: // standard
-        // No additional charge
-        break;
-    }
-
-    // Fragile items surcharge
-    if (isFragile) {
-      totalPrice += 50; // Fixed surcharge for fragile items
-    }
-
-    // Insurance surcharge (5% of insured value)
-    if (insuranceValue && insuranceValue > 0) {
-      totalPrice += insuranceValue * 0.05;
-    }
-
-    // Time-based surcharges
-    if (scheduledDateTime) {
-      const bookingTime = new Date(scheduledDateTime);
-      const dayOfWeek = bookingTime.getDay();
-
-      // Weekend surcharge (Saturday/Sunday)
-      if (dayOfWeek === 0 || dayOfWeek === 6) {
-        totalPrice *= 1.15; // 15% weekend surcharge
-      }
-    }
-
-    // Fuel and handling surcharge (approximately 8% based on industry standards)
-    totalPrice *= 1.08;
-
-    // VAT (25% in Sweden)
-    totalPrice *= 1.25;
+    // Simple pricing: 50 SEK per kg
+    let totalPrice = weight * 50;
 
     return Math.round(totalPrice);
   }

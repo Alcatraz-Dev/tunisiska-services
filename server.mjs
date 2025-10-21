@@ -7,8 +7,9 @@ import os from "os";
 dotenv.config();
 
 const app = express();
-
+app.use(cors({ origin: "*" })); // You can restrict to your app domain in production
 const PORT = process.env.PORT || 3000;
+
 // --- Sanity export route (single copy only)
 app.get("/sanity/export", async (req, res) => {
   try {
@@ -281,8 +282,8 @@ app.post("/payment-sheet", async (req, res) => {
 // Checkout session endpoint (for web)
 app.post("/create-checkout-session", async (req, res) => {
   try {
-    const { amount, currency, successUrl, cancelUrl, points } = req.body;
-    console.log("📡 [SERVER] Received checkout request:", { amount, currency, points });
+    const { amount, currency, successUrl, cancelUrl, points , service , isWallet } = req.body;
+    console.log("📡 [SERVER] Received checkout request:", { amount, currency, points  });
 
     if (!amount) return res.status(400).json({ error: "Amount is required" });
 
@@ -302,8 +303,8 @@ app.post("/create-checkout-session", async (req, res) => {
           price_data: {
             currency: usedCurrency,
             product_data: {
-              name: `${displayPoints} Poäng - Tunisiska Services`,
-              description: `Köp ${displayPoints} poäng för ${displayAmount} ${usedCurrency.toUpperCase()}`,
+              name: isWallet ? `${displayPoints} Poäng - Tunisiska Services` : `${service || 'Tjänst'} - Tunisiska Services`,
+              description: isWallet ? `Köp ${displayPoints} poäng för ${displayAmount} ${usedCurrency.toUpperCase()}` : `Betalning för ${service || 'Tjänst'} - ${displayAmount} ${usedCurrency.toUpperCase()}`,
             },
             unit_amount: stripeAmount,
           },
