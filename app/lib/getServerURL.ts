@@ -10,9 +10,11 @@ export const getServerURL = (port: number = 3000): string => {
 
   if (debuggerHost) {
     const ip = debuggerHost.split(":")[0];
+    console.log("🔍 [SERVER URL] Found debugger host:", debuggerHost, "-> IP:", ip);
     return `http://${ip}:${port}`;
   }
 
-  // Fallback for production or if running in a build
+  // For production builds, use the production server URL
+  console.log("🔍 [SERVER URL] No debugger host found, using production URL");
   return "https://tunisiska-services-app.expo.app";
 };

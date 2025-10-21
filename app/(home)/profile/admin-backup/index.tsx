@@ -32,7 +32,9 @@ export default function AdminBackupScreen() {
       setExportProgress("Hämtar data från server...");
 
       const serverURL = getServerURL();
+      console.log("🔍 [BACKUP] Using server URL:", serverURL);
       const response = await fetch(`${serverURL}/sanity/export`);
+      console.log("🔍 [BACKUP] Response status:", response.status);
       if (!response.ok) throw new Error(`Server error: ${response.status}`);
 
       const backupText = await response.text();

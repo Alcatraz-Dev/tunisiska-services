@@ -44,6 +44,7 @@ import map from "../assets/icons/map.png";
 import referral from "../assets/icons/referral.png";
 import driver from "../assets/icons/driver.png";
 import backup from "../assets/icons/backup.png";
+
 export default {
   google,
   home,
