@@ -9,6 +9,44 @@ dotenv.config();
 const app = express();
 
 const PORT = process.env.PORT || 3000;
+// --- Sanity export route (single copy only)
+app.get("/sanity/export", async (req, res) => {
+  try {
+    const projectId = process.env.EXPO_PUBLIC_SANITY_PROJECT_ID || "c7b65ce0-2aa6-4b42-b6d7-4f04277bc839";
+    const dataset =  process.env.EXPO_PUBLIC_SANITY_DATASET || "production";
+    const token = process.env.EXPO_PUBLIC_SANITY_TOKEN || "";
+
+    console.log("🔍 [SANITY EXPORT] Environment variables:");
+    console.log("🔍 [SANITY EXPORT] SANITY_PROJECT_ID:", projectId ? "present" : "missing");
+    console.log("🔍 [SANITY EXPORT] SANITY_DATASET:", dataset ? "present" : "missing");
+    console.log("🔍 [SANITY EXPORT] SANITY_API_TOKEN:", token ? "present (length: " + token.length + ")" : "missing");
+
+    const url = `https://${projectId}.api.sanity.io/v2021-06-07/data/export/${dataset}`;
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      return res.status(response.status).send(text);
+    }
+
+    res.setHeader("Content-Type", "application/x-ndjson");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="sanity-backup-${new Date()
+        .toISOString()
+        .split("T")[0]}.ndjson"`
+    );
+
+    // Handle the response body properly
+    const text = await response.text();
+    res.send(text);
+  } catch (err) {
+    console.error("Sanity export error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
 // ⚠️ Use server-side secret key (not EXPO_PUBLIC)
 const STRIPE_SECRET_KEY = process.env.EXPO_PUBLIC_STRIPE_SECRET_KEY;
 if (!STRIPE_SECRET_KEY) {
@@ -261,9 +299,9 @@ app.post("/payment-sheet", async (req, res) => {
 
 // Checkout session endpoint (for web)
 app.post("/create-checkout-session", async (req, res) => {
-  console.log("🔍 [DIAGNOSTIC] /create-checkout-session called with:", { amount: req.body.amount, currency: req.body.currency, points: req.body.points , service: req.body.service });
+  console.log("🔍 [DIAGNOSTIC] /create-checkout-session called with:", { amount: req.body.amount, currency: req.body.currency, points: req.body.points, service: req.body.service });
   try {
-    const { amount, currency, successUrl, cancelUrl, points , service } = req.body;
+    const { amount, currency, successUrl, cancelUrl, points, service } = req.body;
     console.log("📡 [SERVER] Received checkout request:", { amount, currency, points });
 
     if (!amount) {
@@ -278,7 +316,7 @@ app.post("/create-checkout-session", async (req, res) => {
     console.log("🔍 [DIAGNOSTIC] Using currency:", usedCurrency);
 
     const displayAmount = (amount / 100).toFixed(2);
-    const displayPoints = points || Math.round(amount / 100 );
+    const displayPoints = points || Math.round(amount / 100);
     const displayService = service || "Tjänst";
     console.log("🎯 [SERVER] Display amount:", displayAmount, "Display points:", displayPoints, "Display service:", displayService);
 
@@ -436,6 +474,8 @@ if (process.env.NODE_ENV !== 'production') {
     console.error('❌ Server error:', err);
   });
 
+
+  app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
   // Keep server alive
   process.on('SIGINT', () => {
     console.log('🛑 Shutting down server...');

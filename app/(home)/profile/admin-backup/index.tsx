@@ -4,6 +4,7 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,138 +15,64 @@ import { AutoText } from "@/app/components/ui/AutoText";
 import { showAlert } from "@/app/utils/showAlert";
 import { getPremiumGradient } from "@/app/utils/getPremiumGradient";
 import { LinearGradient } from "expo-linear-gradient";
-import { Platform } from "react-native";
+import * as FileSystem from "expo-file-system/legacy";
+import { shareAsync } from "expo-sharing";
+import { getServerURL } from "@/app/lib/getServerURL";
 
 export default function AdminBackupScreen() {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
   const router = useRouter();
   const [isExporting, setIsExporting] = useState(false);
-  const [exportProgress, setExportProgress] = useState<string>("");
+  const [exportProgress, setExportProgress] = useState("");
 
   const handleExportData = async () => {
     try {
       setIsExporting(true);
-      setExportProgress("Förbereder export...");
+      setExportProgress("Hämtar data från server...");
 
-      // Use Sanity's official backup API
-      const { client } = await import("@/sanityClient");
+      const serverURL = getServerURL();
+      const response = await fetch(`${serverURL}/sanity/export`);
+      if (!response.ok) throw new Error(`Server error: ${response.status}`);
 
-      setExportProgress("Startar Sanity backup...");
-
-      // Use Sanity's export API endpoint - correct format
-      const response = await fetch(
-        `https://${client.config().projectId}.api.sanity.io/v2021-06-07/data/export/${client.config().dataset}`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${client.config().token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(
-          `Sanity API error: ${response.status} ${response.statusText}`
-        );
-      }
-
-      setExportProgress("Hämtar backup data...");
-
-      // Get the backup data as text
       const backupText = await response.text();
+      const fileName = `sanity-backup-${
+        new Date().toISOString().split("T")[0]
+      }.ndjson`;
 
-      setExportProgress("Skapar backup-fil...");
+      const fileUri = (FileSystem as any).documentDirectory + fileName;
+      await FileSystem.writeAsStringAsync(fileUri, backupText);
 
-      const backupId = Date.now().toString();
-      const exportFileDefaultName = `${client.config().dataset}-backup-${backupId}.tar.gz`;
-
-      // For web platform - download file using Next.js style
-      if (Platform.OS === "web") {
-        const blob = new Blob([backupText], {
-          type: "application/x-ndjson",
-        });
-
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = exportFileDefaultName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-
-        setExportProgress("Download påbörjad...");
-        setTimeout(() => {
-          showAlert(
-            "Export slutförd",
-            `Sanity backup-fil "${exportFileDefaultName}" har nedladdats.`
+      if (Platform.OS === "android") {
+        const permissions = await (
+          FileSystem as any
+        ).StorageAccessFramework.requestDirectoryPermissionsAsync();
+        if (permissions.granted) {
+          const base64 = Buffer.from(backupText).toString("base64");
+          const newFileUri = await (
+            FileSystem as any
+          ).StorageAccessFramework.createFileAsync(
+            permissions.directoryUri,
+            fileName,
+            "application/x-ndjson"
           );
-          setIsExporting(false);
-          setExportProgress("");
-        }, 1000);
-      } else {
-        // For mobile platforms - save file to device and share
-        try {
-          setExportProgress("Sparar fil på enheten...");
-
-          // Import expo modules
-          const [expoFs, expoSharing] = await Promise.all([
-            import("expo-file-system"),
-            import("expo-sharing"),
-          ]);
-
-          const fileUri =
-            (expoFs as any).documentDirectory + exportFileDefaultName;
-          await (expoFs as any).writeAsStringAsync(fileUri, backupText);
-
-          setExportProgress("Öppnar delningsdialog...");
-          if (await expoSharing.isAvailableAsync()) {
-            await expoSharing.shareAsync(fileUri, {
-              mimeType: "application/x-ndjson",
-              dialogTitle: "Spara Sanity Backup",
-            });
-            setExportProgress("Fil sparad och delas...");
-            setTimeout(() => {
-              showAlert(
-                "Export slutförd",
-                `Sanity backup-fil "${exportFileDefaultName}" har sparats på enheten och öppnas för delning/sparande.`
-              );
-              setIsExporting(false);
-              setExportProgress("");
-            }, 1000);
-          } else {
-            setExportProgress("Fil sparad...");
-            setTimeout(() => {
-              showAlert(
-                "Export slutförd",
-                `Sanity backup-fil "${exportFileDefaultName}" har sparats på enheten.\n\nPlats: ${fileUri}`
-              );
-              setIsExporting(false);
-              setExportProgress("");
-            }, 1000);
-          }
-        } catch (mobileError) {
-          console.error("Mobile file save error:", mobileError);
-          setExportProgress("Slutför export...");
-          setTimeout(() => {
-            showAlert(
-              "Export slutförd",
-              `Sanity backup har skapats men kunde inte sparas som fil på denna enhet. Försök igen eller använd web-versionen.`
-            );
-            setIsExporting(false);
-            setExportProgress("");
-          }, 1000);
+          await FileSystem.writeAsStringAsync(newFileUri, base64, {
+            encoding: (FileSystem as any).EncodingType.Base64,
+          });
+          showAlert("Export klar", "Backup-filen sparades i vald mapp.");
+        } else {
+          await shareAsync(fileUri);
         }
+      } else {
+        await shareAsync(fileUri);
       }
-    } catch (error) {
-      console.error("Export error:", error);
-      showAlert(
-        "Fel",
-        "Kunde inte exportera data från Sanity: " + (error as Error).message
-      );
+
       setIsExporting(false);
       setExportProgress("");
+    } catch (err: any) {
+      console.error("Export error:", err);
+      showAlert("Fel", "Kunde inte exportera data: " + err.message);
+      setIsExporting(false);
     }
   };
 
@@ -169,7 +96,7 @@ export default function AdminBackupScreen() {
               isDark ? "text-white" : "text-gray-900"
             }`}
           >
-            Admin Backup
+             Backup Data 
           </AutoText>
         </View>
         <AutoText
@@ -177,12 +104,11 @@ export default function AdminBackupScreen() {
             isDark ? "text-gray-400" : "text-gray-600"
           }`}
         >
-          Exportera all data från Sanity för säkerhetskopiering och
-          återställning.
+          Exportera all Sanity CMS data som NDJSON för säkerhetskopiering
         </AutoText>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-6">
+      <ScrollView showsVerticalScrollIndicator={false}>
         {/* Info Card */}
         <LinearGradient
           colors={getPremiumGradient() as [string, string]}
@@ -197,6 +123,8 @@ export default function AdminBackupScreen() {
             borderRadius: 12,
             padding: 20,
             marginBottom: 20,
+            marginHorizontal: 16,
+            marginTop: 20,
           }}
         >
           <View className="items-center mb-4">
@@ -206,9 +134,8 @@ export default function AdminBackupScreen() {
             <AutoText className="text-white text-xl font-bold text-center mb-2">
               Sanity Data Export
             </AutoText>
-            <AutoText className="text-white/90 text-center text-xs">
-              Exportera all data till en .tar.gz backup-fil för
-              säkerhetskopiering
+            <AutoText className="text-white/90 text-center text-sm">
+              Exportera all data till en .zgr-fil för säkerhetskopiering
             </AutoText>
           </View>
 
@@ -217,7 +144,7 @@ export default function AdminBackupScreen() {
             <AutoText className="text-white font-semibold mb-3 text-center">
               Data som exporteras:
             </AutoText>
-            <View className="space-y-2 ">
+            <View className="space-y-2">
               {[
                 "Användare",
                 "Flyttbeställningar",
@@ -228,84 +155,140 @@ export default function AdminBackupScreen() {
                 "Vänförfrågningar",
               ].map((item, index) => (
                 <View key={index} className="flex-row items-center">
-                  <View className="w-1 h-1 bg-white rounded-full mr-3" />
-                  <AutoText className="text-white/90 text-xs">{item}</AutoText>
+                  <View className="w-2 h-2 bg-white rounded-full mr-3" />
+                  <AutoText className="text-white/90 text-sm">{item}</AutoText>
                 </View>
               ))}
             </View>
+            <View className="mt-4 flex-row items-center justify-center mb-3">
+             <Ionicons
+                name="information-circle"
+                size={20}
+                color={isDark ? "#fff" : "#fff"}
+              />
+              <AutoText
+                className={`ml-2 font-semibold text-sm ${isDark ? "text-white" : "text-black"}`}
+              >
+                Backup Information
+              </AutoText>
+              
+              </View>
+               <AutoText
+              className={`text-xs leading-5 px-6 text-center ${isDark ? "text-gray-300" : "text-gray-600"}`}
+            >
+              Detta kommer att exportera allt ditt Sanity CMS innehåll inklusive
+              sidor, inlägg, användare och mediafiler. Backup-filen sparas i
+              NDJSON-format och kan användas för att återställa dina data om det
+              behövs.
+            </AutoText>
           </View>
         </LinearGradient>
 
+       
+
         {/* Export Button */}
-        <View className="mb-8">
-          {isExporting ? (
-            <View
-              className={`p-6 rounded-2xl items-center justify-center ${isDark ? "bg-dark-card" : "bg-light-card"}`}
-            >
-              <ActivityIndicator
-                size="small"
-                color={isDark ? "#fff" : "#000"}
-              />
-              <AutoText
-                className={`mt-4 text-center ${isDark ? "text-white" : "text-gray-900"}`}
-              >
-                {exportProgress}
-              </AutoText>
-            </View>
-          ) : (
-            <TouchableOpacity
-              onPress={handleExportData}
-              className="bg-blue-500 rounded-2xl p-6 items-center"
-              style={{
-                shadowColor: "#3B82F6",
-                shadowOpacity: 0.3,
-                shadowRadius: 10,
-                shadowOffset: { width: 0, height: 5 },
-                elevation: 8,
-              }}
-            >
-              <View className="flex-row items-center">
-                <Ionicons name="cloud-download" size={14} color="white" />
-                <AutoText className="text-white font-bold text-sm ml-3">
-                  Exportera Data
+        <View className="px-6 mt-6">
+          <TouchableOpacity
+            onPress={handleExportData}
+            disabled={isExporting}
+            className={`rounded-2xl p-6 items-center shadow-lg ${
+              isExporting
+                ? isDark
+                  ? "bg-gray-600"
+                  : "bg-gray-400"
+                : "bg-gradient-to-r from-blue-500 to-blue-600"
+            }`}
+          >
+            {isExporting ? (
+              <View className="items-center">
+                <ActivityIndicator color="#fff" size="large" />
+                <AutoText className="text-white font-semibold mt-4 text-center">
+                  {exportProgress}
+                </AutoText>
+                <AutoText className="text-white/80 text-sm mt-2 text-center">
+                  Vänta medan vi förbereder din backup...
                 </AutoText>
               </View>
-              <AutoText className="text-white/90 text-xs mt-2 text-center">
-                Skapa och ladda ner .tar.gz backup-fil
-              </AutoText>
-            </TouchableOpacity>
-          )}
+            ) : (
+              <View className="items-center">
+                <View
+                  className={`p-3 rounded-full mb-3 ${isDark ? "bg-white/20" : "bg-white/30"}`}
+                >
+                  <Ionicons name="cloud-download" size={28} color="#fff" />
+                </View>
+                <AutoText className="text-white font-bold text-lg mb-1">
+                  Exportera Database Backup
+                </AutoText>
+                <AutoText className="text-white/90 text-sm text-center">
+                  Ladda ner komplett Sanity CMS data
+                </AutoText>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
 
-        {/* Warning */}
-        <View
-          className={`p-4 rounded-xl mb-8 ${isDark ? "bg-yellow-500/10 border border-yellow-500/20" : "bg-yellow-50 border border-yellow-200"}`}
-        >
-          <View className="flex-row items-start">
-            <Ionicons
-              name="warning"
-              size={20}
-              color={isDark ? "#fbbf24" : "#f59e0b"}
-              style={{ marginRight: 8, marginTop: 2 }}
-            />
-            <View className="flex-1">
+        {/* Additional Info */}
+        {!isExporting && (
+          <View className="px-6 mt-6">
+            <View
+              className={`rounded-2xl p-4 shadow-sm ${
+                isDark ? "bg-dark-card" : "bg-gray-100"
+              }`}
+            >
+              <View className="flex-row items-center mb-2">
+                <Ionicons
+                  name="time"
+                  size={16}
+                  color={isDark ? "#9ca3af" : "#6b7280"}
+                />
+                <AutoText
+                  className={`ml-2 text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}
+                >
+                  Uppskattad tid
+                </AutoText>
+              </View>
               <AutoText
-                className={`font-semibold mb-1 ${isDark ? "text-yellow-400" : "text-yellow-800"}`}
+                className={`text-xs ${isDark ? "text-gray-400" : "text-gray-600"}`}
               >
-                Viktig information
-              </AutoText>
-              <AutoText
-                className={`text-[9px] ${isDark ? "text-yellow-300" : "text-yellow-700"}`}
-              >
-                Denna export innehåller all känslig data från din
-                Sanity-databas. Förvara backup-filen säkert och dela den inte
-                med obehöriga.
+                Backup-processen tar vanligtvis 30-60 sekunder beroende på
+                datamängd
               </AutoText>
             </View>
           </View>
+        )}
+        {/* Warning */}
+        <View className="px-6 mt-6">
+          <View
+            className={`p-4  rounded-xl mb-8 ${isDark ? "bg-yellow-500/10 border border-yellow-500/20" : "bg-yellow-50 border border-yellow-200"}`}
+          >
+            <View className="flex-row items-start">
+              <Ionicons
+                name="warning"
+                size={14}
+                color={isDark ? "#fbbf24" : "#f59e0b"}
+                style={{ marginRight: 8, marginTop: 2 }}
+              />
+              <View className="flex-1">
+                <AutoText
+                  className={`font-semibold mb-1 text-sm ${isDark ? "text-yellow-400" : "text-yellow-800"}`}
+                >
+                  Viktig information
+                </AutoText>
+                <AutoText
+                  className={`text-xs ${isDark ? "text-yellow-300" : "text-yellow-700"}`}
+                >
+                  Denna export innehåller all känslig data från din
+                  Sanity-databas. Förvara backup-filen säkert och dela den inte
+                  med obehöriga.
+                </AutoText>
+              </View>
+            </View>
+          </View>
         </View>
-      </ScrollView>
 
+        {/* Bottom spacing */}
+        <View className="h-20" />
+      </ScrollView>
       <StatusBar style={isDark ? "light" : "dark"} />
     </SafeAreaView>
   );
