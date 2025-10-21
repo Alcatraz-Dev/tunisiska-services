@@ -102,7 +102,7 @@ export default function Move() {
     const pointsValue = pointsToUse / 10; // Convert points to SEK
     return Math.max(0, estimatedPrice - pointsValue);
   };
-  const createMoveOrder = async () => {
+  const createMoveOrder = async (skipPaymentCheck = false) => {
     // Required field validation
     if (!customerName.trim()) {
       showAlert("Fel", "Namn är obligatoriskt.");
@@ -175,8 +175,8 @@ export default function Move() {
         specialRequirements: notes,
       };
 
-      // For non-cash payments, process payment first before creating order
-      if (paymentMethod !== 'cash') {
+      // Skip payment processing if called from payment success callback
+      if (!skipPaymentCheck && paymentMethod !== 'cash') {
         const finalPrice = getFinalPrice();
         if (finalPrice > 0) {
           // Show payment modal for non-cash payments
@@ -186,11 +186,11 @@ export default function Move() {
         }
       }
 
-      // For cash payment or points-only payment, create order directly
+      // Create order directly (for cash payment, points-only payment, or after successful payment)
       const result = await MoveOrderService.createMoveOrder(orderData);
 
       if (result.success) {
-        // Send notification for cash payment or points-only payment
+        // Send notification
         await MoveOrderService.sendOrderConfirmationNotification(orderData.userId, orderData);
         showAlert(
           'Beställning skapad! 🎉',
@@ -697,10 +697,9 @@ export default function Move() {
               amount={getFinalPrice()}
               points={getFinalPrice() * 10}
               isDark={isDark}
+              service="Flytt utan städning"
               customText={`Betala ${getFinalPrice()} SEK för Flytt`}
-              customClassName={`w-full rounded-xl p-4 items-center ${
-                isDark ? "bg-dark-card" : "bg-light-card"
-              }`}
+              customClassName="mb-10 text-lg font-semibold"
               customStyle={{
                 backgroundColor: isDark ? "#1e1e1e" : "#ffffff",
                 borderWidth: 1,
@@ -708,13 +707,13 @@ export default function Move() {
               }}
               disabled={!customerName.trim() || !customerPhone.trim() || !pickup.trim() || !dropoff.trim() || !numPersons.trim() || parseInt(numPersons) < 1 || !numItems.trim() || parseInt(numItems) < 1 || selectedCategories.length === 0}
               onPaymentSuccess={async (purchasedPoints: number, amountPaid: number) => {
-                await createMoveOrder();
-              }}
+                 await createMoveOrder(true);
+               }}
             />
           ) : (
             <TouchableOpacity
               className={`p-4 rounded-xl items-center ${isLoading ? "bg-gray-500" : "bg-blue-500"}`}
-              onPress={createMoveOrder}
+              onPress={() => createMoveOrder()}
               disabled={isLoading || !customerName.trim() || !customerPhone.trim() || !pickup.trim() || !dropoff.trim() || !numPersons.trim() || parseInt(numPersons) < 1 || !numItems.trim() || parseInt(numItems) < 1 || selectedCategories.length === 0}
             >
               <AutoText className="text-white font-semibold text-lg">

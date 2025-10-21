@@ -440,7 +440,7 @@ useFocusEffect(
             </View>
           </TouchableOpacity>
           {(item.screenImage || item.image || item.videoUrl) && (
-            <View className="relative">
+            <View className="relative mt-5">
               {item.mediaType === "video" && item.videoUrl ? (
                 <View
                   style={{

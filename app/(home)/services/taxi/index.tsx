@@ -1019,9 +1019,7 @@ export default function Taxi() {
             points={getFinalPrice() * 10}
             isDark={isDark}
             customText={`Betala ${getFinalPrice()} SEK för Taxi`}
-            customClassName={`w-full rounded-xl p-4 items-center ${
-              isDark ? "bg-dark-card" : "bg-light-card"
-            }`}
+            customClassName={`mb-10 `}
             customStyle={{
               backgroundColor: isDark ? "#1e1e1e" : "#ffffff",
               borderWidth: 1,

@@ -261,9 +261,9 @@ app.post("/payment-sheet", async (req, res) => {
 
 // Checkout session endpoint (for web)
 app.post("/create-checkout-session", async (req, res) => {
-  console.log("🔍 [DIAGNOSTIC] /create-checkout-session called with:", { amount: req.body.amount, currency: req.body.currency, points: req.body.points });
+  console.log("🔍 [DIAGNOSTIC] /create-checkout-session called with:", { amount: req.body.amount, currency: req.body.currency, points: req.body.points , service: req.body.service });
   try {
-    const { amount, currency, successUrl, cancelUrl, points } = req.body;
+    const { amount, currency, successUrl, cancelUrl, points , service } = req.body;
     console.log("📡 [SERVER] Received checkout request:", { amount, currency, points });
 
     if (!amount) {
@@ -278,8 +278,9 @@ app.post("/create-checkout-session", async (req, res) => {
     console.log("🔍 [DIAGNOSTIC] Using currency:", usedCurrency);
 
     const displayAmount = (amount / 100).toFixed(2);
-    const displayPoints = points || Math.round(amount / 100 * 10);
-    console.log("🎯 [SERVER] Display amount:", displayAmount, "Display points:", displayPoints);
+    const displayPoints = points || Math.round(amount / 100 );
+    const displayService = service || "Tjänst";
+    console.log("🎯 [SERVER] Display amount:", displayAmount, "Display points:", displayPoints, "Display service:", displayService);
 
     console.log("🔍 [DIAGNOSTIC] Creating checkout session...");
     const session = await stripe.checkout.sessions.create({
@@ -289,8 +290,8 @@ app.post("/create-checkout-session", async (req, res) => {
           price_data: {
             currency: usedCurrency,
             product_data: {
-              name: `${displayPoints} Poäng - Tunisiska Services`,
-              description: `Köp ${displayPoints} poäng för ${displayAmount} ${usedCurrency.toUpperCase()}`,
+              name: `${displayService} - Tunisiska Services`,
+              description: `Betalning för ${displayService} tjänst - ${displayAmount} ${usedCurrency.toUpperCase()}`,
             },
             unit_amount: stripeAmount,
           },

@@ -254,7 +254,7 @@ const Profile = () => {
       <SafeAreaView
         className={`flex-1 justify-center items-center ${isDark ? "bg-dark" : "bg-light"}`}
       >
-        <ActivityIndicator size="large" color={isDark ? "#fff" : "#000"} />
+        <ActivityIndicator size="small" color={isDark ? "#fff" : "#000"} />
         <AutoText
           className={`mt-4 ${isDark ? "text-gray-300" : "text-gray-600"}`}
         >

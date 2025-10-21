@@ -1050,9 +1050,7 @@ export default function MoveCleaning() {
                 points={getFinalPrice() * 10}
                 isDark={isDark}
                 customText={`Betala ${getFinalPrice()} SEK för Flytt & Städning`}
-                customClassName={`w-full rounded-2xl ${
-                  isDark ? "bg-dark-card" : "bg-light-card"
-                } py-5`}
+                customClassName="mb-10 text-lg font-semibold"
                 customStyle={{
                   backgroundColor: isDark ? "#1e1e1e" : "#ffffff",
                   borderWidth: 1,

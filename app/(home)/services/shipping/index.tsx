@@ -823,9 +823,7 @@ export default function ShippingPage() {
                 points={calculateTotal() * 10}
                 isDark={isDark}
                 customText={`Betala ${calculateTotal()} SEK för Frakt`}
-                customClassName={`w-full rounded-xl p-4 items-center ${
-                  isDark ? "bg-dark-card" : "bg-light-card"
-                }`}
+                customClassName="mb-10 text-lg font-semibold"
                 customStyle={{
                   backgroundColor: isDark ? "#1e1e1e" : "#ffffff",
                   borderWidth: 1,

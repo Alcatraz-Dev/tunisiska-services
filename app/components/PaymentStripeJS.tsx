@@ -22,7 +22,9 @@ interface PaymentStripeJSProps {
   customText?: string;
   customClassName?: string;
   customStyle?: any;
-  isWallet?: boolean; // New prop to differentiate wallet vs services
+  isWallet?: boolean;
+  disabled?: boolean;
+  service?: string;
 }
 
 export default function PaymentStripeJS({
@@ -35,7 +37,9 @@ export default function PaymentStripeJS({
   customText,
   customClassName,
   customStyle,
-  isWallet = false, 
+  isWallet = false,
+  disabled = false,
+  service,
 }: PaymentStripeJSProps) {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -59,6 +63,7 @@ export default function PaymentStripeJS({
         amount: Math.round(amount * 100), // Convert to cents
         currency: "sek",
         points: points || Math.round(amount * 10),
+        service: service || "Tjänst",
       };
       console.log("🔍 [PAYMENT] Request body:", JSON.stringify(requestBody, null, 2));
 
@@ -77,9 +82,9 @@ export default function PaymentStripeJS({
         console.error("❌ [PAYMENT] Response statusText:", response.statusText);
         console.error("❌ [PAYMENT] Request URL:", `${serverUrl}/create-checkout-session`);
         console.error("❌ [PAYMENT] Request body:", JSON.stringify({
-          amount: Math.round(amount * 100),
+          amount: Math.round(amount / 100),
           currency: "sek",
-          points: points || Math.round(amount * 10),
+          points: points || Math.round(amount / 10),
         }));
         console.error("❌ [PAYMENT] Full response:", response);
         showAlert("Server Error", `Status: ${response.status}\nDetails: ${errorText}\nURL: ${serverUrl}`);
@@ -196,7 +201,7 @@ export default function PaymentStripeJS({
 
       <TouchableOpacity
         testID="checkout-button-stripe-js"
-        disabled={disableAll || loading}
+        disabled={disableAll || loading || disabled}
         onPress={createCheckoutSession}
         activeOpacity={disableAll ? 1 : 0.7}
         className={customClassName || ""}
@@ -213,7 +218,7 @@ export default function PaymentStripeJS({
               ? isDark
                 ? "#1e1e1e"
                 : "#f3f4f6"
-              : isWallet
+              : !isWallet
                 ? isDark
                   ? "#2563EB" // Blue for wallet dark mode
                   : "#3B82F6" // Blue for wallet light mode
@@ -225,7 +230,7 @@ export default function PaymentStripeJS({
         {loading ? (
           <View
             className={`w-full rounded-2xl ${
-              isWallet
+              !isWallet
                 ? isDark
                   ? "bg-blue-600" // Blue background for wallet loading
                   : "bg-blue-500"
@@ -245,11 +250,11 @@ export default function PaymentStripeJS({
           >
             <ActivityIndicator
               size="small"
-              color={isWallet ? "#fff" : isDark ? "#fff" : "#0ea5e9"}
+              color={!isWallet ? "#fff" : isDark ? "#fff" : "#0ea5e9"}
             />
             <AutoText
               className={`text-xs font-medium text-center mt-2 ${
-                isWallet ? "text-white" : isDark ? "text-white" : "text-black"
+                !isWallet ? "text-white" : isDark ? "text-white" : "text-black"
               }`}
               style={{ letterSpacing: 0.5 }}
             >
@@ -279,8 +284,8 @@ export default function PaymentStripeJS({
           >
             {customText ? (
               <AutoText
-                className={`text-xs font-semibold text-center mt-2 ${
-                  isWallet ? "text-white" : isDark ? "text-white" : "text-black"
+                className={` text-center mt-2 ${
+                  !isWallet ? "text-white font-bold text-sm" : isDark ? "text-white text-xs font-semibold" : "text-black text-xs font-semibold"
                 }`}
                 style={{ letterSpacing: 0.5 }}
               >
@@ -290,15 +295,15 @@ export default function PaymentStripeJS({
               <>
                 <AutoText
                   className={`text-xs font-medium text-center mt-2 ${
-                    isWallet ? "text-white" : isDark ? "text-white" : "text-black"
+                    !isWallet ? "text-white font-bold text-sm" : isDark ? "text-white text-xs font-medium " : "text-black text-xs font-medium "
                   }`}
                   style={{ letterSpacing: 0.5 }}
                 >
                   {formattedAmount} SEK
                 </AutoText>
                 <AutoText
-                  className={`text-xs font-semibold text-center mt-2 ${
-                    isWallet ? "text-white" : isDark ? "text-white" : "text-black"
+                  className={`text-center mt-2 ${
+                    !isWallet ? "text-white  font-bold text-sm" : isDark ? "text-white text-xs font-semibold " : "text-black text-xs font-semibold "
                   }`}
                   style={{ letterSpacing: 0.5 }}
                 >
