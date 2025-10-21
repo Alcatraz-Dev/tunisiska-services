@@ -9,9 +9,14 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { Image, ScrollView, TouchableOpacity, View } from "react-native";
+import VideoPlayer from "@/app/components/VideoPlayer";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { client } from "@/sanityClient";
-import { NotificationType, NOTIFICATION_TYPE_CONFIGS } from "@/app/types/notification";
+import {
+  NotificationType,
+  NOTIFICATION_TYPE_CONFIGS,
+} from "@/app/types/notification";
+import { VideoView, useVideoPlayer } from "expo-video";
 
 export default function AdminNotificationsScreen() {
   const { resolvedTheme } = useTheme();
@@ -27,15 +32,62 @@ export default function AdminNotificationsScreen() {
     useState<NotificationType>("general");
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<string>("");
+  // const [videoPlayers, setVideoPlayers] = useState<{ [key: string]: any }>({});
 
   // Fetch announcements for selection
   useEffect(() => {
     const fetchAnnouncements = async () => {
       try {
         const response = await client.fetch(
-          '*[_type == "announcement" && !(_id in path("drafts.**"))] | order(date desc)[0...10]{ title, slug, media }'
+          '*[_type == "announcement" && !(_id in path("drafts.**"))] | order(date desc)[0...10]{ ..., title, slug, media, _id }'
         );
-        setAnnouncements(response || []);
+
+        // Process announcements to get real URLs
+        const processedAnnouncements = (response || []).map(
+          (announcement: any) => {
+            let processedMedia = announcement.media;
+
+            if (processedMedia) {
+              if (
+                processedMedia.type === "image" &&
+                processedMedia.image?.asset?._ref
+              ) {
+                // Construct real image URL from Sanity asset reference
+                const imageAssetRef = processedMedia.image.asset._ref;
+                const imageId = imageAssetRef
+                  .replace("image-", "")
+                  .replace(/-[a-z]+$/g, "");
+                processedMedia.imageUrl = `https://cdn.sanity.io/images/ci4uj541/production/${imageId}.jpg`;
+              } else if (
+                processedMedia.type === "video" &&
+                processedMedia.video?.asset?._ref
+              ) {
+                // Construct real video URL from Sanity asset reference
+                const videoAssetRef = processedMedia.video.asset._ref;
+                const videoId = videoAssetRef
+                  .replace("file-", "")
+                  .replace(/-[a-z]+$/g, "");
+                processedMedia.videoUrl = `https://cdn.sanity.io/files/ci4uj541/production/${videoId}.mov`;
+
+                // Also construct thumbnail URL from the image asset if available
+                if (processedMedia.image?.asset?._ref) {
+                  const imageAssetRef = processedMedia.image.asset._ref;
+                  const imageId = imageAssetRef
+                    .replace("image-", "")
+                    .replace(/-[a-z]+$/g, "");
+                  processedMedia.thumbnailUrl = `https://cdn.sanity.io/images/ci4uj541/production/${imageId}.jpg`;
+                }
+              }
+            }
+
+            return {
+              ...announcement,
+              media: processedMedia,
+            };
+          }
+        );
+
+        setAnnouncements(processedAnnouncements);
       } catch (error) {
         console.error("Error fetching announcements:", error);
       }
@@ -178,16 +230,35 @@ export default function AdminNotificationsScreen() {
         const selectedAnnouncementData = announcements.find(
           (a) => a.slug === selectedAnnouncement
         );
-        const routeSlug = typeof selectedAnnouncement === 'string' ? selectedAnnouncement : (selectedAnnouncement as any)?.current || String(selectedAnnouncement);
+        const routeSlug =
+          typeof selectedAnnouncement === "string"
+            ? selectedAnnouncement
+            : (selectedAnnouncement as any)?.current ||
+              String(selectedAnnouncement);
         notificationData.pushData.route = `/(home)/announcements/${routeSlug}`;
-        console.log("Setting route to:", notificationData.pushData.route, "from selectedAnnouncement:", selectedAnnouncement, "routeSlug:", routeSlug);
-        const announcementSlug = typeof selectedAnnouncement === 'string' ? selectedAnnouncement : (selectedAnnouncement as any)?.current || String(selectedAnnouncement);
+        console.log(
+          "Setting route to:",
+          notificationData.pushData.route,
+          "from selectedAnnouncement:",
+          selectedAnnouncement,
+          "routeSlug:",
+          routeSlug
+        );
+        const announcementSlug =
+          typeof selectedAnnouncement === "string"
+            ? selectedAnnouncement
+            : (selectedAnnouncement as any)?.current ||
+              String(selectedAnnouncement);
         notificationData.pushData.announcementSlug = announcementSlug;
-        notificationData.pushData.announcementTitle = selectedAnnouncementData?.title || "";
+        notificationData.pushData.announcementTitle =
+          selectedAnnouncementData?.title || "";
 
         // Use the announcement's media (image or video) for the notification
         if (selectedAnnouncementData?.media) {
-          console.log("Announcement media found:", selectedAnnouncementData.media);
+          console.log(
+            "Announcement media found:",
+            selectedAnnouncementData.media
+          );
           console.log("Media type:", selectedAnnouncementData.media.type);
 
           if (selectedAnnouncementData.media.type === "video") {
@@ -195,10 +266,18 @@ export default function AdminNotificationsScreen() {
             // Priority: resolved videoUrl > constructed from asset reference
             let videoUrl = selectedAnnouncementData.media.videoUrl;
 
-            if (!videoUrl && selectedAnnouncementData.media.video?.asset?._ref) {
+            if (
+              !videoUrl &&
+              selectedAnnouncementData.media.video?.asset?._ref
+            ) {
               // Construct video URL from asset reference
-              const videoAssetRef = selectedAnnouncementData.media.video.asset._ref;
-              const videoId = videoAssetRef.replace('file-', '').replace('-mov', '').replace('-mp4', '').replace('-webm', '');
+              const videoAssetRef =
+                selectedAnnouncementData.media.video.asset._ref;
+              const videoId = videoAssetRef
+                .replace("file-", "")
+                .replace("-mov", "")
+                .replace("-mp4", "")
+                .replace("-webm", "");
               videoUrl = `https://cdn.sanity.io/files/ci4uj541/production/${videoId}.mov`;
               console.log("Constructed video URL from asset ref:", videoUrl);
             }
@@ -211,12 +290,17 @@ export default function AdminNotificationsScreen() {
               notificationData.pushData.mediaType = "video";
               notificationData.pushData.videoUrl = videoUrl;
             } else {
-              console.log("No video URL found, falling back to image if available");
+              console.log(
+                "No video URL found, falling back to image if available"
+              );
               // Fallback to image if video URL construction failed
               if (selectedAnnouncementData.media.imageUrl) {
-                notificationData.image = selectedAnnouncementData.media.imageUrl;
-                notificationData.pushData.image = selectedAnnouncementData.media.imageUrl;
-                notificationData.pushData.screenImage = selectedAnnouncementData.media.imageUrl;
+                notificationData.image =
+                  selectedAnnouncementData.media.imageUrl;
+                notificationData.pushData.image =
+                  selectedAnnouncementData.media.imageUrl;
+                notificationData.pushData.screenImage =
+                  selectedAnnouncementData.media.imageUrl;
                 notificationData.pushData.mediaType = "image";
               }
             }
@@ -225,10 +309,18 @@ export default function AdminNotificationsScreen() {
             // Priority: resolved imageUrl > constructed from asset reference
             let imageUrl = selectedAnnouncementData.media.imageUrl;
 
-            if (!imageUrl && selectedAnnouncementData.media.image?.asset?._ref) {
+            if (
+              !imageUrl &&
+              selectedAnnouncementData.media.image?.asset?._ref
+            ) {
               // Construct image URL from asset reference
-              const imageAssetRef = selectedAnnouncementData.media.image.asset._ref;
-              const imageId = imageAssetRef.replace('image-', '').replace('-jpg', '').replace('-png', '').replace('-webp', '');
+              const imageAssetRef =
+                selectedAnnouncementData.media.image.asset._ref;
+              const imageId = imageAssetRef
+                .replace("image-", "")
+                .replace("-jpg", "")
+                .replace("-png", "")
+                .replace("-webp", "");
               imageUrl = `https://cdn.sanity.io/images/ci4uj541/production/${imageId}.jpg`;
               console.log("Constructed image URL from asset ref:", imageUrl);
             }
@@ -241,7 +333,10 @@ export default function AdminNotificationsScreen() {
               notificationData.pushData.mediaType = "image";
             }
           } else {
-            console.log("Unknown media type:", selectedAnnouncementData.media.type);
+            console.log(
+              "Unknown media type:",
+              selectedAnnouncementData.media.type
+            );
           }
         } else {
           console.log("No announcement media found, using fallback");
@@ -256,7 +351,8 @@ export default function AdminNotificationsScreen() {
       console.log("Sending notification with data:", notificationData);
 
       // Try the suggested approach with mediaURL
-      const mediaURL = notificationData.pushData.screenImage || notificationData.image;
+      const mediaURL =
+        notificationData.pushData.screenImage || notificationData.image;
       console.log("Using mediaURL:", mediaURL);
 
       let result;
@@ -293,7 +389,6 @@ export default function AdminNotificationsScreen() {
       setLoading(false);
     }
   };
-
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
       {/* Header */}
@@ -340,74 +435,32 @@ export default function AdminNotificationsScreen() {
             >
               Typ av notifikation
             </AutoText>
-            <View className="flex-row flex-wrap gap-2 mb-4">
-              {(Object.keys(NOTIFICATION_TYPE_CONFIGS) as NotificationType[]).map((type) => {
-                const config = NOTIFICATION_TYPE_CONFIGS[type];
-                return {
-                  value: type,
-                  label: config.label,
-                  icon: config.icon,
-                };
-              }).map((type) => (
-                <TouchableOpacity
-                  key={type.value}
-                  onPress={() =>
-                    setNotificationType(type.value as NotificationType)
-                  }
-                    onPressIn={() =>
-                    setNotificationType(type.value as NotificationType)
-                  }
-                  className={`flex-row items-center px-4 py-2 rounded-xl border ${
-                    notificationType === type.value
-                      ? isDark
-                        ? "border-blue-500 bg-blue-500/20"
-                        : "border-blue-500 bg-blue-50"
-                      : isDark
-                        ? "border-gray-700 bg-dark-card"
-                        : "border-gray-300 bg-white"
-                  }`}
-                >
-                  <Ionicons
-                    name={type.icon as any}
-                    size={16}
-                    color={
-                      notificationType === type.value
-                        ? "#3B82F6"
-                        : isDark
-                          ? "#9CA3AF"
-                          : "#6B7280"
-                    }
-                    style={{ marginRight: 6 }}
-                  />
-                  <AutoText
-                    className={`text-sm font-medium ${
-                      notificationType === type.value
-                        ? "text-blue-600"
-                        : isDark
-                          ? "text-gray-300"
-                          : "text-gray-700"
-                    }`}
-                  >
-                    {type.label}
-                  </AutoText>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {notificationType === "announcement" && (
-              <View className="my-3 ">
-                <AutoText className="text-sm text-amber-600 dark:text-amber-400 mb-4">
-                  ℹ️ Välj en annons att länka till
-                </AutoText>
-                <View className="space-y-2">
-                  {announcements.map((announcement, index) => (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              className="mb-4"
+            >
+              <View className="flex-row gap-2">
+                {(Object.keys(NOTIFICATION_TYPE_CONFIGS) as NotificationType[])
+                  .map((type) => {
+                    const config = NOTIFICATION_TYPE_CONFIGS[type];
+                    return {
+                      value: type,
+                      label: config.label,
+                      icon: config.icon,
+                    };
+                  })
+                  .map((type) => (
                     <TouchableOpacity
-                      key={`${announcement.slug}-${index}`}
-                      onPress={() => setSelectedAnnouncement(announcement.slug)}
-                      onPressIn={() =>
-                        setSelectedAnnouncement(announcement.slug)
+                      key={type.value}
+                      onPress={() =>
+                        setNotificationType(type.value as NotificationType)
                       }
-                      className={`p-3 rounded-xl border mb-3 ${
-                        selectedAnnouncement === announcement.slug
+                      onPressIn={() =>
+                        setNotificationType(type.value as NotificationType)
+                      }
+                      className={`flex-row items-center px-4 py-3 rounded-xl border ${
+                        notificationType === type.value
                           ? isDark
                             ? "border-blue-500 bg-blue-500/20"
                             : "border-blue-500 bg-blue-50"
@@ -416,60 +469,146 @@ export default function AdminNotificationsScreen() {
                             : "border-gray-300 bg-white"
                       }`}
                     >
-                      <View className="flex-row items-center">
-                        {/* Media Preview */}
-                        {announcement.media && (
-                          <View className="mr-3">
-                            {announcement.media.type === 'image' && announcement.media.imageUrl ? (
-                              <Image
-                                source={{ uri: announcement.media.imageUrl }}
-                                style={{
-                                  width: 40,
-                                  height: 40,
-                                  borderRadius: 6,
-                                  resizeMode: 'cover',
-                                }}
-                              />
-                            ) : announcement.media.type === 'video' ? (
-                              <View className="w-10 h-10 bg-gray-300 rounded-lg items-center justify-center">
-                                <Ionicons name="videocam" size={16} color="#666" />
-                              </View>
-                            ) : null}
-                          </View>
-                        )}
-
-                        <View className="flex-1">
-                          <AutoText
-                            className={`text-sm font-medium ${
-                              selectedAnnouncement === announcement.slug
-                                ? "text-blue-600"
-                                : isDark
-                                  ? "text-gray-300"
-                                  : "text-gray-700"
-                            }`}
-                          >
-                            {announcement.title}
-                          </AutoText>
-                          {announcement.media && (
-                            <AutoText className="text-xs text-gray-500 mt-1">
-                              {announcement.media.type === "image"
-                                ? "📷 Bild"
-                                : "🎥 Video"}
-                            </AutoText>
-                          )}
-                        </View>
-
-                        {selectedAnnouncement === announcement.slug && (
-                          <Ionicons
-                            name="checkmark-circle"
-                            size={20}
-                            color="#3B82F6"
-                          />
-                        )}
-                      </View>
+                      <Ionicons
+                        name={type.icon as any}
+                        size={18}
+                        color={
+                          notificationType === type.value
+                            ? "#3B82F6"
+                            : isDark
+                              ? "#9CA3AF"
+                              : "#6B7280"
+                        }
+                        style={{ marginRight: 8 }}
+                      />
+                      <AutoText
+                        className={`text-sm font-medium ${
+                          notificationType === type.value
+                            ? "text-blue-600"
+                            : isDark
+                              ? "text-gray-300"
+                              : "text-gray-700"
+                        }`}
+                      >
+                        {type.label}
+                      </AutoText>
                     </TouchableOpacity>
                   ))}
-                </View>
+              </View>
+            </ScrollView>
+            {notificationType === "announcement" && (
+              <View className="my-3 ">
+                <AutoText
+                  className={`text-sm  mb-4 font-semibold ${isDark ? "text-amber-400" : "text-amber-600 "}`}
+                >
+                  Välj en annons att länka till
+                </AutoText>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  className="mb-4"
+                >
+                  <View className="flex-row gap-3">
+                    {announcements.map((announcement, index) => (
+                      <TouchableOpacity
+                        key={`${announcement.slug}-${index}`}
+                        onPress={() =>
+                          setSelectedAnnouncement(announcement.slug)
+                        }
+                        onPressIn={() =>
+                          setSelectedAnnouncement(announcement.slug)
+                        }
+                        className={`p-3 rounded-xl border min-w-[280px] ${
+                          selectedAnnouncement === announcement.slug
+                            ? isDark
+                              ? "border-blue-500 bg-blue-500/20"
+                              : "border-blue-500 bg-blue-50"
+                            : isDark
+                              ? "border-gray-700 bg-dark-card"
+                              : "border-gray-300 bg-white"
+                        }`}
+                      >
+                        <View className="flex-row items-center">
+                          {/* Media Preview */}
+                          {announcement.media && (
+                            <View className="mr-3">
+                              {announcement.media.type === "image" &&
+                              announcement.media.imageUrl ? (
+                                <Image
+                                  source={{ uri: announcement.media.imageUrl }}
+                                  style={{
+                                    width: 60,
+                                    height: 60,
+                                    borderRadius: 8,
+                                    resizeMode: "cover",
+                                  }}
+                                />
+                              ) : announcement.media.type === "video" &&
+                                announcement.media.videoUrl ? (
+                                <>
+                                  <View className="w-[60px] h-[60px] rounded-lg overflow-hidden relative">
+                                    <View
+                                      style={{
+                                        width: 60,
+                                        height: 60,
+                                        borderRadius: 8,
+                                        borderWidth: 1,
+                                        borderColor: isDark
+                                          ? "#374151"
+                                          : "#e5e7eb",
+                                        overflow: "hidden",
+                                      }}
+                                    >
+                                      <VideoPlayer
+                                        uri={announcement.media.videoUrl}
+                                        muted
+                                        aspectRatio={1}
+                                      />
+                                    </View>
+                                  </View>
+                                </>
+                              ) : null}
+                            </View>
+                          )}
+
+                          <View className="flex-1 mb-8 max-w-[300px] ">
+                            <AutoText
+                              className={`text-sm font-semibold mb-1  line-clamp-1 ${
+                                selectedAnnouncement === announcement.slug
+                                  ? "text-blue-600"
+                                  : isDark
+                                    ? "text-gray-300"
+                                    : "text-gray-700"
+                              }`}
+                            >
+                              {announcement.title}
+                            </AutoText>
+                            <AutoText
+                              className={`text-xs font-semibold  line-clamp-1 mr-5 ${
+                                selectedAnnouncement === announcement.slug
+                                  ? "text-blue-600"
+                                  : isDark
+                                    ? "text-gray-300"
+                                    : "text-gray-700"
+                              }`}
+                            >
+                              {announcement.message}
+                            </AutoText>
+                             
+                          </View>
+
+                          {selectedAnnouncement === announcement.slug && (
+                            <Ionicons
+                              name="checkmark-circle"
+                              size={20}
+                              color="#3B82F6"
+                            />
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
               </View>
             )}
           </View>
