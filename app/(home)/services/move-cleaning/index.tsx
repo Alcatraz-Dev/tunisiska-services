@@ -976,6 +976,7 @@ export default function MoveCleaning() {
               amount={getFinalPrice()}
               points={getFinalPrice() * 10}
               isDark={isDark}
+              service="Flytt & Städning"
               customText={`Betala ${getFinalPrice()} SEK för Flytt & Städning`}
               customClassName={`w-full rounded-xl p-4 items-center ${
                 isDark ? "bg-dark-card" : "bg-light-card"

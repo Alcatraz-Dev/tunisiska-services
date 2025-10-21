@@ -822,6 +822,7 @@ export default function ShippingPage() {
                 amount={calculateTotal()}
                 points={calculateTotal() * 10}
                 isDark={isDark}
+                service="Frakt"
                 customText={`Betala ${calculateTotal()} SEK för Frakt`}
                 customClassName="mb-10 text-lg font-semibold"
                 customStyle={{

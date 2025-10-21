@@ -697,7 +697,7 @@ export default function Move() {
               amount={getFinalPrice()}
               points={getFinalPrice() * 10}
               isDark={isDark}
-              service="Flytt utan städning"
+              service="Flytt"
               customText={`Betala ${getFinalPrice()} SEK för Flytt`}
               customClassName="mb-10 text-lg font-semibold"
               customStyle={{
@@ -707,8 +707,8 @@ export default function Move() {
               }}
               disabled={!customerName.trim() || !customerPhone.trim() || !pickup.trim() || !dropoff.trim() || !numPersons.trim() || parseInt(numPersons) < 1 || !numItems.trim() || parseInt(numItems) < 1 || selectedCategories.length === 0}
               onPaymentSuccess={async (purchasedPoints: number, amountPaid: number) => {
-                 await createMoveOrder(true);
-               }}
+                await createMoveOrder(true);
+              }}
             />
           ) : (
             <TouchableOpacity

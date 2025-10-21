@@ -1018,6 +1018,7 @@ export default function Taxi() {
             amount={getFinalPrice()}
             points={getFinalPrice() * 10}
             isDark={isDark}
+            service="Taxi"
             customText={`Betala ${getFinalPrice()} SEK för Taxi`}
             customClassName={`mb-10 `}
             customStyle={{

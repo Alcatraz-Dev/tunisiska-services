@@ -226,26 +226,15 @@ try {
   console.error("⚠️ Stripe init error:", error.message);
 }
 
-// Diagnostic logs for payment endpoints
-console.log("🔍 [DIAGNOSTIC] STRIPE_SECRET_KEY present:", !!STRIPE_SECRET_KEY);
-console.log("🔍 [DIAGNOSTIC] STRIPE_SECRET_KEY length:", STRIPE_SECRET_KEY ? STRIPE_SECRET_KEY.length : 0);
-console.log("🔍 [DIAGNOSTIC] EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY present:", !!process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY);
-console.log("🔍 [DIAGNOSTIC] NODE_ENV:", process.env.NODE_ENV);
-console.log("🔍 [DIAGNOSTIC] PORT:", PORT);
 
 // Payment sheet endpoint (for native apps)
 app.post("/payment-sheet", async (req, res) => {
-  console.log("🔍 [DIAGNOSTIC] /payment-sheet called with:", { amount: req.body.amount, currency: req.body.currency });
   try {
     const { amount, currency } = req.body;
 
-    if (!amount) {
-      console.log("❌ [DIAGNOSTIC] Amount missing in /payment-sheet");
-      return res.status(400).json({ error: "Amount is required" });
-    }
+    if (!amount) return res.status(400).json({ error: "Amount is required" });
 
     const usedCurrency = currency || "sek";
-    console.log("🔍 [DIAGNOSTIC] Using currency:", usedCurrency);
 
     let paymentMethodTypes;
     if (usedCurrency === "sek") {
@@ -259,22 +248,16 @@ app.post("/payment-sheet", async (req, res) => {
       paymentMethodTypes = ["card", "link"];
     }
 
-    console.log("🔍 [DIAGNOSTIC] Creating Stripe customer...");
     const customer = await stripe.customers.create();
-    console.log("✅ [DIAGNOSTIC] Customer created:", customer.id);
 
-    console.log("🔍 [DIAGNOSTIC] Creating ephemeral key...");
     const ephemeralKey = await stripe.ephemeralKeys.create(
       { customer: customer.id },
       { apiVersion: "2024-09-30.acacia" }
     );
-    console.log("✅ [DIAGNOSTIC] Ephemeral key created");
 
     // Convert amount to smallest currency unit (öre for SEK)
     const stripeAmount = usedCurrency === "sek" ? amount * 100 : amount;
-    console.log("🔍 [DIAGNOSTIC] Stripe amount (converted):", stripeAmount);
 
-    console.log("🔍 [DIAGNOSTIC] Creating payment intent...");
     const paymentIntent = await stripe.paymentIntents.create({
       amount: stripeAmount,
       currency: usedCurrency,
@@ -282,9 +265,7 @@ app.post("/payment-sheet", async (req, res) => {
       payment_method_types: paymentMethodTypes,
       metadata: { integration: "mobile_payment_sheet" }
     });
-    console.log("✅ [DIAGNOSTIC] Payment intent created:", paymentIntent.id);
 
-    console.log("🔍 [DIAGNOSTIC] Sending response with publishable key present:", !!process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY);
     res.json({
       paymentIntent: paymentIntent.client_secret,
       ephemeralKey: ephemeralKey.secret,
@@ -299,29 +280,20 @@ app.post("/payment-sheet", async (req, res) => {
 
 // Checkout session endpoint (for web)
 app.post("/create-checkout-session", async (req, res) => {
-  console.log("🔍 [DIAGNOSTIC] /create-checkout-session called with:", { amount: req.body.amount, currency: req.body.currency, points: req.body.points, service: req.body.service, isWallet: req.body.isWallet });
   try {
-    const { amount, currency, successUrl, cancelUrl, points, service, isWallet } = req.body;
-    console.log("📡 [SERVER] Received checkout request:", { amount, currency, points, service, isWallet });
+    const { amount, currency, successUrl, cancelUrl, points } = req.body;
+    console.log("📡 [SERVER] Received checkout request:", { amount, currency, points });
 
-    if (!amount) {
-      console.log("❌ [DIAGNOSTIC] Amount missing in /create-checkout-session");
-      return res.status(400).json({ error: "Amount is required" });
-    }
+    if (!amount) return res.status(400).json({ error: "Amount is required" });
 
     const usedCurrency = currency || "sek";
     // Amount is already in cents from the client
     const stripeAmount = amount;
     console.log("💰 [SERVER] Stripe amount (cents):", stripeAmount);
-    console.log("🔍 [DIAGNOSTIC] Using currency:", usedCurrency);
-    console.log("🔍 [DIAGNOSTIC] isWallet value:", isWallet, "type:", typeof isWallet);
 
     const displayAmount = (amount / 100).toFixed(2);
-    const displayPoints = points || Math.round(amount / 100);
-    const displayService = service || "Tjänst";
-    console.log("🎯 [SERVER] Display amount:", displayAmount, "Display points:", displayPoints, "Display service:", displayService);
-
-    console.log("🔍 [DIAGNOSTIC] Creating checkout session...");
+    const displayPoints = points || Math.round(amount / 100 * 10);
+    console.log("🎯 [SERVER] Display amount:", displayAmount, "Display points:", displayPoints);
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
@@ -330,8 +302,8 @@ app.post("/create-checkout-session", async (req, res) => {
           price_data: {
             currency: usedCurrency,
             product_data: {
-              name: isWallet ? `${displayPoints} poäng - Tunisiska Services` : `${displayService} - Tunisiska Services`,
-              description: isWallet ? `Få ${displayPoints} poäng att använda i appen - ${displayAmount} ${usedCurrency.toUpperCase()}` : `Betalning för ${displayService} tjänst - ${displayAmount} ${usedCurrency.toUpperCase()}`,
+              name: `${displayPoints} Poäng - Tunisiska Services`,
+              description: `Köp ${displayPoints} poäng för ${displayAmount} ${usedCurrency.toUpperCase()}`,
             },
             unit_amount: stripeAmount,
           },
@@ -349,7 +321,6 @@ app.post("/create-checkout-session", async (req, res) => {
     });
 
     console.log("✅ [SERVER] Checkout session created:", session.id, "URL:", session.url);
-    console.log("🔍 [DIAGNOSTIC] Session URL present:", !!session.url);
     res.json({
       sessionId: session.id,
       url: session.url
@@ -359,107 +330,6 @@ app.post("/create-checkout-session", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
-// Expo Push Notification helper
-import pkg from 'expo-server-sdk';
-const { Expo, ExpoPushMessage, ExpoPushToken } = pkg;
-
-// Initialize Expo SDK
-const expo = new Expo();
-
-// API endpoint for sending Expo push notifications with images
-app.post("/api/send-expo-notification", async (req, res) => {
-  try {
-    const { expoPushToken, title, message, image, data } = req.body;
-
-    if (!expoPushToken || !title || !message) {
-      return res.status(400).json({
-        error: 'Missing required fields: expoPushToken, title, message'
-      });
-    }
-
-    // Check if the token is valid
-    if (!Expo.isExpoPushToken(expoPushToken)) {
-      return res.status(400).json({
-        error: 'Invalid Expo push token'
-      });
-    }
-
-    // Create the notification message
-    const notificationMessage = {
-      to: expoPushToken,
-      sound: 'default',
-      title: title,
-      body: message,
-      data: data || {},
-      // Add image support for Expo Go
-      ...(image && { image: image }),
-    };
-
-    console.log('📤 Sending Expo notification:', {
-      token: expoPushToken.substring(0, 20) + '...',
-      title,
-      message,
-      hasImage: !!image,
-      image: image ? image.substring(0, 50) + '...' : null
-    });
-
-    // Send the notification
-    const chunks = expo.chunkPushNotifications([notificationMessage]);
-    const tickets = [];
-
-    for (let chunk of chunks) {
-      try {
-        const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
-        tickets.push(...ticketChunk);
-        console.log('✅ Notification chunk sent successfully');
-      } catch (error) {
-        console.error('❌ Error sending notification chunk:', error);
-        return res.status(500).json({
-          error: 'Failed to send notification',
-          details: error.message
-        });
-      }
-    }
-
-    // Check for any errors in the tickets
-    const errors = [];
-    for (let ticket of tickets) {
-      if (ticket.status === 'error') {
-        errors.push({
-          token: expoPushToken,
-          message: ticket.message,
-          details: ticket.details
-        });
-      }
-    }
-
-    if (errors.length > 0) {
-      console.warn('⚠️ Some notifications failed:', errors);
-      return res.status(207).json({
-        success: false,
-        message: 'Some notifications failed to send',
-        errors,
-        tickets
-      });
-    }
-
-    console.log('✅ All notifications sent successfully');
-    res.json({
-      success: true,
-      message: 'Notification sent successfully',
-      tickets
-    });
-
-  } catch (error) {
-    console.error('❌ Error in send-expo-notification endpoint:', error);
-    res.status(500).json({
-      error: 'Internal server error',
-      details: error.message
-    });
-  }
-});
-
 
 // Export for Vercel serverless deployment
 export default app;
@@ -477,7 +347,6 @@ if (process.env.NODE_ENV !== 'production') {
   });
 
 
-  app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
   // Keep server alive
   process.on('SIGINT', () => {
     console.log('🛑 Shutting down server...');

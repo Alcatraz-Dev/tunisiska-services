@@ -63,7 +63,7 @@ export default function PaymentStripeJS({
         amount: Math.round(amount * 100), // Convert to cents
         currency: "sek",
         points: points || Math.round(amount * 10),
-        service: service || "Tjänst",
+        service: service || "Taxi",
         isWallet,
       };
       console.log("🔍 [PAYMENT] Request body:", JSON.stringify(requestBody, null, 2));
