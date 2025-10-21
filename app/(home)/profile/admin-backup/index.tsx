@@ -137,10 +137,9 @@ export default function AdminBackupScreen() {
               Sanity Data Export
             </AutoText>
             <AutoText className="text-white/90 text-center text-sm">
-              Exportera all data till en .zgr-fil för säkerhetskopiering
+              Exportera all data till en .NDJSON-fil för säkerhetskopiering
             </AutoText>
           </View>
-
           {/* Data Types List */}
           <View className="bg-white/10 rounded-lg p-4">
             <AutoText className="text-white font-semibold mb-3 text-center">

@@ -13,7 +13,7 @@ const PORT = process.env.PORT || 3000;
 app.get("/sanity/export", async (req, res) => {
   try {
     const projectId = process.env.EXPO_PUBLIC_SANITY_PROJECT_ID || "c7b65ce0-2aa6-4b42-b6d7-4f04277bc839";
-    const dataset =  process.env.EXPO_PUBLIC_SANITY_DATASET || "production";
+    const dataset = process.env.EXPO_PUBLIC_SANITY_DATASET || "production";
     const token = process.env.EXPO_PUBLIC_SANITY_TOKEN || "";
 
     console.log("🔍 [SANITY EXPORT] Environment variables:");
@@ -299,9 +299,9 @@ app.post("/payment-sheet", async (req, res) => {
 
 // Checkout session endpoint (for web)
 app.post("/create-checkout-session", async (req, res) => {
-  console.log("🔍 [DIAGNOSTIC] /create-checkout-session called with:", { amount: req.body.amount, currency: req.body.currency, points: req.body.points, service: req.body.service });
+  console.log("🔍 [DIAGNOSTIC] /create-checkout-session called with:", { amount: req.body.amount, currency: req.body.currency, points: req.body.points, service: req.body.service, isWallet: req.body.isWallet });
   try {
-    const { amount, currency, successUrl, cancelUrl, points, service } = req.body;
+    const { amount, currency, successUrl, cancelUrl, points, service, isWallet } = req.body;
     console.log("📡 [SERVER] Received checkout request:", { amount, currency, points });
 
     if (!amount) {
@@ -321,6 +321,8 @@ app.post("/create-checkout-session", async (req, res) => {
     console.log("🎯 [SERVER] Display amount:", displayAmount, "Display points:", displayPoints, "Display service:", displayService);
 
     console.log("🔍 [DIAGNOSTIC] Creating checkout session...");
+    console.log("🔍 [DIAGNOSTIC] isWallet:", isWallet);
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       line_items: [
@@ -328,8 +330,8 @@ app.post("/create-checkout-session", async (req, res) => {
           price_data: {
             currency: usedCurrency,
             product_data: {
-              name: `${displayService} - Tunisiska Services`,
-              description: `Betalning för ${displayService} tjänst - ${displayAmount} ${usedCurrency.toUpperCase()}`,
+              name: isWallet ? `${displayPoints} poäng - Tunisiska Services` : `${displayService} - Tunisiska Services`,
+              description: isWallet ? `Få ${displayPoints} poäng att använda i appen - ${displayAmount} ${usedCurrency.toUpperCase()}` : `Betalning för ${displayService} tjänst - ${displayAmount} ${usedCurrency.toUpperCase()}`,
             },
             unit_amount: stripeAmount,
           },
