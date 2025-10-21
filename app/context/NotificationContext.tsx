@@ -119,17 +119,22 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const markAsRead = async (id: string) => {
+    console.log("🔍 [NOTIFICATION] Marking notification as read:", id);
     setNotifications((prev) => {
       const updated = prev.map((n) => (n.id === id ? { ...n, read: true } : n));
       // Update badge count only if permissions are granted
       const unreadCount = updated.filter(n => !n.read).length;
-      
+      console.log("🔍 [NOTIFICATION] New unread count after marking read:", unreadCount);
+
       if (permissionStatus?.granted && notificationsEnabled) {
+        console.log("🔍 [NOTIFICATION] Setting badge count to:", unreadCount);
         Notifications.setBadgeCountAsync(unreadCount).catch((error) => {
           console.warn('⚠️ Failed to set badge count:', error);
         });
+      } else {
+        console.log("🔍 [NOTIFICATION] Not setting badge - permissions:", permissionStatus?.granted, "enabled:", notificationsEnabled);
       }
-      
+
       return updated;
     });
   };

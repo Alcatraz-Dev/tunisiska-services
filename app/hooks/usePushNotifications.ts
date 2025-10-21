@@ -29,32 +29,55 @@ export default function usePushNotifications() {
     if (stored) addMultipleNotifications(JSON.parse(stored));
   };
   const saveUnreadCount = async (count: number) => {
+    console.log("🔍 [NOTIFICATION] Saving unread count:", count);
     await AsyncStorage.setItem("unreadCount", count.toString());
     if (isRealDevice) {
-      try { await Notifications.setBadgeCountAsync(count); } catch {}
+      try {
+        console.log("🔍 [NOTIFICATION] Setting badge count to:", count);
+        await Notifications.setBadgeCountAsync(count);
+      } catch (error) {
+        console.warn("⚠️ Failed to set badge count:", error);
+      }
     }
   };
   const loadUnreadCount = async () => {
     const stored = await AsyncStorage.getItem("unreadCount");
+    console.log("🔍 [NOTIFICATION] Loading unread count from storage:", stored);
     if (stored) {
       const count = Number(stored);
+      console.log("🔍 [NOTIFICATION] Setting unread count to:", count);
       setUnreadCount(count);
       if (isRealDevice) {
-        try { await Notifications.setBadgeCountAsync(count); } catch {}
+        try {
+          console.log("🔍 [NOTIFICATION] Setting badge count to:", count);
+          await Notifications.setBadgeCountAsync(count);
+        } catch (error) {
+          console.warn("⚠️ Failed to set badge count on load:", error);
+        }
       }
+    } else {
+      console.log("🔍 [NOTIFICATION] No unread count in storage");
     }
   };
 
   // Sync Native Notify inbox
   const syncNativeNotifyInbox = async () => {
-    if (!userId) return;
+    if (!userId) {
+      console.log("🔍 [NOTIFICATION] No userId, skipping sync");
+      return;
+    }
     try {
+      console.log("🔍 [NOTIFICATION] Syncing Native Notify inbox for user:", userId);
       const inboxResp = await getNotificationInbox(32172, "PNF5T5VibvtV6lj8i7pbil", 50, 0);
+      console.log("🔍 [NOTIFICATION] Inbox response:", inboxResp);
       const inbox = Array.isArray(inboxResp) ? inboxResp : (inboxResp && typeof inboxResp === 'object' && 'data' in inboxResp ? inboxResp.data : []) || [];
+      console.log("🔍 [NOTIFICATION] Parsed inbox array:", inbox.length, "items");
       const userInbox = inbox.filter((n: any) => {
         const subId = n?.subscriber_id ?? n?.subscriberId ?? n?.user_id ?? n?.userId;
+        console.log("🔍 [NOTIFICATION] Checking notification subId:", subId, "vs userId:", userId);
         return subId?.toString() === userId;
       });
+      console.log("🔍 [NOTIFICATION] Filtered user inbox:", userInbox.length, "items");
       const mapped = userInbox.map((n: any) => ({
         id: n?.notification_id?.toString() || n?.id?.toString(),
         title: n?.title || "No Title",
@@ -64,13 +87,16 @@ export default function usePushNotifications() {
         date: n?.date ?? n?.date_sent ?? new Date().toISOString(),
         image: n?.image ?? n?.image_url,
       }));
+      console.log("🔍 [NOTIFICATION] Mapped notifications:", mapped.length, "items");
       if (mapped.length > 0) {
         addMultipleNotifications(mapped);
         saveNotifications(mapped);
       }
 
       const unreadResp = await getUnreadNotificationInboxCount(32172, "PNF5T5VibvtV6lj8i7pbil");
+      console.log("🔍 [NOTIFICATION] Unread count response:", unreadResp);
       const apiUnreadCount = typeof unreadResp === "number" ? unreadResp : (unreadResp && typeof unreadResp === 'object' && 'data' in unreadResp ? Number(unreadResp.data) : 0) || 0;
+      console.log("🔍 [NOTIFICATION] Setting unread count to:", apiUnreadCount);
       setUnreadCount(apiUnreadCount);
       await saveUnreadCount(apiUnreadCount);
     } catch (err) {
@@ -81,6 +107,7 @@ export default function usePushNotifications() {
 
   // Handle incoming notification
   const handleIncomingNotification = async (notif: any) => {
+    console.log("🔍 [NOTIFICATION] Incoming notification:", JSON.stringify(notif, null, 2));
     const data = notif?.notification || notif?.request?.content?.data || {};
     const pushData = data?.pushData || data;
     const newNotification: NotificationItem = {
@@ -94,11 +121,14 @@ export default function usePushNotifications() {
       route: pushData?.route,
       screenImage: pushData?.screenImage,
     };
+    console.log("🔍 [NOTIFICATION] Processed notification:", newNotification);
     addNotification(newNotification);
     saveNotifications([newNotification]);
     // Update unread count immediately
-    setUnreadCount(prev => prev + 1);
-    await saveUnreadCount(unreadCount + 1);
+    const newCount = unreadCount + 1;
+    console.log("🔍 [NOTIFICATION] Updating unread count:", unreadCount, "->", newCount);
+    setUnreadCount(newCount);
+    await saveUnreadCount(newCount);
     if (!isRealDevice) showAlert(newNotification.title, newNotification.message);
   };
 
