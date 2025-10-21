@@ -108,9 +108,7 @@ export default function DriverToggle({ isDark }: { isDark: boolean }) {
 
   return (
     <View
-      className={`flex-row items-center justify-between p-4 border-t ${
-        isDark ? "border-gray-700" : "border-gray-200"
-      }`}
+      className={`flex-row items-center justify-between p-4 `}
     >
       <View className="flex-row items-center flex-1">
         <Image

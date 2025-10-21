@@ -26,9 +26,7 @@ export default function LanguageRow({ userProfile }: { userProfile?: any }) {
   const currentLang = language || userProfile?.defaultLanguage || "sv";
   return (
     <View
-      className={`flex-row items-center justify-between p-4 border-b ${
-        isDark ? "border-gray-700" : "border-gray-200"
-      }`}
+      className={`flex-row items-center justify-between p-4 `}
     >
       <View className="flex-row items-center">
         <Image
@@ -47,7 +45,7 @@ export default function LanguageRow({ userProfile }: { userProfile?: any }) {
         className="flex-row items-center"
       >
         <AutoText
-          className={`mr-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}
+          className={`mr-2 text-xs ${isDark ? "text-gray-400" : "text-gray-600"}`}
         >
           {languageNames[currentLang] || currentLang}
         </AutoText>

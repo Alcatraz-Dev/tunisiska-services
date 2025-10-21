@@ -9,9 +9,7 @@ export default function NotificationSettings({ isDark }: { isDark: boolean }) {
 
   return (
     <View
-      className={`flex-row items-center justify-between p-4 border-b ${
-        isDark ? "border-gray-700" : "border-gray-200"
-      }`}
+      className={`flex-row items-center justify-between p-4 `}
     >
       <View className="flex-row items-center">
         <Image
