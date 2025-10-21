@@ -46,10 +46,10 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
             <Ionicons name={icon as any} size={26} color={color} />
           </View>
           <View className="flex-1">
-            <AutoText className={`font-semibold text-base ${isDark ? "text-dark-text" : "text-light-text"}`}>
+            <AutoText className={`font-bold text-sm ${isDark ? "text-dark-text" : "text-light-text"}`}>
               {title}
             </AutoText>
-            <AutoText className={`text-sm mt-1 ${isDark ? "text-dark-text/60" : "text-light-text/60"}`}>
+            <AutoText className={`text-xs mt-1 ${isDark ? "text-dark-text/60" : "text-light-text/60"}`}>
               {description}
             </AutoText>
           </View>
