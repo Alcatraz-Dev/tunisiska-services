@@ -67,10 +67,12 @@ export default function AddFriendScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const pulse = useSharedValue(1);
 
-  const currentUserFriends =
-    (user?.unsafeMetadata as UserMetadata)?.friends || [];
-  const currentFriendRequests =
-    (user?.unsafeMetadata as UserMetadata)?.friendRequests || [];
+  // State for friend data (no longer using Clerk metadata to prevent size limits)
+  const [friendRequests, setFriendRequests] = React.useState<FriendRequest[]>([]);
+  const [friends, setFriends] = React.useState<Friend[]>([]);
+
+  const currentUserFriends = friends;
+  const currentFriendRequests = friendRequests;
 
   // Get points from Sanity as the source of truth
   const [currentUserPoints, setCurrentUserPoints] = useState(0);
@@ -121,7 +123,8 @@ export default function AddFriendScreen() {
       request.fromUserId === user?.id && request.status === "pending"
   );
 
-  // Load friend requests from Sanity
+  // Friend data is now loaded from Sanity and stored in state (no longer using Clerk metadata to prevent size limits)
+
   const loadFriendRequestsFromSanity = async () => {
     try {
       const { client } = await import("@/sanityClient");
@@ -130,47 +133,36 @@ export default function AddFriendScreen() {
         { userId: user?.id }
       );
 
-      // Update user's metadata with latest requests (limit to prevent size issues)
-      if (requests.length > 0) {
-        // Limit to last 50 requests to prevent metadata size issues
-        const recentRequests = requests.slice(0, 50);
+      // Get sender and receiver information for each request
+      const requestsWithInfo = await Promise.all(
+        requests.map(async (req: any) => {
+          // Use data from Sanity, with fallbacks for missing info
+          let senderName =
+            req.fromUserName || `User ${req.fromUserId.slice(-8)}`;
+          let senderImageUrl = req.fromUserImageUrl;
+          let senderPoints = req.fromUserPoints || 0;
 
-        // Get sender and receiver information for each request
-        const requestsWithInfo = await Promise.all(
-          recentRequests.map(async (req: any) => {
-            // Use data from Sanity, with fallbacks for missing info
-            let senderName =
-              req.fromUserName || `User ${req.fromUserId.slice(-8)}`;
-            let senderImageUrl = req.fromUserImageUrl;
-            let senderPoints = req.fromUserPoints || 0;
+          let receiverName =
+            req.toUserName || `User ${req.toUserId.slice(-8)}`;
+          let receiverImageUrl = req.toUserImageUrl;
 
-            let receiverName =
-              req.toUserName || `User ${req.toUserId.slice(-8)}`;
-            let receiverImageUrl = req.toUserImageUrl;
+          return {
+            id: req._id,
+            fromUserId: req.fromUserId,
+            fromUserName: senderName,
+            fromUserImageUrl: senderImageUrl,
+            fromUserPoints: senderPoints,
+            toUserId: req.toUserId,
+            toUserName: receiverName,
+            toUserImageUrl: receiverImageUrl,
+            pointsToTransfer: req.pointsToTransfer || 0,
+            status: req.status,
+            createdAt: req.createdAt,
+          };
+        })
+      );
 
-            return {
-              id: req._id,
-              fromUserId: req.fromUserId,
-              fromUserName: senderName,
-              fromUserImageUrl: senderImageUrl,
-              fromUserPoints: senderPoints,
-              toUserId: req.toUserId,
-              toUserName: receiverName,
-              toUserImageUrl: receiverImageUrl,
-              pointsToTransfer: req.pointsToTransfer || 0,
-              status: req.status,
-              createdAt: req.createdAt,
-            };
-          })
-        );
-
-        await user?.update({
-          unsafeMetadata: {
-            ...(user?.unsafeMetadata as any),
-            friendRequests: requestsWithInfo,
-          },
-        });
-      }
+      setFriendRequests(requestsWithInfo);
     } catch (error) {
       console.error("Error loading friend requests from Sanity:", error);
     }
@@ -208,15 +200,7 @@ export default function AddFriendScreen() {
         })
       );
 
-      // Update user's friends list in metadata (limit to prevent size issues)
-      const limitedFriends = friends.slice(0, 100); // Limit to 100 friends
-
-      await user?.update({
-        unsafeMetadata: {
-          ...(user?.unsafeMetadata as any),
-          friends: limitedFriends,
-        },
-      });
+      setFriends(friends);
     } catch (error) {
       console.error("Error loading friends from Sanity:", error);
     }
@@ -328,20 +312,8 @@ export default function AddFriendScreen() {
         createdAt: new Date().toISOString(),
       };
 
-      // Add to sender's outgoing requests in metadata (limit size)
-      const existingRequests =
-        (user?.unsafeMetadata as any)?.friendRequests || [];
-      const updatedRequests = [...existingRequests, friendRequest];
-
-      // Keep only the most recent 50 requests to prevent size issues
-      const limitedRequests = updatedRequests.slice(-50);
-
-      await user?.update({
-        unsafeMetadata: {
-          ...(user?.unsafeMetadata as any),
-          friendRequests: limitedRequests,
-        },
-      });
+      // Update local state instead of metadata to prevent size limits
+      setFriendRequests(prev => [...prev, friendRequest]);
 
       console.log(`✅ Friend request sent to: ${friendValue}`);
 
@@ -456,8 +428,8 @@ export default function AddFriendScreen() {
         });
       }
 
-      // Add friend to user's friends list
-      const newFriend = {
+      // Add friend to user's friends list (update state instead of metadata)
+      const newFriend: Friend = {
         id: `friend_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         clerkId: request.fromUserId,
         name: request.fromUserName,
@@ -466,26 +438,14 @@ export default function AddFriendScreen() {
         status: "active",
       };
 
-      const currentFriends =
-        (user.unsafeMetadata as UserMetadata)?.friends || [];
-      const updatedFriends = [...currentFriends, newFriend];
+      setFriends(prev => [...prev, newFriend]);
 
-      // Update friend request status in metadata
-      const updatedRequests = currentFriendRequests.map((req: FriendRequest) =>
-        req.id === request.id ? { ...req, status: "accepted" } : req
+      // Update friend request status in state
+      setFriendRequests(prev =>
+        prev.map((req: FriendRequest) =>
+          req.id === request.id ? { ...req, status: "accepted" } : req
+        )
       );
-
-      // Keep only the most recent 50 requests and 100 friends
-      const limitedRequests = updatedRequests.slice(-50);
-      const limitedFriends = updatedFriends.slice(0, 100);
-
-      await user.update({
-        unsafeMetadata: {
-          ...(user.unsafeMetadata as any),
-          friends: limitedFriends,
-          friendRequests: limitedRequests,
-        },
-      });
 
       const pointsMessage =
         pointsToAward > 0
@@ -515,20 +475,10 @@ export default function AddFriendScreen() {
       // Delete friend request from Sanity when rejected
       await client.delete(request.id);
 
-      // Remove friend request from metadata (limit size)
-      const updatedRequests = currentFriendRequests.filter(
-        (req: FriendRequest) => req.id !== request.id
+      // Remove friend request from state instead of metadata
+      setFriendRequests(prev =>
+        prev.filter((req: FriendRequest) => req.id !== request.id)
       );
-
-      // Keep only the most recent 50 requests
-      const limitedRequests = updatedRequests.slice(-50);
-
-      await user.update({
-        unsafeMetadata: {
-          ...(user.unsafeMetadata as any),
-          friendRequests: limitedRequests,
-        },
-      });
 
       showAlert(
         "Vänförfrågan avvisad",
@@ -865,17 +815,10 @@ export default function AddFriendScreen() {
                                               );
                                             }
 
-                                            // Remove friend from local metadata
-                                            const updatedFriends =
-                                              currentUserFriends.filter(
-                                                (f) => f.id !== friend.id
-                                              );
-                                            await user?.update({
-                                              unsafeMetadata: {
-                                                ...(user?.unsafeMetadata as any),
-                                                friends: updatedFriends,
-                                              },
-                                            });
+                                            // Remove friend from local state instead of metadata
+                                            setFriends(prev =>
+                                              prev.filter((f) => f.id !== friend.id)
+                                            );
 
                                             console.log(
                                               `✅ Friend removed: ${friend.name}`

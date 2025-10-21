@@ -11,7 +11,7 @@ import * as Application from "expo-application";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -19,6 +19,7 @@ import {
   ScrollView,
   TouchableOpacity,
   View,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import SignOutButton from "../../components/SignOutButton";
@@ -90,6 +91,29 @@ const Profile = () => {
   const activeReferrals = (userProfile?.referrals ?? []).filter(
     (r) => r.status === "active" || r.status === "completed"
   ).length;
+
+  // Get pending friend requests count from Sanity
+  const [pendingFriendRequests, setPendingFriendRequests] = useState(0);
+
+  useEffect(() => {
+    const loadPendingFriendRequests = async () => {
+      if (!user?.id) return;
+
+      try {
+        const { client } = await import("@/sanityClient");
+        const pendingRequests = await client.fetch(
+          `count(*[_type == "friendRequest" && toUserId == $userId && status == "pending"])`,
+          { userId: user.id }
+        );
+        setPendingFriendRequests(pendingRequests);
+      } catch (error) {
+        console.error("Error loading pending friend requests count:", error);
+        setPendingFriendRequests(0);
+      }
+    };
+
+    loadPendingFriendRequests();
+  }, [user?.id]);
 
   // Initialize isDark early so it can be used in getTierColors
   const isDark = resolvedTheme === "dark";
@@ -246,6 +270,70 @@ const Profile = () => {
 
   const copyToClipboard = () => {
     showAlert("Kopierad", "Referenskoden har kopierats till urklipp!");
+  };
+
+  // Admin backup function
+  const handleBackupData = async () => {
+    try {
+      setLoading(true);
+      const { client } = await import("@/sanityClient");
+
+      // Fetch all data from Sanity
+      const [users, moveOrders, shippingOrders, taxiOrders, moveCleaningOrders, announcements, friendRequests] = await Promise.all([
+        client.fetch(`*[_type == "users"]`),
+        client.fetch(`*[_type == "moveOrder"]`),
+        client.fetch(`*[_type == "shippingOrder"]`),
+        client.fetch(`*[_type == "taxiOrder"]`),
+        client.fetch(`*[_type == "moveCleaningOrder"]`),
+        client.fetch(`*[_type == "announcement"]`),
+        client.fetch(`*[_type == "friendRequest"]`),
+      ]);
+
+      const backupData = {
+        timestamp: new Date().toISOString(),
+        version: "1.0",
+        data: {
+          users,
+          moveOrders,
+          shippingOrders,
+          taxiOrders,
+          moveCleaningOrders,
+          announcements,
+          friendRequests,
+        },
+        summary: {
+          usersCount: users.length,
+          moveOrdersCount: moveOrders.length,
+          shippingOrdersCount: shippingOrders.length,
+          taxiOrdersCount: taxiOrders.length,
+          moveCleaningOrdersCount: moveCleaningOrders.length,
+          announcementsCount: announcements.length,
+          friendRequestsCount: friendRequests.length,
+        }
+      };
+
+      // Create and download JSON file
+      const dataStr = JSON.stringify(backupData, null, 2);
+      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+
+      // For web platform
+      if (Platform.OS === 'web') {
+        const exportFileDefaultName = `sanity-backup-${new Date().toISOString().split('T')[0]}.json`;
+        const linkElement = document.createElement('a');
+        linkElement.setAttribute('href', dataUri);
+        linkElement.setAttribute('download', exportFileDefaultName);
+        linkElement.click();
+        showAlert("Backup slutförd", `Backup-fil nedladdad med ${backupData.summary.usersCount + backupData.summary.moveOrdersCount + backupData.summary.shippingOrdersCount + backupData.summary.taxiOrdersCount + backupData.summary.moveCleaningOrdersCount + backupData.summary.announcementsCount + backupData.summary.friendRequestsCount} total poster.`);
+      } else {
+        // For mobile, show alert with data (can't download files directly)
+        showAlert("Backup slutförd", `Backup innehåller:\n• ${backupData.summary.usersCount} användare\n• ${backupData.summary.moveOrdersCount} flyttbeställningar\n• ${backupData.summary.shippingOrdersCount} fraktbeställningar\n• ${backupData.summary.taxiOrdersCount} taxibeställningar\n• ${backupData.summary.moveCleaningOrdersCount} flyttstädningar\n• ${backupData.summary.announcementsCount} annonser\n• ${backupData.summary.friendRequestsCount} vänförfrågningar`);
+      }
+    } catch (error) {
+      console.error("Backup error:", error);
+      showAlert("Fel", "Kunde inte skapa backup");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Show loading state while user data is being fetched
@@ -522,6 +610,10 @@ const Profile = () => {
                   icon: icons.people,
                   text: " Vänner",
                   href: "/profile/add-friend",
+                  badge:
+                    pendingFriendRequests > 0
+                      ? pendingFriendRequests
+                      : undefined,
                 },
 
                 {
@@ -540,6 +632,11 @@ const Profile = () => {
                         icon: icons.bell,
                         text: "Skicka Notifikationer",
                         href: "/profile/admin-notifications",
+                      },
+                      {
+                        icon: icons.backup,
+                        text: "Backup Data",
+                        onPress: handleBackupData,
                       },
                     ]
                   : []),
@@ -568,11 +665,20 @@ const Profile = () => {
                   >
                     {item.text}
                   </AutoText>
-                  <Image
-                    source={icons.rightArrow}
-                    className="w-4 h-4"
-                    style={{ tintColor: isDark ? "#94a3b8" : "#64748b" }}
-                  />
+                  <View className="flex-row items-center">
+                    {item.badge && (
+                      <View className="bg-red-500 rounded-full mr-2 min-w-[20px] min-h-[20px] items-center justify-center">
+                        <AutoText className="text-white text-[9px] font-bold">
+                          {item.badge}
+                        </AutoText>
+                      </View>
+                    )}
+                    <Image
+                      source={icons.rightArrow}
+                      className="w-4 h-4"
+                      style={{ tintColor: isDark ? "#94a3b8" : "#64748b" }}
+                    />
+                  </View>
                 </TouchableOpacity>
               ))}
             </View>
