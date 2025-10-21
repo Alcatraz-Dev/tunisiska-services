@@ -272,74 +272,6 @@ const Profile = () => {
     showAlert("Kopierad", "Referenskoden har kopierats till urklipp!");
   };
 
-  // Admin backup function
-  const handleBackupData = async () => {
-    try {
-      setLoading(true);
-      const { client } = await import("@/sanityClient");
-
-      // Fetch all data from Sanity
-      const [users, moveOrders, shippingOrders, taxiOrders, moveCleaningOrders, announcements, friendRequests] = await Promise.all([
-        client.fetch(`*[_type == "users"]`),
-        client.fetch(`*[_type == "moveOrder"]`),
-        client.fetch(`*[_type == "shippingOrder"]`),
-        client.fetch(`*[_type == "taxiOrder"]`),
-        client.fetch(`*[_type == "moveCleaningOrder"]`),
-        client.fetch(`*[_type == "announcement"]`),
-        client.fetch(`*[_type == "friendRequest"]`),
-      ]);
-
-      const backupData = {
-        timestamp: new Date().toISOString(),
-        version: "1.0",
-        data: {
-          users,
-          moveOrders,
-          shippingOrders,
-          taxiOrders,
-          moveCleaningOrders,
-          announcements,
-          friendRequests,
-        },
-        summary: {
-          usersCount: users.length,
-          moveOrdersCount: moveOrders.length,
-          shippingOrdersCount: shippingOrders.length,
-          taxiOrdersCount: taxiOrders.length,
-          moveCleaningOrdersCount: moveCleaningOrders.length,
-          announcementsCount: announcements.length,
-          friendRequestsCount: friendRequests.length,
-        }
-      };
-
-      // Create and download .zgr file
-      const dataStr = JSON.stringify(backupData, null, 2);
-      const dataUri = 'data:application/octet-stream;charset=utf-8,'+ encodeURIComponent(dataStr);
-
-      const exportFileDefaultName = `sanity-backup-${new Date().toISOString().split('T')[0]}.zgr`;
-
-      // For web platform - download file
-      if (Platform.OS === 'web') {
-        const linkElement = document.createElement('a');
-        linkElement.setAttribute('href', dataUri);
-        linkElement.setAttribute('download', exportFileDefaultName);
-        linkElement.style.display = 'none';
-        document.body.appendChild(linkElement);
-        linkElement.click();
-        document.body.removeChild(linkElement);
-
-        showAlert("Backup slutförd", `Backup-fil "${exportFileDefaultName}" har nedladdats med ${backupData.summary.usersCount + backupData.summary.moveOrdersCount + backupData.summary.shippingOrdersCount + backupData.summary.taxiOrdersCount + backupData.summary.moveCleaningOrdersCount + backupData.summary.announcementsCount + backupData.summary.friendRequestsCount} total poster.`);
-      } else {
-        // For mobile platforms - show data in alert (file system access is complex on mobile)
-        showAlert("Backup slutförd", `Backup innehåller:\n• ${backupData.summary.usersCount} användare\n• ${backupData.summary.moveOrdersCount} flyttbeställningar\n• ${backupData.summary.shippingOrdersCount} fraktbeställningar\n• ${backupData.summary.taxiOrdersCount} taxibeställningar\n• ${backupData.summary.moveCleaningOrdersCount} flyttstädningar\n• ${backupData.summary.announcementsCount} annonser\n• ${backupData.summary.friendRequestsCount} vänförfrågningar\n\nAnvänd web-versionen för att ladda ner .zgr-filen direkt.`);
-      }
-    } catch (error) {
-      console.error("Backup error:", error);
-      showAlert("Fel", "Kunde inte skapa backup: " + (error as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Show loading state while user data is being fetched
   if (!isLoaded || loading) {
@@ -641,7 +573,7 @@ const Profile = () => {
                       {
                         icon: icons.backup,
                         text: "Backup Data",
-                        onPress: handleBackupData,
+                        href: "/profile/admin-backup",
                       },
                     ]
                   : []),
