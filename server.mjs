@@ -302,7 +302,7 @@ app.post("/create-checkout-session", async (req, res) => {
   console.log("🔍 [DIAGNOSTIC] /create-checkout-session called with:", { amount: req.body.amount, currency: req.body.currency, points: req.body.points, service: req.body.service, isWallet: req.body.isWallet });
   try {
     const { amount, currency, successUrl, cancelUrl, points, service, isWallet } = req.body;
-    console.log("📡 [SERVER] Received checkout request:", { amount, currency, points });
+    console.log("📡 [SERVER] Received checkout request:", { amount, currency, points, service, isWallet });
 
     if (!amount) {
       console.log("❌ [DIAGNOSTIC] Amount missing in /create-checkout-session");
@@ -314,6 +314,7 @@ app.post("/create-checkout-session", async (req, res) => {
     const stripeAmount = amount;
     console.log("💰 [SERVER] Stripe amount (cents):", stripeAmount);
     console.log("🔍 [DIAGNOSTIC] Using currency:", usedCurrency);
+    console.log("🔍 [DIAGNOSTIC] isWallet value:", isWallet, "type:", typeof isWallet);
 
     const displayAmount = (amount / 100).toFixed(2);
     const displayPoints = points || Math.round(amount / 100);
@@ -321,7 +322,6 @@ app.post("/create-checkout-session", async (req, res) => {
     console.log("🎯 [SERVER] Display amount:", displayAmount, "Display points:", displayPoints, "Display service:", displayService);
 
     console.log("🔍 [DIAGNOSTIC] Creating checkout session...");
-    console.log("🔍 [DIAGNOSTIC] isWallet:", isWallet);
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],

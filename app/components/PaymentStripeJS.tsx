@@ -64,6 +64,7 @@ export default function PaymentStripeJS({
         currency: "sek",
         points: points || Math.round(amount * 10),
         service: service || "Tjänst",
+        isWallet,
       };
       console.log("🔍 [PAYMENT] Request body:", JSON.stringify(requestBody, null, 2));
 
