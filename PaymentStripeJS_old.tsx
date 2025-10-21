@@ -9,8 +9,10 @@ import {
   Platform,
 } from "react-native";
 import { WebView } from "react-native-webview";
-import { AutoText } from "./ui/AutoText";
-import { showAlert } from "../utils/showAlert";
+import { showAlert } from "./app/utils/showAlert";
+import { AutoText } from "./app/components/ui/AutoText";
+import { getServerURL } from "./app/lib/getServerURL";
+
 
 interface PaymentStripeJSProps {
   amount: number;
@@ -51,8 +53,8 @@ export default function PaymentStripeJS({
       setLoading(true);
 
       // Create checkout session on your server
-      const serverUrl =
-        process.env.EXPO_PUBLIC_SERVER_URL || "http://localhost:3000";
+      const serverUrl = getServerURL();
+        // process.env.EXPO_PUBLIC_SERVER_URL || "http://localhost:3000";
       const response = await fetch(`${serverUrl}/create-checkout-session`, {
         method: "POST",
         headers: {

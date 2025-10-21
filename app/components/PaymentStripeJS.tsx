@@ -51,17 +51,23 @@ export default function PaymentStripeJS({
       setLoading(true);
 
       // Create checkout session on your server
-      const serverUrl = "http://localhost:3000";
+      const serverUrl = process.env.EXPO_PUBLIC_SERVER_URL || "http://localhost:3000";
+      console.log("🔍 [PAYMENT] Using server URL:", serverUrl);
+      console.log("🔍 [PAYMENT] EXPO_PUBLIC_SERVER_URL:", process.env.EXPO_PUBLIC_SERVER_URL);
+
+      const requestBody = {
+        amount: Math.round(amount * 100), // Convert to cents
+        currency: "sek",
+        points: points || Math.round(amount * 10),
+      };
+      console.log("🔍 [PAYMENT] Request body:", JSON.stringify(requestBody, null, 2));
+
       const response = await fetch(`${serverUrl}/create-checkout-session`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          amount: Math.round(amount * 100), // Convert to cents
-          currency: "sek",
-          points: points || Math.round(amount * 10),
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -75,7 +81,8 @@ export default function PaymentStripeJS({
           currency: "sek",
           points: points || Math.round(amount * 10),
         }));
-        showAlert("Server Error", `Status: ${response.status}\nDetails: ${errorText}`);
+        console.error("❌ [PAYMENT] Full response:", response);
+        showAlert("Server Error", `Status: ${response.status}\nDetails: ${errorText}\nURL: ${serverUrl}`);
         return;
       }
 
@@ -104,8 +111,13 @@ export default function PaymentStripeJS({
         }
       }
     } catch (error) {
-      console.error("Error creating checkout session:", error);
-      showAlert("Fel", "Kunde inte skapa betalningssession");
+      console.error("❌ [PAYMENT] Error creating checkout session:", error);
+      console.error("❌ [PAYMENT] Error type:", typeof error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      console.error("❌ [PAYMENT] Error message:", errorMessage);
+      if (errorStack) console.error("❌ [PAYMENT] Error stack:", errorStack);
+      showAlert("Fel", `Kunde inte skapa betalningssession: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
