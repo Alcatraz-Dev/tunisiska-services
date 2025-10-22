@@ -26,58 +26,94 @@ export default function AdminBackupScreen() {
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState("");
 
+  // const handleExportData = async () => {
+  //   try {
+  //     setIsExporting(true);
+  //     setExportProgress("Hämtar data från server...");
+
+  //     const serverURL = await  getServerURL();
+  //     console.log("🔍 [BACKUP] Using server URL:", serverURL);
+  //     const response = await fetch(`${serverURL}/sanity/export`);
+  //     console.log("🔍 [BACKUP] Response status:", response.status);
+  //     if (!response.ok) throw new Error(`Server error: ${response.status}`);
+
+  //     const backupText = await response.text();
+  //     const fileName = `sanity-backup-${
+  //       new Date().toISOString().split("T")[0]
+  //     }.ndjson`;
+
+  //     const fileUri = (FileSystem as any).documentDirectory + fileName;
+  //     await FileSystem.writeAsStringAsync(fileUri, backupText);
+
+  //     if (Platform.OS === "android") {
+  //       const permissions = await (
+  //         FileSystem as any
+  //       ).StorageAccessFramework.requestDirectoryPermissionsAsync();
+  //       if (permissions.granted) {
+  //         const base64 = Buffer.from(backupText).toString("base64");
+  //         const newFileUri = await (
+  //           FileSystem as any
+  //         ).StorageAccessFramework.createFileAsync(
+  //           permissions.directoryUri,
+  //           fileName,
+  //           "application/x-ndjson"
+  //         );
+  //         await FileSystem.writeAsStringAsync(newFileUri, base64, {
+  //           encoding: (FileSystem as any).EncodingType.Base64,
+  //         });
+  //         showAlert("Export klar", "Backup-filen sparades i vald mapp.");
+  //       } else {
+  //         await shareAsync(fileUri);
+  //       }
+  //     } else {
+  //       await shareAsync(fileUri);
+  //     }
+
+  //     setIsExporting(false);
+  //     setExportProgress("");
+  //   } catch (err: any) {
+  //     console.error("Export error:", err);
+  //     showAlert("Fel", "Kunde inte exportera data: " + err.message);
+  //     setIsExporting(false);
+  //   }
+  // };
+  const sanityProjectId = process.env.EXPO_PUBLIC_SANITY_PROJECT_ID;
+  const sanityDataset = process.env.EXPO_PUBLIC_SANITY_DATASET;
+  const sanityToken = process.env.EXPO_PUBLIC_SANITY_TOKEN; // read-only token if needed
   const handleExportData = async () => {
     try {
       setIsExporting(true);
-      setExportProgress("Hämtar data från server...");
+      setExportProgress("Hämtar data från Sanity...");
 
-      const serverURL = await  getServerURL();
-      console.log("🔍 [BACKUP] Using server URL:", serverURL);
-      const response = await fetch(`${serverURL}/sanity/export`);
-      console.log("🔍 [BACKUP] Response status:", response.status);
-      if (!response.ok) throw new Error(`Server error: ${response.status}`);
+      const response = await fetch(
+        `https://${sanityProjectId}.api.sanity.io/v2021-06-07/data/export/${sanityDataset}`,
+        {
+          headers: sanityToken
+            ? { Authorization: `Bearer ${sanityToken}` }
+            : undefined,
+        }
+      );
+
+      if (!response.ok) throw new Error(`Sanity error: ${response.status}`);
 
       const backupText = await response.text();
       const fileName = `sanity-backup-${
         new Date().toISOString().split("T")[0]
       }.ndjson`;
 
-      const fileUri = (FileSystem as any).documentDirectory + fileName;
+      const fileUri = FileSystem.documentDirectory + fileName;
       await FileSystem.writeAsStringAsync(fileUri, backupText);
-
-      if (Platform.OS === "android") {
-        const permissions = await (
-          FileSystem as any
-        ).StorageAccessFramework.requestDirectoryPermissionsAsync();
-        if (permissions.granted) {
-          const base64 = Buffer.from(backupText).toString("base64");
-          const newFileUri = await (
-            FileSystem as any
-          ).StorageAccessFramework.createFileAsync(
-            permissions.directoryUri,
-            fileName,
-            "application/x-ndjson"
-          );
-          await FileSystem.writeAsStringAsync(newFileUri, base64, {
-            encoding: (FileSystem as any).EncodingType.Base64,
-          });
-          showAlert("Export klar", "Backup-filen sparades i vald mapp.");
-        } else {
-          await shareAsync(fileUri);
-        }
-      } else {
-        await shareAsync(fileUri);
-      }
+      await shareAsync(fileUri);
 
       setIsExporting(false);
       setExportProgress("");
+      showAlert("Export klar", "Backup-filen har sparats.");
     } catch (err: any) {
       console.error("Export error:", err);
-      showAlert("Fel", "Kunde inte exportera data: " + err.message);
+      showAlert("Fel", "Kunde inte exportera Sanity-data: " + err.message);
       setIsExporting(false);
     }
   };
-
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
       {/* Header */}
@@ -98,7 +134,7 @@ export default function AdminBackupScreen() {
               isDark ? "text-white" : "text-gray-900"
             }`}
           >
-             Backup Data 
+            Backup Data
           </AutoText>
         </View>
         <AutoText
@@ -162,7 +198,7 @@ export default function AdminBackupScreen() {
               ))}
             </View>
             <View className="mt-4 flex-row items-center justify-center mb-3">
-             <Ionicons
+              <Ionicons
                 name="information-circle"
                 size={20}
                 color={isDark ? "#fff" : "#fff"}
@@ -172,9 +208,8 @@ export default function AdminBackupScreen() {
               >
                 Backup Information
               </AutoText>
-              
-              </View>
-               <AutoText
+            </View>
+            <AutoText
               className={`text-xs leading-5 px-6 text-center ${isDark ? "text-gray-300" : "text-gray-600"}`}
             >
               Detta kommer att exportera allt ditt Sanity CMS innehåll inklusive
@@ -184,8 +219,6 @@ export default function AdminBackupScreen() {
             </AutoText>
           </View>
         </LinearGradient>
-
-       
 
         {/* Export Button */}
         <View className="px-6 mt-6">
