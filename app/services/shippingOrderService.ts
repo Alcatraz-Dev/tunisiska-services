@@ -109,7 +109,7 @@ export class ShippingOrderService {
 
 
       const schedules = await client.fetch(
-        `*[_type == "shippingSchedule" && status == "available" && isActive == false]`,
+        `*[_type == "shippingSchedule" && status == "available" && isActive == false && departureTime >= $start && departureTime <= $end] | order(departureTime asc)`,
       );
 
       if (schedules.length === 0) {
