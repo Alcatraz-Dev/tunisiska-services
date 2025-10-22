@@ -8,6 +8,7 @@ export interface ShippingOrderData {
     phone: string;
     email?: string;
   };
+  route: string;
   pickupAddress: string;
   deliveryAddress: string;
   scheduledDateTime: string;
@@ -48,6 +49,7 @@ export class ShippingOrderService {
         serviceType: "shipping",
         status: "pending",
         customerInfo: orderData.customerInfo,
+        route: orderData.route,
         pickupAddress: orderData.pickupAddress,
         deliveryAddress: orderData.deliveryAddress,
         scheduledDateTime: orderData.scheduledDateTime,
@@ -109,8 +111,13 @@ export class ShippingOrderService {
 
 
       const schedules = await client.fetch(
-        `*[_type == "shippingSchedule" && status == "available" && isActive == false && departureTime >= $start && departureTime <= $end] | order(departureTime asc)`,
+        `*[_type == "shippingSchedule" && status == "available" && isActive == false  | order(departureTime asc)`,
+        {
+          start: new Date(scheduledDateTime).toISOString(),
+          end: new Date(new Date(scheduledDateTime).getTime() + 24 * 60 * 60 * 1000).toISOString()
+        }
       );
+      
 
       if (schedules.length === 0) {
         console.log("⚠️ No schedules found for this date and time window");
@@ -434,7 +441,7 @@ export class ShippingOrderService {
     try {
       const notificationPayload = {
         title: "Fraktbokning bekräftad! 📦",
-        message: `Din frakt från ${orderData.pickupAddress} till ${orderData.deliveryAddress} är bokad för ${new Date(orderData.scheduledDateTime).toLocaleString("sv-SE")}. Totalt pris: ${orderData.totalPrice} SEK.`,
+        message: `Din frakt från ${orderData.route.split('_')[0].replace('stockholm', 'Stockholm').replace('goteborg', 'Göteborg').replace('malmo', 'Malmö')} till ${orderData.route.split('_')[1].replace('tunis', 'Tunis').replace('sousse', 'Sousse')} är bokad för ${new Date(orderData.scheduledDateTime).toLocaleString("sv-SE")}. Totalt pris: ${orderData.totalPrice} SEK.`,
         subID: userId,
         pushData: {
           orderId: "new-shipping-order", // This would be the actual order ID

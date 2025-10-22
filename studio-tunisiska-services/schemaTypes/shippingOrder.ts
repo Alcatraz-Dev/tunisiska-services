@@ -68,6 +68,12 @@ export default defineType({
       validation: (Rule) => Rule.required(),
     }),
     defineField({
+      name: "route",
+      title: "Route",
+      type: "string",
+      description: "Route identifier (e.g., stockholm_tunis)",
+    }),
+    defineField({
       name: "deliveryAddress",
       title: "Delivery Address",
       type: "string",

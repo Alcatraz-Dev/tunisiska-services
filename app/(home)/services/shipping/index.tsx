@@ -200,6 +200,7 @@ export default function ShippingPage() {
         phone: customerPhone,
         email: customerEmail,
       },
+      route: selectedTrip.route,
       pickupAddress:
         selectedPickupLocation?.location ||
         selectedTrip.route

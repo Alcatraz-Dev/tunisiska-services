@@ -114,12 +114,33 @@ export default function BookingDetailsScreen() {
           };
         } else {
           // Shipping order
+          let pickupLocation = order.pickupAddress || "Plats saknas";
+          let dropoffLocation = order.deliveryAddress || "Plats saknas";
+
+          if (order.route) {
+            const routeParts = order.route.split('_');
+            if (routeParts.length === 2) {
+              pickupLocation = routeParts[0]
+                .replace('stockholm', 'Stockholm')
+                .replace('goteborg', 'Göteborg')
+                .replace('malmo', 'Malmö')
+                .replace('tunis', 'Tunis')
+                .replace('sousse', 'Sousse');
+              dropoffLocation = routeParts[1]
+                .replace('stockholm', 'Stockholm')
+                .replace('goteborg', 'Göteborg')
+                .replace('malmo', 'Malmö')
+                .replace('tunis', 'Tunis')
+                .replace('sousse', 'Sousse');
+            }
+          }
+
           transformedBooking = {
             id: order._id || "N/A",
             category: "Frakt",
             date: order.scheduledDateTime ? new Date(order.scheduledDateTime).toLocaleDateString('sv-SE') : "Datum saknas",
-            pickup: order.pickupAddress || "Plats saknas",
-            dropoff: order.deliveryAddress || "Plats saknas",
+            pickup: pickupLocation,
+            dropoff: dropoffLocation,
             status: getStatusText(order.status || "unknown"),
             price: order.totalPrice ? `${order.totalPrice} SEK` : "Pris saknas",
             passengers: order.packageDetails?.weight || 0,
