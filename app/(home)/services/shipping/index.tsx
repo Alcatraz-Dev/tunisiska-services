@@ -26,6 +26,7 @@ const fetchShippingSchedules = async () => {
     const { client } = await import("@/sanityClient");
     const schedules = await client.fetch(`
       *[_type == "shippingSchedule" && status == "available"] {
+        ...,
         _id,
         route,
         departureTime,
@@ -958,8 +959,8 @@ export default function ShippingPage() {
                 amount={calculateTotal()}
                 points={calculateTotal() * 10}
                 isDark={isDark}
-                service="Frakt"
-                customText={`Betala ${calculateTotal()} SEK för Frakt`}
+                service="Shipping"
+                customText={`Betala ${calculateTotal()} SEK för Shipping`}
                 customStyle={{
                   backgroundColor: isDark ? "#1e1e1e" : "#ffffff",
                   borderWidth: 1,
