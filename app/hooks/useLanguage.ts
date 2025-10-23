@@ -12,7 +12,7 @@ type LanguageState = {
 };
 
 export const useLanguageStore = create<LanguageState>((set, get) => ({
-  language: Localization.getLocales()[0]?.languageCode || "en",
+  language: Localization.getLocales()[0]?.languageCode || "sv",
   _hasLoaded: false,
   
   _setHasLoaded: (loaded: boolean) => {

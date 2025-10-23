@@ -303,7 +303,7 @@ app.post("/create-checkout-session", async (req, res) => {
           price_data: {
             currency: usedCurrency,
             product_data: {
-              name: isWallet ? `${displayPoints} Poäng - Tunisiska Services` : `${service || 'Tjänst'} - Tunisiska Services`,
+              name: isWallet ? `${displayPoints} Poäng - Tunisiska Mega Service` : `${service || 'Tjänst'} - Tunisiska Mega Service`,
               description: isWallet ? `Köp ${displayPoints} poäng för ${displayAmount} ${usedCurrency.toUpperCase()}` : `Betalning för ${service || 'Tjänst'} - ${displayAmount} ${usedCurrency.toUpperCase()}`,
             },
             unit_amount: stripeAmount,
@@ -312,8 +312,8 @@ app.post("/create-checkout-session", async (req, res) => {
         },
       ],
       mode: "payment",
-      success_url: successUrl || `tunisiska-services://success?session_id={CHECKOUT_SESSION_ID}&points=${displayPoints}&amount=${displayAmount}`,
-      cancel_url: cancelUrl || `tunisiska-services://cancel`,
+      success_url: successUrl || `tunisiska-mega-service://success?session_id={CHECKOUT_SESSION_ID}&points=${displayPoints}&amount=${displayAmount}`,
+      cancel_url: cancelUrl || `tunisiska-mega-service://cancel`,
       metadata: {
         integration: "web_checkout",
         points: displayPoints.toString(),

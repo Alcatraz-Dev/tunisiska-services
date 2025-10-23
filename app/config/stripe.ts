@@ -9,9 +9,9 @@ export const STRIPE_CONFIG = {
   secretKey: process.env.EXPO_PUBLIC_STRIPE_SECRET_KEY!,
 
   // Merchant configuration
-  merchantDisplayName: 'Tunisiska Services',
+  merchantDisplayName: 'Tunisiska Mega Service',
   merchantIdentifier: 'merchant.com.tunisiska.services', // Required for iOS Apple Pay
-  returnURL: 'tunisiska-services://stripe-redirect',
+  returnURL: 'tunisiska-mega-services://stripe-redirect',
 
   // Payment configuration
   currency: 'sek',

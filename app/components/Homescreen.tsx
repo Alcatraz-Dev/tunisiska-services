@@ -47,7 +47,7 @@ interface UserProfileData {
 const services = [
   {
     id: "1",
-    title: "Shipping mellan Sverige & Tunisien",
+    title: "Frakt mellan Sverige & Tunisien",
     description: "Snabb och säker frakt av paket mellan Sverige och Tunisien.",
     icon: "cube-outline",
     color: "#3B82F6",

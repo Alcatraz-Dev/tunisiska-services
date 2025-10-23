@@ -3,12 +3,12 @@ const IS_PREVIEW = process.env.APP_VARIANT === 'preview';
 
 module.exports = {
   expo: {
-    name: IS_DEV ? 'Tunisiska Services (Dev)' : IS_PREVIEW ? 'Tunisiska Services (Preview)' : 'Tunisiska Services',
-    slug: 'tunisiska-services',
-    description: 'Tunisiska Services is a mobile app for booking and managing services.',
+    name: IS_DEV ? 'Tunisiska Mega Service (Dev)' : IS_PREVIEW ? 'Tunisiska Mega Service (Preview)' : 'Tunisiska Mega Service',
+    slug: 'tunisiska-mega-service',
+    description: 'Tunisiska Mega Service is a mobile app for booking and managing services.',
     version: '1.0.0',
     orientation: 'portrait',
-    icon: './app/assets/icons/adaptive-icon.png',
+    icon: './app/assets/logo-android/mipmap-xxxhdpi/ic_launcher.png',
     userInterfaceStyle: 'automatic',
     splash: {
       image: './app/assets/icons/splash-icon.png',
@@ -23,7 +23,7 @@ module.exports = {
           ? 'com.alcatrazdev.tunisiskaservices.preview'
           : 'com.alcatrazdev.tunisiskaservices',
       infoPlist: {
-        CFBundleDisplayName: IS_DEV ? 'Tunisiska Services Dev' : IS_PREVIEW ? 'Tunisiska Services Preview' : 'Tunisiska Services',
+        CFBundleDisplayName: IS_DEV ? 'Tunisiska Mega Service Dev' : IS_PREVIEW ? 'Tunisiska Mega Service Preview' : 'Tunisiska Mega Service',
         UIBackgroundModes: ['remote-notification'],
         UNUserNotificationCenter: {
           UNAuthorizationStatusAuthorized: true
@@ -41,14 +41,14 @@ module.exports = {
         // Add URL schemes for Stripe redirect
         CFBundleURLTypes: [
           {
-            CFBundleURLSchemes: ['tunisiska-services']
+            CFBundleURLSchemes: ['tunisiska-mega-service']
           }
         ]
       }
     },
     android: {
       adaptiveIcon: {
-        foregroundImage: './app/assets/icons/adaptive-icon.png',
+        foregroundImage: './app/assets/logo-android/mipmap-xxxhdpi/ic_launcher_foreground.png',
         backgroundColor: '#ffffff'
       },
       package: IS_DEV
@@ -69,7 +69,7 @@ module.exports = {
           action: 'VIEW',
           data: [
             {
-              scheme: 'tunisiska-services'
+              scheme: 'tunisiska-mega-service'
             }
           ],
           category: ['BROWSABLE', 'DEFAULT']
@@ -84,9 +84,9 @@ module.exports = {
     web: {
       bundler: 'metro',
       output: 'static',
-      favicon: './app/assets/icons/adaptive-icon.png'
+      favicon: './app/assets/logo-ios/AppIcon.appiconset/Icon-App-60x60@3x.png'
     },
-    scheme: 'tunisiska-services',
+    scheme: 'tunisiska-mega-service',
     plugins: [
       [
         'expo-router',
@@ -112,9 +112,9 @@ module.exports = {
         'expo-splash-screen',
         {
           backgroundColor: '#232323',
-          image: './app/assets/icons/splash-icon.png',
+          image: './app/assets/logo-ios/AppIcon.appiconset/Icon-App-60x60@3x.png',
           dark: {
-            image: './app/assets/icons/splash-icon.png',
+            image: './app/assets/logo-ios/AppIcon.appiconset/Icon-App-60x60@3x.png',
             backgroundColor: '#000000'
           },
           imageWidth: 200
@@ -124,7 +124,7 @@ module.exports = {
       [
         'expo-notifications',
         {
-          icon: './app/assets/icons/adaptive-icon.png',
+          icon: './app/assets/logo-ios/AppIcon.appiconset/Icon-App-60x60@3x.png',
           color: '#ffffff',
           defaultChannel: 'default',
           sounds: ['./app/assets/sounds/notification.wav'],
@@ -132,12 +132,12 @@ module.exports = {
           iosDisplayInForeground: true,
           mode: IS_DEV ? 'development' : 'production',
           ios: {
-            icon: './app/assets/icons/adaptive-icon.png'
+            icon: './app/assets/logo-ios/AppIcon.appiconset/Icon-App-60x60@3x.png'
           },
           android: {
-            icon: './app/assets/icons/adaptive-icon.png',
+            icon: './app/assets/logo-android/mipmap-xxxhdpi/ic_launcher.png',
             color: '#ffffff',
-            largeIcon: './app/assets/icons/adaptive-icon.png'
+            largeIcon: './app/assets/logo-android/mipmap-xxxhdpi/ic_launcher.png'
           }
         }
       ],
@@ -156,7 +156,7 @@ module.exports = {
     extra: {
       router: {},
       eas: {
-        projectId: 'c7b65ce0-2aa6-4b42-b6d7-4f04277bc839'
+        projectId: 'febc1a59-7c3b-4754-a888-3246bca56018'
       },
       // Expose Sanity config so it's available at runtime on device/web
       sanity: {
@@ -179,7 +179,7 @@ module.exports = {
       policy: 'appVersion'
     },
     updates: {
-      url: 'https://u.expo.dev/c7b65ce0-2aa6-4b42-b6d7-4f04277bc839'
+      url: 'https://u.expo.dev/febc1a59-7c3b-4754-a888-3246bca56018'
     },
     owner: 'alcatrazdev'
   }

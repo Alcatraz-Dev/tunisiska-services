@@ -34,31 +34,6 @@ export default defineType({
       validation: (Rule) => Rule.required(),
     }),
 
-    defineField({
-      name: 'pickupLocations',
-      title: 'Pickup Locations & Times',
-      type: 'array',
-      of: [
-        {
-          type: 'object',
-          fields: [
-            {
-              name: 'location',
-              title: 'Location',
-              type: 'string',
-              validation: (Rule) => Rule.required(),
-            },
-            {
-              name: 'pickupDateTime',
-              title: 'Pickup Date & Time',
-              type: 'datetime',
-              validation: (Rule) => Rule.required(),
-            },
-          ],
-        },
-      ],
-      validation: (Rule) => Rule.required().min(1),
-    }),
 
     defineField({
       name: 'capacity',
@@ -128,16 +103,14 @@ export default defineType({
       route: 'route',
       status: 'status',
       time: 'departureTime',
-      pickupLocations: 'pickupLocations',
     },
     prepare(selection) {
-      const {route, status, time, pickupLocations} = selection
-      const pickupCount = pickupLocations ? pickupLocations.length : 0
+      const {route, status, time} = selection
       const routeTitle = route?.replace('_', ' → ')?.replace('tunis', 'Tunis') || 'Unknown Route'
 
       return {
         title: `${routeTitle} - ${status}`,
-        subtitle: `${new Date(time).toLocaleDateString()} • ${pickupCount} pickups`,
+        subtitle: `${new Date(time).toLocaleDateString()}`,
       }
     },
   },

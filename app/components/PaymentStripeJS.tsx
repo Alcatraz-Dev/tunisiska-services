@@ -146,7 +146,7 @@ export default function PaymentStripeJS({
         setCheckoutUrl("");
         showAlert(
           "Betalning genomförd! 🎉",
-          `Din betalning på ${amount} SEK är bekräftad!\n\n🎁 Du fick ${earnedPoints} poäng!`
+          `Din betalning på ${amount} SEK är bekräftad !`
         );
       } else if (data.type === "PAYMENT_CANCELLED") {
         setShowModal(false);

@@ -33,7 +33,6 @@ const fetchShippingSchedules = async () => {
         capacity,
         availableCapacity,
         vehicle,
-        pickupLocations
       }
     `);
     return schedules;
@@ -51,8 +50,6 @@ export default function ShippingPage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [availableTrips, setAvailableTrips] = useState<any[]>([]);
   const [selectedTrip, setSelectedTrip] = useState<any>(null);
-  const [selectedPickupLocation, setSelectedPickupLocation] =
-    useState<any>(null);
   const [shippingSchedules, setShippingSchedules] = useState<any[]>([]);
 
   const [kg, setKg] = useState("");
@@ -202,7 +199,6 @@ export default function ShippingPage() {
       },
       route: selectedTrip.route,
       pickupAddress:
-        selectedPickupLocation?.location ||
         selectedTrip.route
           ?.split("_")[0]
           ?.replace("stockholm", "Stockholm")
@@ -211,8 +207,7 @@ export default function ShippingPage() {
         "Stockholm",
       deliveryAddress:
         selectedTrip.route?.split("_")[1]?.replace("tunis", "Tunis") || "Tunis",
-      scheduledDateTime:
-        selectedPickupLocation?.pickupDateTime || selectedTrip.departureTime,
+      scheduledDateTime: selectedTrip.departureTime,
       packageDetails: {
         weight: parseFloat(kg),
         dimensions: {
@@ -382,7 +377,7 @@ export default function ShippingPage() {
               isDark ? "text-white" : "text-gray-900"
             }`}
           >
-            Shipping
+            Frakt
           </AutoText>
         </View>
         <AutoText
@@ -503,65 +498,6 @@ export default function ShippingPage() {
           </View>
         )}
 
-        {/* Pickup Location Selection */}
-        {selectedTrip &&
-          selectedTrip.pickupLocations &&
-          selectedTrip.pickupLocations.length > 0 && (
-            <View className="mt-6">
-              <AutoText
-                className={`text-lg font-semibold mb-4 ${
-                  isDark ? "text-white" : "text-gray-900"
-                }`}
-              >
-                Välj upphämtningsplats
-              </AutoText>
-              {selectedTrip.pickupLocations.map(
-                (pickup: any, index: number) => (
-                  <TouchableOpacity
-                    key={index}
-                    onPress={() => setSelectedPickupLocation(pickup)}
-                    onPressIn={() => setSelectedPickupLocation(pickup)}
-                    className={`p-4 rounded-xl mb-3 ${
-                      selectedPickupLocation === pickup
-                        ? "bg-blue-500"
-                        : isDark
-                          ? "bg-dark-card"
-                          : "bg-gray-100"
-                    }`}
-                  >
-                    <AutoText
-                      className={`font-bold mb-2 ${
-                        selectedPickupLocation === pickup
-                          ? "text-white"
-                          : isDark
-                            ? "text-white"
-                            : "text-gray-900"
-                      }`}
-                    >
-                      {pickup.location}
-                    </AutoText>
-                    <AutoText
-                      className={`text-xs ${
-                        selectedPickupLocation === pickup
-                          ? "text-white"
-                          : isDark
-                            ? "text-gray-400"
-                            : "text-gray-600"
-                      }`}
-                    >
-                      {new Date(pickup.pickupDateTime).toLocaleString("sv-SE", {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </AutoText>
-                  </TouchableOpacity>
-                )
-              )}
-            </View>
-          )}
 
         {/* Customer Information */}
         {selectedTrip && (

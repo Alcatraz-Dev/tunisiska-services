@@ -4,7 +4,7 @@ import { nativeNotifyAPI, NotificationPayload, BulkNotificationPayload, Schedule
 export const NotificationTemplates = {
   // Welcome & Onboarding
   WELCOME: {
-    title: 'Välkommen till Tunisiska Services! 👋',
+    title: 'Välkommen till Tunisiska Mega Service ! 👋',
     message: 'Vi är glada att ha dig här! Utforska våra tjänster och boka din första service idag.',
     pushData: { type: 'welcome', action: 'open_services' }
   },
@@ -236,6 +236,7 @@ export class NotificationUtils {
     imageUrl?: string
   ): Promise<boolean> {
     try {
+      //@ts-ignore
       const result = await nativeNotifyAPI.sendBulkNotification({
         title,
         message,
@@ -261,6 +262,7 @@ export class NotificationUtils {
     type: string = 'scheduled'
   ): Promise<boolean> {
     try {
+      //@ts-ignore
       const result = await nativeNotifyAPI.scheduleNotification({
         title,
         message,
@@ -312,6 +314,7 @@ export class NotificationUtils {
     maintenanceEnd: string
   ): Promise<boolean> {
     try {
+      //@ts-ignore
       const result = await nativeNotifyAPI.sendBulkNotification({
         title: 'Systemunderhåll 🔧',
         message: `Appen kommer att vara otillgänglig för underhåll mellan ${maintenanceStart} och ${maintenanceEnd}. Vi ber om ursäkt för eventuella besvär.`,

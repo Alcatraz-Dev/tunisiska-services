@@ -263,7 +263,7 @@ export default function BookingDetailsScreen() {
       let shareMessage = '';
 
       if (serviceType === 'shipping') {
-        shareMessage = `📦 Fraktbeställning från Tunisiska Services
+        shareMessage = `📦 Fraktbeställning från Tunisiska Mega Service
 
 Avsändare: ${booking.customerInfo?.name}
 Telefon: ${booking.customerInfo?.phone}

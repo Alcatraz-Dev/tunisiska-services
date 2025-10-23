@@ -13,7 +13,6 @@ import { showAlert } from "./app/utils/showAlert";
 import { AutoText } from "./app/components/ui/AutoText";
 import { getServerURL } from "./app/lib/getServerURL";
 
-
 interface PaymentStripeJSProps {
   amount: number;
   points?: number;
@@ -37,7 +36,7 @@ export default function PaymentStripeJS({
   customText,
   customClassName,
   customStyle,
-  isWallet = false, 
+  isWallet = false,
 }: PaymentStripeJSProps) {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -54,16 +53,16 @@ export default function PaymentStripeJS({
 
       // Create checkout session on your server
       const serverUrl = await getServerURL();
-        // process.env.EXPO_PUBLIC_SERVER_URL || "http://localhost:3000";
+      // process.env.EXPO_PUBLIC_SERVER_URL || "http://localhost:3000";
       const response = await fetch(`${serverUrl}/create-checkout-session`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          amount: amount , // Convert to cents
+          amount: amount, // Convert to cents
           currency: "sek",
-          points: points || amount ,
+          points: points || amount,
         }),
       });
 
@@ -120,7 +119,7 @@ export default function PaymentStripeJS({
         setCheckoutUrl("");
         showAlert(
           "Betalning genomförd! 🎉",
-          `Din betalning på ${amount} SEK är bekräftad!\n\n🎁 Du fick ${earnedPoints} poäng!`
+          `Din betalning på ${amount} SEK är bekräftad !`
         );
       } else if (data.type === "PAYMENT_CANCELLED") {
         setShowModal(false);
@@ -210,8 +209,8 @@ export default function PaymentStripeJS({
                   ? "bg-blue-600" // Blue background for wallet loading
                   : "bg-blue-500"
                 : isDark
-                ? "bg-dark-card"
-                : "bg-light-card"
+                  ? "bg-dark-card"
+                  : "bg-light-card"
             } py-5`}
             style={{
               paddingVertical: 35,
@@ -240,12 +239,12 @@ export default function PaymentStripeJS({
           <View
             className={`w-full rounded-2xl ${
               !isWallet
-                ? isDark 
+                ? isDark
                   ? "bg-blue-600" // Blue background for wallet
                   : "bg-blue-500"
-                : isDark 
-                ? "bg-dark-card"
-                : "bg-light-card"
+                : isDark
+                  ? "bg-dark-card"
+                  : "bg-light-card"
             } py-5`}
             style={{
               paddingVertical: 35,
@@ -270,7 +269,11 @@ export default function PaymentStripeJS({
               <>
                 <AutoText
                   className={`text-xs font-medium text-center mt-2 ${
-                    isWallet ? "text-white" : isDark ? "text-white" : "text-black"
+                    isWallet
+                      ? "text-white"
+                      : isDark
+                        ? "text-white"
+                        : "text-black"
                   }`}
                   style={{ letterSpacing: 0.5 }}
                 >
@@ -278,7 +281,11 @@ export default function PaymentStripeJS({
                 </AutoText>
                 <AutoText
                   className={`text-xs font-semibold text-center mt-2 ${
-                    isWallet ? "text-white" : isDark ? "text-white" : "text-black"
+                    isWallet
+                      ? "text-white"
+                      : isDark
+                        ? "text-white"
+                        : "text-black"
                   }`}
                   style={{ letterSpacing: 0.5 }}
                 >
@@ -286,12 +293,9 @@ export default function PaymentStripeJS({
                 </AutoText>
               </>
             )}
-
           </View>
         )}
       </TouchableOpacity>
     </View>
   );
-
-
 }

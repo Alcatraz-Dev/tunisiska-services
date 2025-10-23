@@ -128,7 +128,7 @@ export default function OrderManager({ onBack }: OrderManagerProps) {
 
       if (order.serviceType === ServiceType.SHIPPING) {
         const shippingOrder = order as any;
-        shareMessage = `📦 Fraktbeställning från Tunisiska Services
+        shareMessage = `📦 Fraktbeställning från Tunisiska Mega Service
 
 Avsändare: ${shippingOrder.customerInfo?.name}
 Telefon: ${shippingOrder.customerInfo?.phone}

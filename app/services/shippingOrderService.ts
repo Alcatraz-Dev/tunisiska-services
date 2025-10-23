@@ -75,7 +75,8 @@ export class ShippingOrderService {
       if (orderData.scheduledDateTime) {
         await this.updateShippingScheduleCapacity(
           orderData.scheduledDateTime,
-          orderData.packageDetails.weight
+          orderData.packageDetails.weight,
+          orderData.route
         );
       }
 
@@ -92,13 +93,14 @@ export class ShippingOrderService {
   // Update shipping schedule capacity when order is created
   static async updateShippingScheduleCapacity(
     scheduledDateTime: string,
-    weightUsed: number
+    weightUsed: number,
+    route: string // ← أضف هذا المتغير
   ): Promise<void> {
     try {
       const { client } = await import("@/sanityClient");
       const scheduledDate = new Date(scheduledDateTime);
-      const scheduleDateStr = scheduledDate.toISOString().split("T")[0]; // YYYY-MM-DD
-      const departureHour = scheduledDate.getHours(); // Get the hour of departure
+      const scheduleDateStr = scheduledDate.toISOString().split("T")[0];
+      const departureHour = scheduledDate.getHours();
 
       console.log(
         "📦 Updating shipping schedule capacity for date:",
@@ -109,22 +111,33 @@ export class ShippingOrderService {
         weightUsed
       );
 
+      const startOfDay = new Date(scheduledDate);
+      startOfDay.setUTCHours(0, 0, 0, 0);
+
+      const endOfDay = new Date(scheduledDate);
+      endOfDay.setUTCHours(23, 59, 59, 999);
 
       const schedules = await client.fetch(
-        `*[_type == "shippingSchedule" && status == "available" && isActive == false  | order(departureTime asc)`,
+        `*[
+    _type == "shippingSchedule" &&
+    status == "available" &&
+    isActive == false &&
+    route == $route &&
+    departureTime >= $startOfDay &&
+    departureTime <= $endOfDay
+  ] | order(departureTime asc)`,
         {
-          start: new Date(scheduledDateTime).toISOString(),
-          end: new Date(new Date(scheduledDateTime).getTime() + 24 * 60 * 60 * 1000).toISOString()
+          route,
+          startOfDay: startOfDay.toISOString(),
+          endOfDay: endOfDay.toISOString(),
         }
       );
-      
 
-      if (schedules.length === 0) {
+      if (!schedules.length) {
         console.log("⚠️ No schedules found for this date and time window");
         return;
       }
 
-      // Update each schedule's availableCapacity
       for (const schedule of schedules) {
         const currentCapacity =
           schedule.availableCapacity ?? schedule.capacity ?? 0;
@@ -138,10 +151,13 @@ export class ShippingOrderService {
           })
           .commit();
 
-        console.log("Updated schedule:", updatedSchedule);
-
         console.log(
-          `✅ Schedule ${schedule._id} updated: ${currentCapacity} -> ${newCapacity} (departure: ${new Date(schedule.dateTime).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })})`
+          `✅ Schedule ${schedule._id} updated: ${currentCapacity} → ${newCapacity} (departure: ${new Date(
+            schedule.departureTime
+          ).toLocaleTimeString("sv-SE", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })})`
         );
       }
     } catch (error) {
@@ -182,7 +198,12 @@ export class ShippingOrderService {
     error?: string;
   }> {
     try {
-      console.log("🔍 Fetching available shipping schedules for date:", date, "departure time:", departureTime);
+      console.log(
+        "🔍 Fetching available shipping schedules for date:",
+        date,
+        "departure time:",
+        departureTime
+      );
 
       const scheduleDate = new Date(date);
       const startOfDay = new Date(scheduleDate);
@@ -441,7 +462,7 @@ export class ShippingOrderService {
     try {
       const notificationPayload = {
         title: "Fraktbokning bekräftad! 📦",
-        message: `Din frakt från ${orderData.route.split('_')[0].replace('stockholm', 'Stockholm').replace('goteborg', 'Göteborg').replace('malmo', 'Malmö')} till ${orderData.route.split('_')[1].replace('tunis', 'Tunis').replace('sousse', 'Sousse')} är bokad för ${new Date(orderData.scheduledDateTime).toLocaleString("sv-SE")}. Totalt pris: ${orderData.totalPrice} SEK.`,
+        message: `Din frakt från ${orderData.route.split("_")[0].replace("stockholm", "Stockholm").replace("goteborg", "Göteborg").replace("malmo", "Malmö")} till ${orderData.route.split("_")[1].replace("tunis", "Tunis").replace("sousse", "Sousse")} är bokad för ${new Date(orderData.scheduledDateTime).toLocaleString("sv-SE")}. Totalt pris: ${orderData.totalPrice} SEK.`,
         subID: userId,
         pushData: {
           orderId: "new-shipping-order", // This would be the actual order ID

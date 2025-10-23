@@ -56,7 +56,7 @@ export default function SignUpScreen() {
         if (user?.id) {
           try {
             const result = await nativeNotifyAPI.sendNotification({
-              title: "Välkommen till Tunisiska Services!",
+              title: "Välkommen till Tunisiska Mega Service !",
               message: "Tack för att du registrerade dig! Utforska våra tjänster och börja boka.",
               subID: user.id,
               pushData: {

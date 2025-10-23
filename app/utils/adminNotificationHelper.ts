@@ -69,7 +69,7 @@ export class AdminNotificationHelper {
       // Process in batches
       for (let i = 0; i < userIds.length; i += batchSize) {
         const batch = userIds.slice(i, i + batchSize);
-        
+        //@ts-ignore
         const result = await nativeNotifyAPI.sendBulkNotification({
           title,
           message,
@@ -125,7 +125,7 @@ export class AdminNotificationHelper {
 
         for (let i = 0; i < userIds.length; i += batchSize) {
           const batch = userIds.slice(i, i + batchSize);
-          
+          //@ts-ignore
           const result = await nativeNotifyAPI.sendBulkNotification({
             title,
             message,
@@ -197,7 +197,7 @@ export class AdminNotificationHelper {
         const followUpResult = await NotificationUtils.scheduleNotification(
           userId,
           'Hur går det? 👋',
-          'Vi hoppas att du trivs med Tunisiska Services! Behöver du hjälp med något?',
+          'Vi hoppas att du trivs med Tunisiska Mega Service ! Behöver du hjälp med något?',
           sendDate,
           sendTime,
           'followup'
@@ -277,7 +277,7 @@ export class AdminNotificationHelper {
     try {
       const greetings = {
         christmas: {
-          title: 'God Jul från Tunisiska Services! 🎄',
+          title: 'God Jul från Tunisiska Mega Service ! 🎄',
           message: 'Vi önskar dig och din familj en riktigt God Jul och ett Gott Nytt År! Tack för att du är en del av vår resa.',
         },
         newyear: {
