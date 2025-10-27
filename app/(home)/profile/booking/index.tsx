@@ -87,7 +87,7 @@ export default function BookingHistoryScreen() {
         if (shippingResult.success && shippingResult.orders) {
           const shippingOrders = shippingResult.orders.map((order: any) => ({
             id: order._id,
-            category: "Shipping",
+            category: "Frakt",
             dateObj: order.scheduledDateTime ? new Date(order.scheduledDateTime) : null,
             pickup: order.pickupAddress || "Plats saknas",
             dropoff: order.deliveryAddress || "Plats saknas",
