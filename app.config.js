@@ -11,7 +11,7 @@ module.exports = {
     icon: './app/assets/logo-android/mipmap-xxxhdpi/ic_launcher.png',
     userInterfaceStyle: 'automatic',
     splash: {
-      image: './app/assets/icons/splash-icon.png',
+      image: './app/assets/logo-transparent.png',
       resizeMode: 'contain',
       backgroundColor: '#ffffff'
     },
