@@ -1,6 +1,6 @@
 import polyline from "@mapbox/polyline"; // decode polyline from Directions API
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Text, View, TouchableOpacity } from "react-native";
+import { Text, View, TouchableOpacity, Platform } from "react-native";
 import MapView, {
   Callout,
   Marker,
@@ -215,7 +215,7 @@ export default function MapOverviewScreen() {
     <View className="flex-1 ">
       <MapView
         ref={mapRef}
-        provider={PROVIDER_GOOGLE}
+        provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
         style={{ flex: 1 }}
         showsUserLocation={false}
         showsMyLocationButton={false}
