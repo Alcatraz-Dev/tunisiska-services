@@ -1,25 +1,32 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import { NotificationItem } from "@/app/types/notification";
 
-// Configure notification handler for production
-Notifications.setNotificationHandler({
-  handleNotification: async (notification) => {
-    console.log('🔔 Notification handler called:', JSON.stringify(notification, null, 2));
+// Conditionally import expo-notifications
+let Notifications: any = null;
+try {
+  Notifications = require("expo-notifications");
 
-    // Always show notifications when app is in foreground
-    // For background notifications, let the system decide based on user preferences
-    return {
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    };
-  },
-});
+  // Configure notification handler for production if module is available
+  Notifications.setNotificationHandler({
+    handleNotification: async (notification: any) => {
+      console.log('🔔 Notification handler called:', JSON.stringify(notification, null, 2));
+
+      // Always show notifications when app is in foreground
+      // For background notifications, let the system decide based on user preferences
+      return {
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      };
+    },
+  });
+} catch (error) {
+  console.log("📱 expo-notifications not available (Expo Go limitation)");
+}
 
 interface NotificationContextProps {
   notifications: NotificationItem[];
@@ -30,7 +37,7 @@ interface NotificationContextProps {
   markAllAsRead: () => void;
   notificationsEnabled: boolean;
   setNotificationsEnabled: (value: boolean) => void;
-  permissionStatus: Notifications.NotificationPermissionsStatus | null;
+  permissionStatus: any; // Notifications.NotificationPermissionsStatus | null
   requestPermissions: () => Promise<boolean>;
 }
 
@@ -43,7 +50,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [permissionStatus, setPermissionStatus] = useState<Notifications.NotificationPermissionsStatus | null>(null);
+  const [permissionStatus, setPermissionStatus] = useState<any>(null);
 
   useEffect(() => {
     // Initialize permissions and load settings
@@ -51,24 +58,37 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
       // Load notificationsEnabled from AsyncStorage
       const value = await AsyncStorage.getItem("notificationsEnabled");
       if (value !== null) setNotificationsEnabled(value === "true");
-      
-      // Get current permission status
-      const status = await Notifications.getPermissionsAsync();
-      setPermissionStatus(status);
-      
-      // If permissions are granted, set initial badge count
-      if (status.granted) {
-        await Notifications.setBadgeCountAsync(0);
+
+      if (!Notifications) {
+        console.log("📱 Skipping notification initialization (Notifications module missing)");
+        return;
       }
-      
-      console.log('📱 Notification permissions:', status);
+
+      // Get current permission status
+      try {
+        const status = await Notifications.getPermissionsAsync();
+        setPermissionStatus(status);
+
+        // If permissions are granted, set initial badge count
+        if (status.granted) {
+          await Notifications.setBadgeCountAsync(0);
+        }
+
+        console.log('📱 Notification permissions:', status);
+      } catch (error) {
+        console.warn("⚠️ Failed to initialize notifications:", error);
+      }
     };
-    
+
     initializeNotifications();
   }, []);
-  
 
   const requestPermissions = async (): Promise<boolean> => {
+    if (!Notifications) {
+      console.log("📱 Skipping permission request (Notifications module missing)");
+      return false;
+    }
+
     try {
       const { status } = await Notifications.requestPermissionsAsync({
         ios: {
@@ -81,10 +101,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
           allowProvisional: false,
         },
       });
-      
+
       const newStatus = await Notifications.getPermissionsAsync();
       setPermissionStatus(newStatus);
-      
+
       console.log('🔔 Permission request result:', status, newStatus);
       return status === 'granted' || newStatus.granted;
     } catch (error) {
@@ -101,7 +121,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
         return;
       }
     }
-    
+
     setNotificationsEnabled(value);
     await AsyncStorage.setItem("notificationsEnabled", value.toString());
   };
@@ -126,9 +146,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
       const unreadCount = updated.filter(n => !n.read).length;
       console.log("🔍 [NOTIFICATION] New unread count after marking read:", unreadCount);
 
-      if (permissionStatus?.granted && notificationsEnabled) {
+      if (Notifications && permissionStatus?.granted && notificationsEnabled) {
         console.log("🔍 [NOTIFICATION] Setting badge count to:", unreadCount);
-        Notifications.setBadgeCountAsync(unreadCount).catch((error) => {
+        Notifications.setBadgeCountAsync(unreadCount).catch((error: any) => {
           console.warn('⚠️ Failed to set badge count:', error);
         });
       } else {
@@ -141,9 +161,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const markAllAsRead = async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    
+
     // Clear badge when all notifications are read, only if permissions granted
-    if (permissionStatus?.granted && notificationsEnabled) {
+    if (Notifications && permissionStatus?.granted && notificationsEnabled) {
       try {
         await Notifications.setBadgeCountAsync(0);
       } catch (error) {

@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import { Platform, AppState } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -10,6 +9,14 @@ import { getNotificationInbox, getUnreadNotificationInboxCount } from "native-no
 import { nativeNotifyAPI } from "@/app/services/nativeNotifyApi";
 import { useAuth } from "@clerk/clerk-expo";
 import { NotificationItem } from "../types/notification";
+
+// Conditionally import expo-notifications (not available in Expo Go on Android SDK 53+)
+let Notifications: any = null;
+try {
+  Notifications = require("expo-notifications");
+} catch (error) {
+  console.log("📱 expo-notifications not available (Expo Go limitation), using native-notify only");
+}
 
 export default function usePushNotifications() {
   const { notifications, addNotification, addMultipleNotifications, markAsRead } = useNotifications();
@@ -31,7 +38,7 @@ export default function usePushNotifications() {
   const saveUnreadCount = async (count: number) => {
     console.log("🔍 [NOTIFICATION] Saving unread count:", count);
     await AsyncStorage.setItem("unreadCount", count.toString());
-    if (isRealDevice) {
+    if (isRealDevice && Notifications) {
       try {
         console.log("🔍 [NOTIFICATION] Setting badge count to:", count);
         await Notifications.setBadgeCountAsync(count);
@@ -47,7 +54,7 @@ export default function usePushNotifications() {
       const count = Number(stored);
       console.log("🔍 [NOTIFICATION] Setting unread count to:", count);
       setUnreadCount(count);
-      if (isRealDevice) {
+      if (isRealDevice && Notifications) {
         try {
           console.log("🔍 [NOTIFICATION] Setting badge count to:", count);
           await Notifications.setBadgeCountAsync(count);
@@ -177,14 +184,19 @@ export default function usePushNotifications() {
     syncNativeNotifyInbox();
 
     // Expo foreground notifications
-    const notificationListener = Notifications.addNotificationReceivedListener(handleIncomingNotification);
-    const responseListener = Notifications.addNotificationResponseReceivedListener(async (response) => {
-      const id = response.notification.request.identifier;
-      markAsRead(id);
-      const newCount = Math.max(0, unreadCount - 1);
-      setUnreadCount(newCount);
-      await saveUnreadCount(newCount);
-    });
+    let notificationListener: any = null;
+    let responseListener: any = null;
+
+    if (Notifications) {
+      notificationListener = Notifications.addNotificationReceivedListener(handleIncomingNotification);
+      responseListener = Notifications.addNotificationResponseReceivedListener(async (response: any) => {
+        const id = response.notification.request.identifier;
+        markAsRead(id);
+        const newCount = Math.max(0, unreadCount - 1);
+        setUnreadCount(newCount);
+        await saveUnreadCount(newCount);
+      });
+    }
 
     // App comes to foreground
     const appStateSub = AppState.addEventListener("change", (state) => {
@@ -192,8 +204,8 @@ export default function usePushNotifications() {
     });
 
     return () => {
-      notificationListener.remove();
-      responseListener.remove();
+      if (notificationListener) notificationListener.remove();
+      if (responseListener) responseListener.remove();
       appStateSub.remove();
       if (isUsingOneSignal) {
         try {
@@ -227,6 +239,11 @@ export default function usePushNotifications() {
 
 export async function registerForPushNotificationsAsync(): Promise<string | undefined> {
   if (Platform.OS === "web" || !Device.isDevice) return;
+  
+  if (!Notifications) {
+    console.log("📱 Skipping push token registration (Notifications module missing)");
+    return;
+  }
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;

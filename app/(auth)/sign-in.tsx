@@ -101,7 +101,7 @@ export default function SignInScreen() {
           onChangeText={setPassword}
           placeholder="Ange lösenord"
           placeholderTextColor={isDark ? "gray" : "gray"}
-          secureTextEntry
+          isPassword={true}
           className={inputStyle}
         />
 

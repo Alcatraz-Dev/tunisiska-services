@@ -6,13 +6,17 @@ import { Ionicons } from "@expo/vector-icons";
 
 const rtlLanguages = ["ar"];
 
-export default function Input(props: TextInputProps) {
+interface InputProps extends TextInputProps {
+  isPassword?: boolean;
+}
+
+export default function Input(props: InputProps) {
   const { language } = useLanguage();
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const placeholder = useTranslationText(props.placeholder || "Placeholder", language);
   const isRTL = rtlLanguages.includes(language);
 
-  const isPasswordField = props.secureTextEntry;
+  const isPasswordField = props.isPassword || props.secureTextEntry;
   const shouldBeSecure = isPasswordField && !isPasswordVisible;
 
   // Extract margin classes to apply to container instead of TextInput

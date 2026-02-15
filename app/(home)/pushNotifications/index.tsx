@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { View, Button } from "react-native";
-import * as Notifications from "expo-notifications";
+
 import { registerForPushNotificationsAsync } from "@/app/hooks/usePushNotifications";
-import { savePushToken } from "@/app/hooks/useQuery";
+// import { savePushToken } from "@/app/hooks/useQuery";
 
 export default function TestPushScreen() {
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
@@ -15,7 +15,7 @@ export default function TestPushScreen() {
         console.log("Expo Push Token:", token);
 
         // Save token to Sanity
-        await savePushToken("USER_ID_HERE", token); // replace USER_ID_HERE
+        // await savePushToken("USER_ID_HERE", token); // replace USER_ID_HERE
       }
     })();
   }, []);

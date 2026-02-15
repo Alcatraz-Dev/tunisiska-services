@@ -203,7 +203,7 @@ export default function Wallet() {
 
     // showAlert("🎉 Belöning hämtad!", `Du fick ${rewardPoints} poäng`);
   };
-  
+
   const handlePaymentSuccess = async (purchasedPoints: number, amountPaid: number) => {
     console.log("💎 [PAYMENT SUCCESS] Adding", purchasedPoints, "points to user");
 
@@ -302,9 +302,8 @@ export default function Wallet() {
   if (!isLoaded || !user) {
     return (
       <SafeAreaView
-        className={`flex-1 ${
-          isDark ? "bg-dark" : "bg-light"
-        } justify-center items-center`}
+        className={`flex-1 ${isDark ? "bg-dark" : "bg-light"
+          } justify-center items-center`}
       >
         <ActivityIndicator size="large" color={isDark ? "#fff" : "#000"} />
         <AutoText className={`mt-4 ${isDark ? "text-white" : "text-gray-900"}`}>
@@ -333,17 +332,15 @@ export default function Wallet() {
             />
           </TouchableOpacity>
           <AutoText
-            className={`text-2xl font-extrabold text-center ${
-              isDark ? "text-white" : "text-gray-900"
-            }`}
+            className={`text-2xl font-extrabold text-center ${isDark ? "text-white" : "text-gray-900"
+              }`}
           >
             Din Wallet
           </AutoText>
         </View>
         <AutoText
-          className={`text-sm text-center mt-3 ${
-            isDark ? "text-gray-400" : "text-gray-600"
-          }`}
+          className={`text-sm text-center mt-3 ${isDark ? "text-gray-400" : "text-gray-600"
+            }`}
         >
           Se din senaste aktivitet och transaktioner
         </AutoText>
@@ -356,7 +353,10 @@ export default function Wallet() {
         {/* Modern Wallet Card */}
         <Animated.View entering={FadeInUp.duration(600)}>
           <LinearGradient
-            colors={getPremiumGradient() as [string, string]}
+            colors={getPremiumGradient() as [string, string, ...string[]]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            locations={[0, 0.5, 1]}
             className="p-6 rounded-3xl shadow-lg"
             style={{
               borderRadius: 20,
@@ -370,16 +370,14 @@ export default function Wallet() {
             <View className="flex-row justify-between items-center rounded-3xl p-5">
               <View>
                 <AutoText
-                  className={` text-sm mb-2 ${
-                    isDark ? "text-white" : "text-dark"
-                  }`}
+                  className={` text-sm mb-2 ${isDark ? "text-white" : "text-dark"
+                    }`}
                 >
                   Totala poäng
                 </AutoText>
                 <AutoText
-                  className={`text-4xl font-extrabold mb-2 ${
-                    isDark ? "text-white" : "text-dark"
-                  }`}
+                  className={`text-4xl font-extrabold mb-2 ${isDark ? "text-white" : "text-dark"
+                    }`}
                 >
                   {points} poäng
                 </AutoText>
@@ -402,9 +400,8 @@ export default function Wallet() {
         {/* Daily Reward Week Map */}
         <Animated.View entering={FadeInDown.delay(300)} className="mt-6">
           <AutoText
-            className={`text-lg font-bold mb-5 ${
-              isDark ? "text-white" : "text-gray-900"
-            }`}
+            className={`text-lg font-bold mb-5 ${isDark ? "text-white" : "text-gray-900"
+              }`}
           >
             Dagliga Belöningar
           </AutoText>
@@ -418,9 +415,8 @@ export default function Wallet() {
                   key={day}
                   onPress={isToday ? handleDailyReward : undefined}
                   disabled={!isToday}
-                  className={`flex-1 mx-1 p-1.5 rounded-xl items-center shadow-md ${
-                    isDark ? "bg-dark-card" : "bg-light-card"
-                  }`}
+                  className={`flex-1 mx-1 p-1.5 rounded-xl items-center shadow-md ${isDark ? "bg-dark-card" : "bg-light-card"
+                    }`}
                   style={{
                     shadowColor: "#000",
                     shadowOpacity: 0.1,
@@ -447,9 +443,8 @@ export default function Wallet() {
                     />
                   )}
                   <AutoText
-                    className={`mt-2 text-[9px]  flex-1 flex-row ${
-                      isDark ? "text-white" : "text-gray-900"
-                    }`}
+                    className={`mt-2 text-[9px]  flex-1 flex-row ${isDark ? "text-white" : "text-gray-900"
+                      }`}
                   >
                     Dag{day}
                   </AutoText>
@@ -463,18 +458,16 @@ export default function Wallet() {
         <View className="flex-row mt-6  gap-4 items-center justify-center">
           <TouchableOpacity
             onPress={() => router.push("/profile/referral-users")}
-            className={`flex-1  py-4 px-3 rounded-xl items-center justify-center ${
-              isDark ? " bg-blue-400" : "bg-blue-500"
-            }`}
+            className={`flex-1  py-4 px-3 rounded-xl items-center justify-center ${isDark ? " bg-blue-400" : "bg-blue-500"
+              }`}
           >
             <AutoText className="text-black font-bold">Tjäna poäng</AutoText>
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={() => router.push("/(home)/profile/transfer-points")}
-            className={`flex-1 bg-green-500 py-4 px-3 rounded-xl items-center justify-center ${
-              isDark ? " bg-yellow-400" : "bg-yellow-500"
-            }`}
+            className={`flex-1 bg-green-500 py-4 px-3 rounded-xl items-center justify-center ${isDark ? " bg-yellow-400" : "bg-yellow-500"
+              }`}
           >
             <AutoText
               className={`font-bold ${isDark ? "text-dark" : " text-dark"}`}
@@ -486,9 +479,8 @@ export default function Wallet() {
         {/* Premium Payment Cards - Smaller Enhanced Design */}
         <View className="flex-row items-center justify-between mb-2 mt-2">
           <AutoText
-            className={`text-lg font-bold mt-4 ${
-              isDark ? "text-white" : "text-gray-900"
-            }`}
+            className={`text-lg font-bold mt-4 ${isDark ? "text-white" : "text-gray-900"
+              }`}
           >
             Köp poäng
           </AutoText>
@@ -500,9 +492,8 @@ export default function Wallet() {
         </View>
 
         <AutoText
-          className={`text-xs mb-4 ${
-            isDark ? "text-gray-400" : "text-gray-600"
-          }`}
+          className={`text-xs mb-4 ${isDark ? "text-gray-400" : "text-gray-600"
+            }`}
         >
           Välj mellan Bankkort, Klarna, Apple Pay, Google Pay ... och fler !
         </AutoText>
@@ -516,9 +507,8 @@ export default function Wallet() {
                 key={topUp.amount}
                 entering={FadeIn.duration(500).delay(index * 100)}
                 exiting={FadeOut.duration(500)}
-                className={`relative rounded-xl overflow-hidden ${
-                  isLastTwo ? "w-[48%]" : "w-[30%]"
-                }`}
+                className={`relative rounded-xl overflow-hidden ${isLastTwo ? "w-[48%]" : "w-[30%]"
+                  }`}
               >
                 {isPopular && (
                   <View className="absolute top-4 right-0 z-10">
@@ -546,9 +536,8 @@ export default function Wallet() {
 
         {/* Transaction History */}
         <AutoText
-          className={`text-lg font-semibold mt-8 mb-4 ${
-            isDark ? "text-white" : "text-gray-900"
-          }`}
+          className={`text-lg font-semibold mt-8 mb-4 ${isDark ? "text-white" : "text-gray-900"
+            }`}
         >
           Senaste aktivitet
         </AutoText>
@@ -564,9 +553,8 @@ export default function Wallet() {
               className="flex-row justify-between items-center mb-3 "
             >
               <View
-                className={`flex-1 flex-row items-center p-4 rounded-xl  ${
-                  isDark ? "bg-dark-card" : "bg-light-card"
-                }`}
+                className={`flex-1 flex-row items-center p-4 rounded-xl  ${isDark ? "bg-dark-card" : "bg-light-card"
+                  }`}
                 style={{
                   shadowColor: "#000",
                   shadowOpacity: 0.12,
@@ -580,59 +568,56 @@ export default function Wallet() {
                     tx.description.includes("Dag") || tx.description.includes("belöning")
                       ? "gift"
                       : tx.description.includes("Köp") || tx.description.includes("poäng för")
-                      ? "card"
-                      : tx.description.includes("Överfört") || tx.description.includes("till mottagare")
-                      ? "swap-horizontal"
-                      : tx.description.includes("Mottagit") || tx.description.includes("från")
-                      ? "arrow-down-circle"
-                      : tx.type === "earned"
-                      ? "trending-up"
-                      : tx.type === "spent"
-                      ? "cart"
-                      : "wallet"
+                        ? "card"
+                        : tx.description.includes("Överfört") || tx.description.includes("till mottagare")
+                          ? "swap-horizontal"
+                          : tx.description.includes("Mottagit") || tx.description.includes("från")
+                            ? "arrow-down-circle"
+                            : tx.type === "earned"
+                              ? "trending-up"
+                              : tx.type === "spent"
+                                ? "cart"
+                                : "wallet"
                   }
                   size={18}
                   color={
                     tx.description.includes("Dag") || tx.description.includes("belöning")
                       ? "#f59e0b" // Yellow for daily rewards
                       : tx.description.includes("Köp") || tx.description.includes("poäng för")
-                      ? "#3b82f6" // Blue for purchases
-                      : tx.description.includes("Överfört") || tx.description.includes("till mottagare")
-                      ? "#ef4444" // Red for sent transfers
-                      : tx.description.includes("Mottagit") || tx.description.includes("från")
-                      ? "#22c55e" // Green for received transfers
-                      : tx.type === "earned"
-                      ? "#22c55e"
-                      : tx.type === "spent"
-                      ? "#ef4444"
-                      : "#f59e0b"
+                        ? "#3b82f6" // Blue for purchases
+                        : tx.description.includes("Överfört") || tx.description.includes("till mottagare")
+                          ? "#ef4444" // Red for sent transfers
+                          : tx.description.includes("Mottagit") || tx.description.includes("från")
+                            ? "#22c55e" // Green for received transfers
+                            : tx.type === "earned"
+                              ? "#22c55e"
+                              : tx.type === "spent"
+                                ? "#ef4444"
+                                : "#f59e0b"
                   }
                   style={{ marginRight: 8 }}
                 />
                 <View className="flex-1 justify-between gap-2">
                   <AutoText
-                    className={`font-semibold text-xs ${
-                      isDark ? "text-white" : "text-gray-900"
-                    }`}
+                    className={`font-semibold text-xs ${isDark ? "text-white" : "text-gray-900"
+                      }`}
                   >
                     {tx.description}
                   </AutoText>
                   <AutoText
-                    className={`${
-                      isDark ? "text-gray-400" : "text-gray-500"
-                    } text-[9px]`}
+                    className={`${isDark ? "text-gray-400" : "text-gray-500"
+                      } text-[9px]`}
                   >
                     {new Date(tx.date).toLocaleDateString("sv-SE")}
                   </AutoText>
                 </View>
                 <AutoText
-                  className={`ml-2 font-bold text-xs ${
-                    tx.type === "earned"
-                      ? "text-green-500"
-                      : tx.type === "spent"
+                  className={`ml-2 font-bold text-xs ${tx.type === "earned"
+                    ? "text-green-500"
+                    : tx.type === "spent"
                       ? "text-red-500"
                       : "text-yellow-400"
-                  }`}
+                    }`}
                 >
                   {tx.type === "earned"
                     ? `+${tx.points} poäng`
