@@ -1,12 +1,20 @@
 
 import { client } from '@/sanityClient';
-
+import { Platform } from "react-native";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 
 let Notifications: any = null;
-try {
-  Notifications = require("expo-notifications");
-} catch (error) {
-  console.log("📱 expo-notifications not available (Expo Go limitation)");
+
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+if (Platform.OS === 'android' && isExpoGo) {
+  console.log("📱 Skipping expo-notifications in Expo Go on Android (functionality removed in SDK 53)");
+} else {
+  try {
+    Notifications = require("expo-notifications");
+  } catch (error) {
+    console.log("📱 expo-notifications not available (Expo Go limitation)");
+  }
 }
 
 export const setupPushNotifications = async (clerkId: string) => {

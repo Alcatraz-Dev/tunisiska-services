@@ -7,21 +7,23 @@ import { useEffect, useMemo, useState } from "react";
 import { Image, ScrollView, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-// Conditionally import native-notify functions to prevent crashes in Expo Go
-const getNotificationInbox = (() => {
-  try {
-    return require("native-notify").getNotificationInbox;
-  } catch {
-    return null;
-  }
-})();
-const getUnreadNotificationInboxCount = (() => {
-  try {
-    return require("native-notify").getUnreadNotificationInboxCount;
-  } catch {
-    return null;
-  }
-})();
+import Constants from "expo-constants";
+
+const isExpoGo = Constants.appOwnership === "expo";
+
+export const getNotificationInbox = async (...args: any[]) => {
+  if (isExpoGo) return []; // fallback safe
+
+  const { getNotificationInbox } = require("native-notify");
+  return getNotificationInbox(...args);
+};
+
+export const getUnreadNotificationInboxCount = async (...args: any[]) => {
+  if (isExpoGo) return 0; // fallback safe
+
+  const { getUnreadNotificationInboxCount } = require("native-notify");
+  return getUnreadNotificationInboxCount(...args);
+};
 import AnnouncementsCarousel from "../components/AnnouncementsCarousel";
 import AppFooter from "../components/AppFooter";
 import LiveStatus from "../components/LiveStatus";
@@ -116,7 +118,7 @@ export default function HomePage() {
   const getId = (n: any) => (n.id ?? n.notification_id ?? '').toString();
   const filterForUser = (items: any[]) => {
     if (!userId) return items;
-    const keys = ['subscriber_id','subscriberId','user_id','userId','indie_id','indieId','sub_id','subId'];
+    const keys = ['subscriber_id', 'subscriberId', 'user_id', 'userId', 'indie_id', 'indieId', 'sub_id', 'subId'];
     const hasAny = items.some((it) => keys.some((k) => it && typeof it === 'object' && k in it));
     if (!hasAny) return items;
     return items.filter((it) => keys.some((k) => it?.[k]?.toString?.() === userId?.toString()))
@@ -283,16 +285,15 @@ export default function HomePage() {
                 <View className="ml-2 ">
                   {/* Name */}
                   <AutoText
-                    className={`font-semibold text-sm ml-3 mb-2 ${
-                      isDark ? "text-dark-text" : "text-light-text"
-                    }`}
+                    className={`font-semibold text-sm ml-3 mb-2 ${isDark ? "text-dark-text" : "text-light-text"
+                      }`}
                   >
                     {getGreeting(
                       !userProfile
                         ? ((user?.firstName + " " + user?.lastName) as string)
                         : userProfile?.firstName && userProfile?.lastName
-                        ? `${userProfile.firstName} ${userProfile.lastName}`
-                        : user?.firstName ?? "Användare"
+                          ? `${userProfile.firstName} ${userProfile.lastName}`
+                          : user?.firstName ?? "Användare"
                     )}
                   </AutoText>
                   {/* Location Row */}
@@ -304,9 +305,8 @@ export default function HomePage() {
                       style={{ marginRight: 3 }}
                     />
                     <AutoText
-                      className={`text-xs  ${
-                        isDark ? "text-dark-text/60" : "text-light-text/60"
-                      }`}
+                      className={`text-xs  ${isDark ? "text-dark-text/60" : "text-light-text/60"
+                        }`}
                     >
                       {(userProfile?.country || "") +
                         ", " +
@@ -341,11 +341,10 @@ export default function HomePage() {
             <LiveStatus />
             {/* Search + Filter Row */}
             <View
-              className={`flex-row items-center rounded-full border px-2 h-14 mt-3 ${
-                isDark
+              className={`flex-row items-center rounded-full border px-2 h-14 mt-3 ${isDark
                   ? "bg-dark-card border-gray-700"
                   : "bg-light-card border-gray-300"
-              }`}
+                }`}
             >
               {/* Search Icon */}
               <Ionicons
@@ -396,9 +395,8 @@ export default function HomePage() {
             className={`px-6 flex-1 ${isDark ? "bg-dark" : "bg-light"}`}
           >
             <AutoText
-              className={`text-xl font-bold my-4 ${
-                isDark ? "text-dark-text" : "text-light-text"
-              }`}
+              className={`text-xl font-bold my-4 ${isDark ? "text-dark-text" : "text-light-text"
+                }`}
             >
               Våra Tjänster
             </AutoText>
@@ -426,9 +424,8 @@ export default function HomePage() {
                     color={isDark ? "#9CA3AF" : "#6B7280"}
                   />
                   <AutoText
-                    className={`mt-3 text-base ${
-                      isDark ? "text-dark-text/60" : "text-light-text/60"
-                    }`}
+                    className={`mt-3 text-base ${isDark ? "text-dark-text/60" : "text-light-text/60"
+                      }`}
                   >
                     Inga tjänster hittades
                   </AutoText>

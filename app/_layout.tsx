@@ -4,7 +4,7 @@ import { tokenCache } from "@clerk/clerk-expo/token-cache";
 import { useFonts } from "expo-font";
 import { Slot } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import registerNNPushToken from "native-notify";
+import Constants from "expo-constants";
 import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -26,7 +26,21 @@ function PushBootstrap() {
   return null;
 }
 export default function RootLayout() {
-  registerNNPushToken(32172, "PNF5T5VibvtV6lj8i7pbil");
+  useEffect(() => {
+    const isExpoGo = Constants.appOwnership === "expo";
+
+    if (isExpoGo) {
+      // Expo Go: ما تعملش شي
+      return;
+    }
+
+    try {
+      const registerNNPushToken = require("native-notify").default;
+      registerNNPushToken(32172, "PNF5T5VibvtV6lj8i7pbil");
+    } catch (e) {
+      console.log("native-notify not available in this build", e);
+    }
+  }, []);
 
   const [loaded] = useFonts({
     RubikBold: require("./assets/fonts/Rubik-Bold.ttf"),

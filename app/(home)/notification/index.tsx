@@ -9,8 +9,14 @@ import { StatusBar } from "expo-status-bar";
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+import Constants, { ExecutionEnvironment } from "expo-constants";
+import { Platform } from "react-native";
+
 // Conditionally import getNotificationInbox
 const getNotificationInbox = (() => {
+  const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+  if (Platform.OS === 'android' && isExpoGo) return null;
+
   try {
     return require("native-notify").getNotificationInbox;
   } catch {
@@ -74,21 +80,21 @@ export default function Notification() {
     () => `notification_hidden_ids:${userId ?? "anon"}`,
     [userId]
   );
-useFocusEffect(
-  useCallback(() => {
-    (async () => {
-      try {
-        const response = getNotificationInbox
-          ? await getNotificationInbox(APP_ID, APP_TOKEN, PAGE_SIZE, 0)
-          : [];
-        const notifications: NotificationItem[] = (response);
-        setData(applyOverlays(filterForUser(notifications)));
-      } catch (err) {
-        console.error("Failed fetching notifications:", err);
-      }
-    })();
-  }, [userId])
-);
+  useFocusEffect(
+    useCallback(() => {
+      (async () => {
+        try {
+          const response = getNotificationInbox
+            ? await getNotificationInbox(APP_ID, APP_TOKEN, PAGE_SIZE, 0)
+            : [];
+          const notifications: NotificationItem[] = (response);
+          setData(applyOverlays(filterForUser(notifications)));
+        } catch (err) {
+          console.error("Failed fetching notifications:", err);
+        }
+      })();
+    }, [userId])
+  );
   const getId = (n: NotificationItem) =>
     ((n.id || n.notification_id) ?? "").toString();
 
@@ -138,12 +144,12 @@ useFocusEffect(
   const saveReadIds = async (ids: string[]) => {
     try {
       await AsyncStorage.setItem(READ_IDS_KEY, JSON.stringify(ids));
-    } catch {}
+    } catch { }
   };
   const saveHiddenIds = async (ids: string[]) => {
     try {
       await AsyncStorage.setItem(HIDDEN_IDS_KEY, JSON.stringify(ids));
-    } catch {}
+    } catch { }
   };
 
   const markItemAsRead = async (notificationId?: string) => {
@@ -160,7 +166,7 @@ useFocusEffect(
     });
     try {
       markAsRead(notificationId);
-    } catch {}
+    } catch { }
     try {
       if (getNotificationInbox) {
         const nn = require("native-notify");
@@ -174,7 +180,7 @@ useFocusEffect(
         if (typeof fn === "function" && userId)
           await fn(userId.toString(), idStr, APP_ID, APP_TOKEN);
       }
-    } catch {}
+    } catch { }
   };
 
   const deleteItem = async (notificationId?: string) => {
@@ -193,7 +199,7 @@ useFocusEffect(
         if (typeof fn === "function" && userId)
           await fn(userId.toString(), idStr, APP_ID, APP_TOKEN);
       }
-    } catch {}
+    } catch { }
     setHiddenIds((prev) => {
       if (prev.includes(idStr)) return prev;
       const next = [...prev, idStr];
@@ -215,68 +221,68 @@ useFocusEffect(
       const currentPage = opts?.page ?? 0;
       const response = getNotificationInbox
         ? await getNotificationInbox(
-            APP_ID,
-            APP_TOKEN,
-            PAGE_SIZE,
-            currentPage * PAGE_SIZE
-          )
+          APP_ID,
+          APP_TOKEN,
+          PAGE_SIZE,
+          currentPage * PAGE_SIZE
+        )
         : [];
       const notificationData = response?.data || response || [];
       const typedData: NotificationItem[] = Array.isArray(notificationData)
         ? notificationData.map((n: any) => {
-            let imageUrl =
-              n.image ?? n.image_url ?? n.photo ?? n.picture ?? n.bigPictureURL;
-            let screenImageUrl = imageUrl,
-              routeUrl = undefined,
-              mediaType = "image",
-              videoUrl = undefined;
-            if (n.pushData) {
-              try {
-                const pushData =
-                  typeof n.pushData === "string"
-                    ? JSON.parse(n.pushData)
-                    : n.pushData;
-                console.log("📦 Push data:", pushData);
-                screenImageUrl =
-                  pushData.screenImage || pushData.image || imageUrl;
-                routeUrl = pushData.route;
-                mediaType = pushData.mediaType || "image";
-                videoUrl = pushData.videoUrl;
+          let imageUrl =
+            n.image ?? n.image_url ?? n.photo ?? n.picture ?? n.bigPictureURL;
+          let screenImageUrl = imageUrl,
+            routeUrl = undefined,
+            mediaType = "image",
+            videoUrl = undefined;
+          if (n.pushData) {
+            try {
+              const pushData =
+                typeof n.pushData === "string"
+                  ? JSON.parse(n.pushData)
+                  : n.pushData;
+              console.log("📦 Push data:", pushData);
+              screenImageUrl =
+                pushData.screenImage || pushData.image || imageUrl;
+              routeUrl = pushData.route;
+              mediaType = pushData.mediaType || "image";
+              videoUrl = pushData.videoUrl;
 
-                // Extract the real notification type from pushData if available
-                if (
-                  pushData.notificationType &&
-                  NOTIFICATION_TYPE_CONFIGS.hasOwnProperty(
-                    pushData.notificationType
-                  )
-                ) {
-                  n.type = pushData.notificationType;
-                  console.log(
-                    "🔄 Updated notification type from pushData:",
-                    n.type
-                  );
-                }
-              } catch (e) {
-                console.warn("Failed to parse pushData:", n.pushData, e);
+              // Extract the real notification type from pushData if available
+              if (
+                pushData.notificationType &&
+                NOTIFICATION_TYPE_CONFIGS.hasOwnProperty(
+                  pushData.notificationType
+                )
+              ) {
+                n.type = pushData.notificationType;
+                console.log(
+                  "🔄 Updated notification type from pushData:",
+                  n.type
+                );
               }
+            } catch (e) {
+              console.warn("Failed to parse pushData:", n.pushData, e);
             }
-            return {
-              id: n.notification_id?.toString() || n.id?.toString(),
-              notification_id: n.notification_id?.toString(),
-              title: n.title,
-              message: n.message,
-              type: n.category ?? n.type ?? "general",
-              category: n.category ?? n.type,
-              read: n.read ?? false,
-              date: n.date ?? n.date_sent ?? new Date().toISOString(),
-              date_sent: n.date_sent ?? n.date,
-              image: imageUrl,
-              screenImage: screenImageUrl,
-              route: routeUrl,
-              mediaType,
-              videoUrl,
-            };
-          })
+          }
+          return {
+            id: n.notification_id?.toString() || n.id?.toString(),
+            notification_id: n.notification_id?.toString(),
+            title: n.title,
+            message: n.message,
+            type: n.category ?? n.type ?? "general",
+            category: n.category ?? n.type,
+            read: n.read ?? false,
+            date: n.date ?? n.date_sent ?? new Date().toISOString(),
+            date_sent: n.date_sent ?? n.date,
+            image: imageUrl,
+            screenImage: screenImageUrl,
+            route: routeUrl,
+            mediaType,
+            videoUrl,
+          };
+        })
         : [];
       const scoped = filterForUser(typedData);
       const processed = applyOverlays(scoped, opts);

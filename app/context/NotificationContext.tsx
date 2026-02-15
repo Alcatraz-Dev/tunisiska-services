@@ -2,30 +2,38 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import { NotificationItem } from "@/app/types/notification";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 
 // Conditionally import expo-notifications
 let Notifications: any = null;
-try {
-  Notifications = require("expo-notifications");
 
-  // Configure notification handler for production if module is available
-  Notifications.setNotificationHandler({
-    handleNotification: async (notification: any) => {
-      console.log('🔔 Notification handler called:', JSON.stringify(notification, null, 2));
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
-      // Always show notifications when app is in foreground
-      // For background notifications, let the system decide based on user preferences
-      return {
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-        shouldShowBanner: true,
-        shouldShowList: true,
-      };
-    },
-  });
-} catch (error) {
-  console.log("📱 expo-notifications not available (Expo Go limitation)");
+if (Platform.OS === 'android' && isExpoGo) {
+  console.log("📱 Skipping expo-notifications in Expo Go on Android (functionality removed in SDK 53)");
+} else {
+  try {
+    Notifications = require("expo-notifications");
+
+    // Configure notification handler for production if module is available
+    Notifications.setNotificationHandler({
+      handleNotification: async (notification: any) => {
+        console.log('🔔 Notification handler called:', JSON.stringify(notification, null, 2));
+
+        // Always show notifications when app is in foreground
+        // For background notifications, let the system decide based on user preferences
+        return {
+          shouldShowAlert: true,
+          shouldPlaySound: true,
+          shouldSetBadge: true,
+          shouldShowBanner: true,
+          shouldShowList: true,
+        };
+      },
+    });
+  } catch (error) {
+    console.log("📱 expo-notifications not available or failed to load");
+  }
 }
 
 interface NotificationContextProps {

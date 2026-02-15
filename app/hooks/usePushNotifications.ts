@@ -2,20 +2,38 @@ import { useEffect, useState } from "react";
 import * as Device from "expo-device";
 import { Platform, AppState } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Constants from "expo-constants";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import { useNotifications } from "@/app/context/NotificationContext";
 import { showAlert } from "@/app/utils/showAlert";
-import { getNotificationInbox, getUnreadNotificationInboxCount } from "native-notify";
 import { nativeNotifyAPI } from "@/app/services/nativeNotifyApi";
 import { useAuth } from "@clerk/clerk-expo";
 import { NotificationItem } from "../types/notification";
 
-// Conditionally import expo-notifications (not available in Expo Go on Android SDK 53+)
 let Notifications: any = null;
-try {
-  Notifications = require("expo-notifications");
-} catch (error) {
-  console.log("📱 expo-notifications not available (Expo Go limitation), using native-notify only");
+let NativeNotify: any = null;
+let getNotificationInbox: any = null;
+let getUnreadNotificationInboxCount: any = null;
+
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+if (Platform.OS === 'android' && isExpoGo) {
+  console.log("📱 Skipping expo-notifications & native-notify modules in Expo Go on Android");
+} else {
+  try {
+    Notifications = require("expo-notifications");
+  } catch (error) {
+    console.log("📱 expo-notifications not available");
+  }
+  
+  try {
+    NativeNotify = require("native-notify");
+    if (NativeNotify) {
+        getNotificationInbox = NativeNotify.getNotificationInbox;
+        getUnreadNotificationInboxCount = NativeNotify.getUnreadNotificationInboxCount;
+    }
+  } catch (error) {
+    console.log("📱 native-notify not available");
+  }
 }
 
 export default function usePushNotifications() {
@@ -71,6 +89,11 @@ export default function usePushNotifications() {
   const syncNativeNotifyInbox = async () => {
     if (!userId) {
       console.log("🔍 [NOTIFICATION] No userId, skipping sync");
+      return;
+    }
+    
+    if (!getNotificationInbox || !getUnreadNotificationInboxCount) {
+      console.log("🔍 [NOTIFICATION] Skipping sync (NativeNotify functions missing)");
       return;
     }
     try {

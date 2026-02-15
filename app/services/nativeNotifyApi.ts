@@ -1,4 +1,22 @@
-import { registerIndieID, unregisterIndieDevice } from "native-notify";
+import { Platform } from "react-native";
+import Constants, { ExecutionEnvironment } from "expo-constants";
+
+let registerIndieID: any = null;
+let unregisterIndieDevice: any = null;
+
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+if (Platform.OS === 'android' && isExpoGo) {
+  console.log("📱 Skipping native-notify module in Expo Go on Android");
+} else {
+  try {
+    const NativeNotify = require("native-notify");
+    registerIndieID = NativeNotify.registerIndieID;
+    unregisterIndieDevice = NativeNotify.unregisterIndieDevice;
+  } catch (error) {
+    console.log("📱 native-notify not available");
+  }
+}
 
 const NATIVE_NOTIFY_CONFIG = {
   APP_ID: parseInt(process.env.EXPO_PUBLIC_NATIVE_NOTIFY_APP_ID || "32172"),
@@ -78,6 +96,10 @@ export class NativeNotifyAPI {
     userId: string,
     expoPushToken?: string
   ): Promise<NotificationResponse> {
+    if (!registerIndieID) {
+      console.log("📱 Skipping native notify registration (module missing)");
+      return { success: false, message: "Native Notify module missing" };
+    }
     try {
       await retryApiCall(async () =>
         registerIndieID(userId, this.appId, this.appToken)
@@ -96,6 +118,10 @@ export class NativeNotifyAPI {
   }
 
   async unregisterUser(userId: string): Promise<NotificationResponse> {
+    if (!unregisterIndieDevice) {
+      console.log("📱 Skipping native notify unregistration (module missing)");
+      return { success: false, message: "Native Notify module missing" };
+    }
     try {
       await retryApiCall(async () =>
         unregisterIndieDevice(userId, this.appId, this.appToken)
