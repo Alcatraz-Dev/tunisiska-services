@@ -77,7 +77,7 @@ export default function GoogleSignInButton({ setUserProfile }: Props) {
 
       await AsyncStorage.setItem(`userEmail_${userId}`, email);
 
-      showAlert("Sparad", "Din Google-profil har uppdaterats!");
+      await showAlert("Sparad", "Din Google-profil har uppdaterats!");
     } catch (error) {
       console.error("❌ Error updating Clerk metadata:", error);
       showAlert("Error", "Kunde inte uppdatera Google-profilen");
@@ -150,7 +150,7 @@ export default function GoogleSignInButton({ setUserProfile }: Props) {
       }
     } catch (err: any) {
       console.error("OAuth error:", err);
-      showAlert(
+      await showAlert(
         "Error",
         err.errors?.[0]?.message || "Failed to sign in with Google"
       );
@@ -161,9 +161,8 @@ export default function GoogleSignInButton({ setUserProfile }: Props) {
 
   return (
     <TouchableOpacity
-      className={`flex-row items-center justify-center rounded-full  px-4 py-3 shadow-lg ${
-        isDark ? "bg-light-card" : " bg-dark-card"
-      }`}
+      className={`flex-row items-center justify-center rounded-full  px-4 py-3 shadow-lg ${isDark ? "bg-light-card" : " bg-dark-card"
+        }`}
       onPress={onPress}
       disabled={loading}
       activeOpacity={0.8}

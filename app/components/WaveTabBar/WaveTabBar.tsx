@@ -2,7 +2,7 @@ import React from "react";
 import { Text, Image, View } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import AnimatedTabBar, { TabsConfigsType } from "curved-bottom-navigation-bar";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+// import { SafeAreaProvider } from "react-native-safe-area-context"; // Redundant
 import icons from "@/app/constants/icons";
 import { useTheme } from "@/app/context/ThemeContext";
 import HomeScreen from "@/app/components/Homescreen";
@@ -50,7 +50,7 @@ function WaveTabBar() {
             marginTop: 2, // Space between icon and title
           }}
         >
-        {getTitle("Home")}
+          {getTitle("Home")}
         </Text>
       ),
     },
@@ -98,7 +98,7 @@ function WaveTabBar() {
             marginTop: 2, // Space between icon and title
           }}
         >
-        {getTitle("Profile")}
+          {getTitle("Profile")}
         </Text>
       ),
     },
@@ -125,7 +125,7 @@ function WaveTabBar() {
             marginTop: 2, // Space between icon and title
           }}
         >
-         {getTitle("Wallet")}
+          {getTitle("Wallet")}
         </Text>
       ),
     },
@@ -152,7 +152,7 @@ function WaveTabBar() {
             marginTop: 2, // Space between icon and title
           }}
         >
-        {getTitle("Booking")}
+          {getTitle("Booking")}
         </Text>
       ),
     },
@@ -179,65 +179,63 @@ function WaveTabBar() {
             marginTop: 2, // Space between icon and title
           }}
         >
-        {getTitle("Map")}
+          {getTitle("Map")}
         </Text>
       ),
     },
   };
   const Tab = createBottomTabNavigator();
   return (
-    <SafeAreaProvider>
-      <Tab.Navigator
-        screenOptions={{ headerShown: false }}
-        initialRouteName="Home"
-        tabBar={(props) => (
-          <View
-            style={{
-              borderTopWidth: 2,
-              borderTopColor: BORDER_COLOR,
-              backgroundColor: BAR_COLOR,
-            }}
-          >
-            <AnimatedTabBar
-              {...props}
-              dotColor={ACTIVE_COLOR_DOT}
-              tabs={tabs}
-              barColor={BAR_COLOR}
-              barHeight={TAB_HEIGHT}
-              titleShown={true}
-            />
-          </View>
-        )}
-      >
-         <Tab.Screen
-          name="Home"
-          component={HomeScreen}
-          options={{ title: "Hem" }}
-        />
-        <Tab.Screen
-          name="Booking"
-          component={BookingScreen}
-          options={{ title: "Bokningar" }}
-        />
-        <Tab.Screen
-          name="Wallet"
-          component={WalletScreen}
-          options={{ title: "Wallet" }}
-        />
-       
-        <Tab.Screen
-          name="Map"
-          component={MapOverviewScreen}
-          options={{ title: "Karta" }}
-          
-        />
-        <Tab.Screen
-          name="Profile"
-          component={ProfileScreen}
-          options={{ title: "Profil" }}
-        />
-      </Tab.Navigator>
-    </SafeAreaProvider>
+    <Tab.Navigator
+      screenOptions={{ headerShown: false }}
+      initialRouteName="Home"
+      tabBar={(props) => (
+        <View
+          style={{
+            borderTopWidth: 2,
+            borderTopColor: BORDER_COLOR,
+            backgroundColor: BAR_COLOR,
+          }}
+        >
+          <AnimatedTabBar
+            {...props}
+            dotColor={ACTIVE_COLOR_DOT}
+            tabs={tabs}
+            barColor={BAR_COLOR}
+            barHeight={TAB_HEIGHT}
+            titleShown={true}
+          />
+        </View>
+      )}
+    >
+      <Tab.Screen
+        name="Home"
+        component={HomeScreen}
+        options={{ title: "Hem" }}
+      />
+      <Tab.Screen
+        name="Booking"
+        component={BookingScreen}
+        options={{ title: "Bokningar" }}
+      />
+      <Tab.Screen
+        name="Wallet"
+        component={WalletScreen}
+        options={{ title: "Wallet" }}
+      />
+
+      <Tab.Screen
+        name="Map"
+        component={MapOverviewScreen}
+        options={{ title: "Karta" }}
+
+      />
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{ title: "Profil" }}
+      />
+    </Tab.Navigator>
   );
 }
 

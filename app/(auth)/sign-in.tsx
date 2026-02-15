@@ -1,5 +1,5 @@
 import * as React from "react";
-import { TouchableOpacity, View, ScrollView, Image, Alert } from "react-native";
+import { TouchableOpacity, View, ScrollView, Image, Alert, ActivityIndicator } from "react-native";
 import { useSignIn } from "@clerk/clerk-expo";
 import { Link, useRouter } from "expo-router";
 import { useTheme } from "../context/ThemeContext";
@@ -21,38 +21,50 @@ export default function SignInScreen() {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [emailAddress, setEmailAddress] = React.useState("");
   const [password, setPassword] = React.useState("");
+  const [loading, setLoading] = useState(false);
 
   const onSignInPress = async () => {
-    if (!isLoaded) return;
+    if (!isLoaded || loading) return;
+
+    setLoading(true);
     try {
       const signInAttempt = await signIn.create({
         identifier: emailAddress,
         password,
       });
+
       if (signInAttempt.status === "complete") {
         await setActive({ session: signInAttempt.createdSessionId });
         router.replace("/");
       } else {
-        console.error(JSON.stringify(signInAttempt, null, 2));
+        // This could happen if more steps are required (MFA, etc.)
+        console.warn("Sign in status not complete:", signInAttempt.status);
+        showAlert("Inloggning", `Status: ${signInAttempt.status}`);
       }
     } catch (err: any) {
-      console.error(JSON.stringify(err, null, 2));
+      // Don't stringify big error objects in logs as it might be intercepted by UI
+      console.log("Sign in error:", err?.message || "Unknown error");
+
+      // Extract the most descriptive error message from Clerk
+      const clerkError = err?.errors?.[0];
       const errorMessage =
-        err?.errors?.[0]?.message || "Något gick fel. Försök igen."; // fallback in Swedish
-        showAlert("Error", errorMessage);
-    
+        clerkError?.longMessage ||
+        clerkError?.message ||
+        "Något gick fel. Försök igen.";
+
+      await showAlert("Inloggningsfel", errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const inputStyle = `w-full p-4 rounded-xl border mb-4 ${
-    isDark
-      ? "border-gray-700 bg-dark-card text-white"
-      : "border-gray-300 bg-white text-gray-900"
-  }`;
+  const inputStyle = `w-full p-4 rounded-xl border mb-4 ${isDark
+    ? "border-gray-700 bg-dark-card text-white"
+    : "border-gray-300 bg-white text-gray-900"
+    }`;
 
-  const buttonStyle = `w-full p-4 rounded-xl items-center ${
-    isDark ? "bg-blue-600" : "bg-blue-500"
-  }`;
+  const buttonStyle = `w-full p-4 rounded-xl items-center ${isDark ? "bg-blue-600" : "bg-blue-500"
+    }`;
 
   const buttonTextStyle = "text-white font-semibold";
 
@@ -68,9 +80,8 @@ export default function SignInScreen() {
         contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
       >
         <AutoText
-          className={`text-3xl font-bold mb-6 text-center ${
-            isDark ? "text-white" : "text-gray-900"
-          }`}
+          className={`text-3xl font-bold mb-6 text-center ${isDark ? "text-white" : "text-gray-900"
+            }`}
         >
           Logga in
         </AutoText>
@@ -94,14 +105,21 @@ export default function SignInScreen() {
           className={inputStyle}
         />
 
-        <TouchableOpacity className={buttonStyle} onPress={onSignInPress}>
-          <AutoText className={buttonTextStyle}>Fortsätt</AutoText>
+        <TouchableOpacity
+          className={`${buttonStyle} ${loading ? 'opacity-70' : ''}`}
+          onPress={onSignInPress}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <AutoText className={buttonTextStyle}>Fortsätt</AutoText>
+          )}
         </TouchableOpacity>
 
         <View
-          className={`flex-row justify-center my-4 border ${
-            isDark ? "border-zinc-600" : "border-zinc-300"
-          }`}
+          className={`flex-row justify-center my-4 border ${isDark ? "border-zinc-600" : "border-zinc-300"
+            }`}
         />
 
         {!userProfile ? (

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { TouchableOpacity, View, ScrollView, Image, Alert } from "react-native";
+import { TouchableOpacity, View, ScrollView, Image, Alert, ActivityIndicator } from "react-native";
 import { useSignUp } from "@clerk/clerk-expo";
 import { Link, useRouter } from "expo-router";
 import { useTheme } from "../context/ThemeContext";
@@ -27,24 +27,31 @@ export default function SignUpScreen() {
   const [pendingVerification, setPendingVerification] = React.useState(false);
   const [code, setCode] = React.useState("");
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
 
   const onSignUpPress = async () => {
-    if (!isLoaded) return;
+    if (!isLoaded || loading) return;
+    setLoading(true);
     try {
       await signUp.create({ emailAddress, password });
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       setPendingVerification(true);
     } catch (err: any) {
-      console.error(JSON.stringify(err, null, 2));
-      // Clerk returns structured errors
+      console.log("Sign up error:", err?.message || "Unknown error");
+      const clerkError = err?.errors?.[0];
       const errorMessage =
-        err?.errors?.[0]?.message || "Något gick fel. Försök igen."; // fallback in Swedish
-      showAlert("Fel vid registrering", errorMessage);
+        clerkError?.longMessage ||
+        clerkError?.message ||
+        "Något gick fel. Försök igen.";
+      await showAlert("Fel vid registrering", errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
   const onVerifyPress = async () => {
-    if (!isLoaded) return;
+    if (!isLoaded || loading) return;
+    setLoading(true);
     try {
       const signUpAttempt = await signUp.attemptEmailAddressVerification({
         code,
@@ -78,41 +85,43 @@ export default function SignUpScreen() {
 
         router.replace("/");
       } else {
-        console.error(JSON.stringify(signUpAttempt, null, 2));
+        console.warn("Sign up verification not complete:", signUpAttempt.status);
+        await showAlert("Verifiering", `Status: ${signUpAttempt.status}`);
       }
     } catch (err: any) {
-      console.error(JSON.stringify(err, null, 2));
+      console.log("Verification error:", err?.message || "Unknown error");
+      const clerkError = err?.errors?.[0];
       const errorMessage =
-        err?.errors?.[0]?.message || "Något gick fel. Försök igen."; // fallback in Swedish
+        clerkError?.longMessage ||
+        clerkError?.message ||
+        "Något gick fel. Försök igen.";
 
-      showAlert("Fel vid verifiering", errorMessage);
+      await showAlert("Fel vid verifiering", errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const inputStyle = `w-full p-4 rounded-xl border mb-4 ${
-    isDark
-      ? "border-gray-700 bg-dark-card text-white"
-      : "border-gray-300 bg-white text-gray-900"
-  }`;
+  const inputStyle = `w-full p-4 rounded-xl border mb-4 ${isDark
+    ? "border-gray-700 bg-dark-card text-white"
+    : "border-gray-300 bg-white text-gray-900"
+    }`;
 
-  const buttonStyle = `w-full p-4 rounded-xl items-center ${
-    isDark ? "bg-blue-600" : "bg-blue-500"
-  }`;
+  const buttonStyle = `w-full p-4 rounded-xl items-center ${isDark ? "bg-blue-600" : "bg-blue-500"
+    }`;
 
   const buttonTextStyle = "text-white font-semibold";
 
   if (pendingVerification) {
     return (
       <View
-        className={`flex-1 justify-center px-6 ${
-          isDark ? "bg-dark" : "bg-light"
-        }`}
+        className={`flex-1 justify-center px-6 ${isDark ? "bg-dark" : "bg-light"
+          }`}
       >
         {/* Header */}
         <AutoText
-          className={`text-2xl font-bold mb-4 ${
-            isDark ? "text-white" : "text-gray-900"
-          }`}
+          className={`text-2xl font-bold mb-4 ${isDark ? "text-white" : "text-gray-900"
+            }`}
         >
           Verifiera din e-post
         </AutoText>
@@ -142,11 +151,15 @@ export default function SignUpScreen() {
 
         {/* Verify button */}
         <TouchableOpacity
-          className={`${buttonStyle} mt-6`}
+          className={`${buttonStyle} mt-6 ${loading ? 'opacity-70' : ''}`}
           onPress={onVerifyPress}
-          disabled={code.length < 6}
+          disabled={code.length < 6 || loading}
         >
-          <AutoText className={buttonTextStyle}>Verifiera</AutoText>
+          {loading ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <AutoText className={buttonTextStyle}>Verifiera</AutoText>
+          )}
         </TouchableOpacity>
       </View>
     );
@@ -164,9 +177,8 @@ export default function SignUpScreen() {
         contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
       >
         <AutoText
-          className={`text-3xl font-bold mb-6 text-center ${
-            isDark ? "text-white" : "text-gray-900"
-          }`}
+          className={`text-3xl font-bold mb-6 text-center ${isDark ? "text-white" : "text-gray-900"
+            }`}
         >
           Skapa konto
         </AutoText>
@@ -189,18 +201,25 @@ export default function SignUpScreen() {
           className={inputStyle}
         />
 
-        <TouchableOpacity className={buttonStyle} onPress={onSignUpPress}>
-          <AutoText className={buttonTextStyle}>Fortsätt</AutoText>
+        <TouchableOpacity
+          className={`${buttonStyle} ${loading ? 'opacity-70' : ''}`}
+          onPress={onSignUpPress}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <AutoText className={buttonTextStyle}>Fortsätt</AutoText>
+          )}
         </TouchableOpacity>
         <View
-          className={`flex-row justify-center my-4 border ${
-            isDark ? "border-zinc-600" : "border-zinc-300"
-          }`}
+          className={`flex-row justify-center my-4 border ${isDark ? "border-zinc-600" : "border-zinc-300"
+            }`}
         ></View>
         {!userProfile ? (
           <GoogleSignInButton
             setUserProfile={setUserProfile}
-            // autoText={AutoText}
+          // autoText={AutoText}
           />
         ) : (
           <View className="items-center">
