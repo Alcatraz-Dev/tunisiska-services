@@ -147,7 +147,8 @@ module.exports = {
         {
           "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location."
         }
-      ]
+      ],
+      "./plugins/withKlarnaRepo"
     ],
 
     experiments: {
