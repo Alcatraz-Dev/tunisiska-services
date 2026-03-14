@@ -22,7 +22,8 @@ export enum ServiceType {
   CLEANING = 'cleaning',
   SHIPPING = 'shipping',
   CLEANING_MOVE = 'cleaning-move',
-  MOVE_CLEANING = 'move_cleaning'
+  MOVE_CLEANING = 'move_cleaning',
+  CONTAINER_SHIPPING = 'container-shipping'
 }
 
 export enum OrderStatus {
@@ -151,6 +152,18 @@ export enum ShippingSpeed {
   OVERNIGHT = 'overnight' // Next day
 }
 
+// Container Shipping Service Schema
+export interface ContainerShippingServiceOrder extends ServiceBase {
+  serviceType: ServiceType.CONTAINER_SHIPPING;
+  pickupAddress: string;
+  deliveryAddress: string;
+  packageDetails: {
+    size: '20ft' | '40ft';
+    description: string;
+    value: number;
+  };
+}
+
 // Cleaning + Move Service Schema
 export interface CleaningMoveServiceOrder extends ServiceBase {
   serviceType: ServiceType.CLEANING_MOVE;
@@ -210,7 +223,8 @@ export type ServiceOrder =
   | CleaningServiceOrder
   | ShippingServiceOrder
   | CleaningMoveServiceOrder
-  | MoveCleaningServiceOrder;
+  | MoveCleaningServiceOrder
+  | ContainerShippingServiceOrder;
 
 // Order tracking and notifications
 export interface OrderUpdate {

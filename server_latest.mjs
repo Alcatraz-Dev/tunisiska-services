@@ -9,7 +9,7 @@ dotenv.config();
 const app = express();
 
 const PORT = process.env.PORT || 3000;
-const STRIPE_SECRET_KEY = process.env.EXPO_PUBLIC_STRIPE_SECRET_KEY || "sk_test_dummy";
+const STRIPE_SECRET_KEY = process.env.EXPO_PUBLIC_STRIPE_SECRET_KEY || "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";
 
 console.log("🔄 Starting Stripe Payment Server...");
 

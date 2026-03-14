@@ -49,8 +49,8 @@ interface UserProfileData {
 const services = [
   {
     id: "1",
-    title: "Frakt mellan Sverige & Tunisien",
-    description: "Snabb och säker frakt av paket mellan Sverige och Tunisien.",
+    title: "Shipping Sweden & Tunisia",
+    description: "Fast and secure shipping of packages between Sweden and Tunisia.",
     icon: "cube-outline",
     color: "#3B82F6",
     route: "/(home)/services/shipping",
@@ -82,6 +82,15 @@ const services = [
     color: "#EF4444",
     route: "/(home)/services/taxi",
     category: "Flygplats Taxi",
+  },
+  {
+    id: "5",
+    title: "Container shipping",
+    description: "Book large containers for shipping between Sweden and Tunisia.",
+    icon: "boat-outline",
+    color: "#6366F1",
+    route: "/(home)/services/container-shipping",
+    category: "Transport",
   },
 ];
 

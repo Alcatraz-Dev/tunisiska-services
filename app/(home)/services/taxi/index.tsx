@@ -241,7 +241,7 @@ export default function Taxi() {
           const { loadStripe } = require("@stripe/stripe-js");
           const stripe = await loadStripe(
             process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ||
-              "pk_test_placeholder"
+              "pk_live_51RBxpfC4Cy0OOwANyH44YXC4575IBb61dzwArC9MdhDmynSQTJ1gsLmfk8Az4SyhYiVjmyNZ3YOwHE1agKLGvajy00Py46dvKO"
           );
 
           if (!stripe) {

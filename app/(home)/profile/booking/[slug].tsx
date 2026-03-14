@@ -24,6 +24,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { TaxiOrderService } from "@/app/services/taxiOrderService";
 import { MoveOrderService } from "@/app/services/moveOrderService";
 import { ShippingOrderService } from "@/app/services/shippingOrderService";
+import { ContainerShippingOrderService } from "@/app/services/containerShippingOrderService";
 import * as Linking from "expo-linking";
 import { showAlert } from "@/app/utils/showAlert";
 
@@ -36,7 +37,7 @@ export default function BookingDetailsScreen() {
   const [booking, setBooking] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [serviceType, setServiceType] = useState<'taxi' | 'move' | 'shipping' | null>(null);
+  const [serviceType, setServiceType] = useState<'taxi' | 'move' | 'shipping' | 'container-shipping' | null>(null);
   const progress = useSharedValue(0);
 
   // Handle slug parameter - it might be an array or string
@@ -55,7 +56,7 @@ export default function BookingDetailsScreen() {
 
       // Try to fetch as taxi order first
       let result = await TaxiOrderService.getTaxiOrder(orderId as string);
-      let orderType: 'taxi' | 'move' | 'shipping' = 'taxi';
+      let orderType: 'taxi' | 'move' | 'shipping' | 'container-shipping' = 'taxi';
 
       // If taxi order not found, try move order
       if (!result.success || !result.order) {
@@ -67,6 +68,12 @@ export default function BookingDetailsScreen() {
       if (!result.success || !result.order) {
         result = await ShippingOrderService.getShippingOrder(orderId as string);
         orderType = 'shipping';
+      }
+
+      // If shipping order not found, try container shipping order
+      if (!result.success || !result.order) {
+        result = await ContainerShippingOrderService.getShippingOrder(orderId as string);
+        orderType = 'container-shipping';
       }
 
       if (result.success && result.order) {
@@ -112,7 +119,7 @@ export default function BookingDetailsScreen() {
             createdAt: order.createdAt,
             scheduledDateTime: order.scheduledDateTime,
           };
-        } else {
+        } else if (orderType === 'shipping') {
           // Shipping order
           let pickupLocation = order.pickupAddress || "Plats saknas";
           let dropoffLocation = order.deliveryAddress || "Plats saknas";
@@ -144,6 +151,48 @@ export default function BookingDetailsScreen() {
             status: getStatusText(order.status || "unknown"),
             price: order.totalPrice ? `${order.totalPrice} SEK` : "Pris saknas",
             passengers: order.packageDetails?.weight || 0,
+            isRoundTrip: false,
+            returnDateTime: null,
+            estimatedDistance: 0,
+            notes: order.notes || "",
+            customerInfo: order.customerInfo || { name: "Namn saknas", phone: "Telefon saknas", email: "E-post saknas" },
+            paymentMethod: order.paymentMethod || 'cash',
+            createdAt: order.createdAt,
+            scheduledDateTime: order.scheduledDateTime,
+            packageDetails: order.packageDetails,
+          };
+        } else if (orderType === 'container-shipping') {
+          // Container Shipping order
+          let pickupLocation = order.pickupAddress || "Plats saknas";
+          let dropoffLocation = order.deliveryAddress || "Plats saknas";
+
+          if (order.route) {
+            const routeParts = order.route.split('_');
+            if (routeParts.length === 2) {
+              pickupLocation = routeParts[0]
+                .replace('stockholm', 'Stockholm')
+                .replace('goteborg', 'Göteborg')
+                .replace('malmo', 'Malmö')
+                .replace('tunis', 'Tunis')
+                .replace('sousse', 'Sousse');
+              dropoffLocation = routeParts[1]
+                .replace('stockholm', 'Stockholm')
+                .replace('goteborg', 'Göteborg')
+                .replace('malmo', 'Malmö')
+                .replace('tunis', 'Tunis')
+                .replace('sousse', 'Sousse');
+            }
+          }
+
+          transformedBooking = {
+            id: order._id || "N/A",
+            category: "Container shipping",
+            date: order.scheduledDateTime ? new Date(order.scheduledDateTime).toLocaleDateString('sv-SE') : "Datum saknas",
+            pickup: pickupLocation,
+            dropoff: dropoffLocation,
+            status: getStatusText(order.status || "unknown"),
+            price: order.totalPrice ? `${order.totalPrice} SEK` : "Pris saknas",
+            passengers: 0,
             isRoundTrip: false,
             returnDateTime: null,
             estimatedDistance: 0,
@@ -212,28 +261,32 @@ export default function BookingDetailsScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              let result;
+              let result: { success: boolean; message?: string } | undefined;
               if (serviceType === 'taxi') {
-                result = await TaxiOrderService.cancelTaxiOrder(orderId as string, "Cancelled by user");
+                result = await TaxiOrderService.cancelTaxiOrder(orderId as string);
               } else if (serviceType === 'move') {
-                result = await MoveOrderService.cancelMoveOrder(orderId as string, "Cancelled by user");
-              } else {
+                result = await MoveOrderService.cancelMoveOrder(orderId as string);
+              } else if (serviceType === 'shipping') {
                 result = await ShippingOrderService.cancelShippingOrder(orderId as string, "Cancelled by user");
+              } else if (serviceType === 'container-shipping') {
+                result = await ContainerShippingOrderService.cancelShippingOrder(orderId as string, "Cancelled by user");
               }
 
-              if (result.success) {
+              if (result && result.success) {
                 showAlert("Bokning avbokad", "Din bokning har blivit avbokad.");
                 // Refresh the booking data
-                let updatedResult;
-                if (serviceType === 'taxi') {
-                  updatedResult = await TaxiOrderService.getTaxiOrder(orderId as string);
-                } else if (serviceType === 'move') {
-                  updatedResult = await MoveOrderService.getMoveOrder(orderId as string);
-                } else {
-                  updatedResult = await ShippingOrderService.getShippingOrder(orderId as string);
-                }
+                let updatedResult: { success: boolean; order?: any } | undefined;
+                  if (serviceType === 'taxi') {
+                    updatedResult = await TaxiOrderService.getTaxiOrder(orderId as string);
+                  } else if (serviceType === 'move') {
+                    updatedResult = await MoveOrderService.getMoveOrder(orderId as string);
+                  } else if (serviceType === 'shipping') {
+                    updatedResult = await ShippingOrderService.getShippingOrder(orderId as string);
+                  } else if (serviceType === 'container-shipping') {
+                    updatedResult = await ContainerShippingOrderService.getShippingOrder(orderId as string);
+                  }
 
-                if (updatedResult.success && updatedResult.order) {
+                if (updatedResult && updatedResult.success && updatedResult.order) {
                   const updatedOrder = updatedResult.order;
                   const updatedBooking = {
                     ...booking,
@@ -262,27 +315,28 @@ export default function BookingDetailsScreen() {
     try {
       let shareMessage = '';
 
-      if (serviceType === 'shipping') {
-        shareMessage = `📦 Fraktbeställning från Tunisiska Mega Service
+      if (serviceType === 'shipping' || serviceType === 'container-shipping') {
+        const isContainer = serviceType === 'container-shipping';
+        shareMessage = `${isContainer ? '🚢 Container Shipping' : '📦 Shipping'} order from Tunisiska Mega Service
 
-Avsändare: ${booking.customerInfo?.name}
-Telefon: ${booking.customerInfo?.phone}
+Sender: ${booking.customerInfo?.name}
+Phone: ${booking.customerInfo?.phone}
 
-Mottagare: ${booking.notes?.split('Recipient: ')[1]?.split(' (')[0] || 'N/A'}
-Mottagarens telefon: ${booking.notes?.split('Recipient: ')[1]?.split(' (')[1]?.replace(')', '') || 'N/A'}
+Recipient: ${booking.notes?.split('Recipient: ')[1]?.split(' (')[0] || 'N/A'}
+Recipient Phone: ${booking.notes?.split('Recipient: ')[1]?.split(' (')[1]?.replace(')', '') || 'N/A'}
 
-Från: ${booking.pickup}
-Till: ${booking.dropoff}
+From: ${booking.pickup}
+To: ${booking.dropoff}
 
-Vikt: ${(booking as any).packageDetails?.weight}kg
-Värde: ${(booking as any).packageDetails?.value} SEK
+${isContainer ? `Size: ${booking.packageDetails?.size}` : `Weight: ${booking.packageDetails?.weight}kg`}
+Value: ${booking.packageDetails?.value} SEK
 
-Datum: ${booking.scheduledDateTime ? new Date(booking.scheduledDateTime).toLocaleString('sv-SE') : 'Datum saknas'}
+Date: ${booking.scheduledDateTime ? new Date(booking.scheduledDateTime).toLocaleString('sv-SE') : 'Date missing'}
 Status: ${booking.status}
 
-Total kostnad: ${booking.price}
+Total Cost: ${booking.price}
 
-Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
+Booking ID: ${booking.id?.slice(-8) || 'N/A'}`;
       } else {
         // Default share message for other order types
         shareMessage = `${booking.category} beställning
@@ -505,9 +559,13 @@ Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
                   </AutoText>
                 </View>
                 <View className="items-center">
-                  <Ionicons name={serviceType === 'shipping' ? "scale-outline" : "people-outline"} size={20} color={`${isDark ? "white" :"black"}`} />
+                  <Ionicons name={serviceType === 'shipping' || serviceType === 'container-shipping' ? (serviceType === 'container-shipping' ? "boat-outline" : "scale-outline") : "people-outline"} size={20} color={`${isDark ? "white" :"black"}`} />
                    <AutoText className={`text-xs mt-1 ${isDark ? "text-white" : "text-black"}`}>
-                     {serviceType === 'shipping' ? `${String(booking.passengers || 0)} kg` : `${String(booking.passengers || 1)} ${serviceType === 'taxi' ? 'pass' : 'pers'}`}
+                     {serviceType === 'container-shipping' 
+                       ? `Storlek: ${booking.packageDetails?.size || "N/A"}`
+                       : serviceType === 'shipping' 
+                         ? `${String(booking.passengers || 0)} kg` 
+                         : `${String(booking.passengers || 1)} ${serviceType === 'taxi' ? 'pass' : 'pers'}`}
                    </AutoText>
                 </View>
                 <View className="items-center">
@@ -519,12 +577,14 @@ Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
                </View>
 
                {/* Package Details Row - Below the main info */}
-               {serviceType === 'shipping' && booking.packageDetails && (
+               {(serviceType === 'shipping' || serviceType === 'container-shipping') && booking.packageDetails && (
                  <View className="flex-row justify-center items-center mt-3 pt-3 border-t border-white/20">
                    <View className="items-center">
                      <Ionicons name="cube-outline" size={20} color={`${isDark ? "white" :"black"}`} />
                      <AutoText className={`text-xs mt-1 ${isDark ? "text-white" : "text-black"}`}>
-                       {String(booking.packageDetails.description || "Beskrivning saknas")}
+                       {serviceType === 'container-shipping' 
+                         ? `Container: ${booking.packageDetails.size || "Beskrivning saknas"}`
+                         : String(booking.packageDetails.description || "Beskrivning saknas")}
                      </AutoText>
                    </View>
                  </View>
@@ -652,16 +712,16 @@ Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
                   <View className="items-center">
                     <View className={`p-3 rounded-xl mb-3 ${isDark ? "bg-purple-500/20" : "bg-purple-100"}`}>
                       <Ionicons
-                        name={serviceType === 'taxi' ? "people-outline" : serviceType === 'shipping' ? "scale-outline" : "cube-outline"}
+                        name={serviceType === 'taxi' ? "people-outline" : (serviceType === 'shipping' || serviceType === 'container-shipping' ? (serviceType === 'container-shipping' ? "boat-outline" : "scale-outline") : "cube-outline")}
                         size={22}
                         color={isDark ? "#C084FC" : "#8B5CF6"}
                       />
                     </View>
                     <AutoText className={`font-semibold text-base mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>
-                      {serviceType === 'taxi' ? 'Passagerare' : serviceType === 'shipping' ? 'Vikt' : 'Personer'}
+                      {serviceType === 'taxi' ? 'Passagerare' : serviceType === 'container-shipping' ? 'Size' : serviceType === 'shipping' ? 'Vikt' : 'Personer'}
                     </AutoText>
-                    <AutoText className={`text-3xl font-bold mb-2 ${isDark ? "text-purple-300" : "text-purple-700"}`}>
-                      {String(booking.passengers || 1)}{serviceType === 'shipping' ? ' kg' : ''}
+                    <AutoText className={`text-xl font-bold mb-2 ${isDark ? "text-purple-300" : "text-purple-700"}`}>
+                      {serviceType === 'container-shipping' ? booking.packageDetails?.size : serviceType === 'shipping' ? `${String(booking.passengers || 0)} kg` : `${String(booking.passengers || 1)} ${serviceType === 'taxi' ? 'pass' : 'pers'}`}
                     </AutoText>
                     {serviceType === 'taxi' && booking.estimatedDistance && (
                       <AutoText className={`text-sm text-center ${isDark ? "text-gray-400" : "text-gray-600"}`}>

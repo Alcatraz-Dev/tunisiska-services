@@ -1,163 +1,189 @@
-const IS_DEV = process.env.APP_VARIANT === 'development';
-const IS_PREVIEW = process.env.APP_VARIANT === 'preview';
+const IS_DEV = process.env.APP_VARIANT === "development";
+const IS_PREVIEW = process.env.APP_VARIANT === "preview";
 
 module.exports = {
   expo: {
-    name: IS_DEV ? 'Tunisiska Mega Service (Dev)' : IS_PREVIEW ? 'Tunisiska Mega Service (Preview)' : 'Tunisiska Mega Service',
-    slug: 'tunisiska-mega-service',
-    description: 'Tunisiska Mega Service is a mobile app for booking and managing services.',
-    version: '1.0.0',
-    orientation: 'portrait',
-    icon: './app/assets/logo-android/mipmap-xxxhdpi/ic_launcher.png',
-    userInterfaceStyle: 'automatic',
+    name: IS_DEV
+      ? "Tunisiska Mega Service (Dev)"
+      : IS_PREVIEW
+        ? "Tunisiska Mega Service (Preview)"
+        : "Tunisiska Mega Service",
+    slug: "tunisiska-mega-service",
+    description:
+      "Tunisiska Mega Service is a mobile app for booking and managing services.",
+    version: "1.0.0",
+    orientation: "portrait",
+    icon: "./app/assets/expo-icons/icon.png",
+    userInterfaceStyle: "automatic",
     splash: {
-      image: './app/assets/logo-transparent.png',
-      resizeMode: 'contain',
-      backgroundColor: '#ffffff'
+      image: "./app/assets/expo-icons/splash.png",
+      resizeMode: "contain",
+      backgroundColor: "#ffffff",
     },
     ios: {
       supportsTablet: true,
       bundleIdentifier: IS_DEV
-        ? 'com.alcatrazdev.tunisiskaservices.dev'
+        ? "com.alcatrazdev.tunisiskaservices.dev"
         : IS_PREVIEW
-          ? 'com.alcatrazdev.tunisiskaservices.preview'
-          : 'com.alcatrazdev.tunisiskaservices',
+          ? "com.alcatrazdev.tunisiskaservices.preview"
+          : "com.alcatrazdev.tunisiskaservices",
       infoPlist: {
-        CFBundleDisplayName: IS_DEV ? 'Tunisiska Mega Service Dev' : IS_PREVIEW ? 'Tunisiska Mega Service Preview' : 'Tunisiska Mega Service',
-        UIBackgroundModes: ['remote-notification'],
+        CFBundleDisplayName: IS_DEV
+          ? "Tunisiska Mega Service Dev"
+          : IS_PREVIEW
+            ? "Tunisiska Mega Service Preview"
+            : "Tunisiska Mega Service",
+        UIBackgroundModes: ["remote-notification"],
         UNUserNotificationCenter: {
-          UNAuthorizationStatusAuthorized: true
+          UNAuthorizationStatusAuthorized: true,
         },
         // Add permission for notifications and badge
-        NSUserNotificationsUsageDescription: 'This app uses notifications to keep you updated on your service bookings and important announcements.',
+        NSUserNotificationsUsageDescription:
+          "This app uses notifications to keep you updated on your service bookings and important announcements.",
         // Enable badge updates
-        'com.apple.developer.usernotifications.communication': true,
+        "com.apple.developer.usernotifications.communication": true,
         ITSAppUsesNonExemptEncryption: false,
         // Location permissions for map functionality
-        NSLocationWhenInUseUsageDescription: 'This app uses location services to show shipping routes and driver locations on the map.',
-        NSLocationAlwaysAndWhenInUseUsageDescription: 'This app uses location services to track shipping deliveries and provide real-time updates.',
-        NSLocationAlwaysUsageDescription: 'This app uses location services in the background to track shipping deliveries and provide real-time updates.',
-        NSFaceIDUsageDescription: "Allows App to use Face ID for a simpler sign in.",
+        NSLocationWhenInUseUsageDescription:
+          "This app uses location services to show shipping routes and driver locations on the map.",
+        NSLocationAlwaysAndWhenInUseUsageDescription:
+          "This app uses location services to track shipping deliveries and provide real-time updates.",
+        NSLocationAlwaysUsageDescription:
+          "This app uses location services in the background to track shipping deliveries and provide real-time updates.",
+        NSFaceIDUsageDescription:
+          "Allows App to use Face ID for a simpler sign in.",
         // Add URL schemes for Stripe redirect
         CFBundleURLTypes: [
           {
-            CFBundleURLSchemes: ['tunisiska-mega-service']
-          }
-        ]
-      }
+            CFBundleURLSchemes: ["tunisiska-mega-service"],
+          },
+        ],
+      },
     },
     android: {
       adaptiveIcon: {
-        foregroundImage: './app/assets/logo-android/mipmap-xxxhdpi/ic_launcher_foreground.png',
-        backgroundColor: '#ffffff'
+        foregroundImage: "./app/assets/expo-icons/adaptive-icon.png",
+        backgroundColor: "#ffffff",
       },
       package: IS_DEV
-        ? 'com.alcatrazdev.tunisiskaservices.dev'
+        ? "com.alcatrazdev.tunisiskaservices.dev"
         : IS_PREVIEW
-          ? 'com.alcatrazdev.tunisiskaservices.preview'
-          : 'com.alcatrazdev.tunisiskaservices',
+          ? "com.alcatrazdev.tunisiskaservices.preview"
+          : "com.alcatrazdev.tunisiskaservices",
       permissions: [
-        'RECEIVE_BOOT_COMPLETED',
-        'VIBRATE',
-        'WAKE_LOCK',
-        'ACCESS_FINE_LOCATION',
-        'ACCESS_COARSE_LOCATION',
-        'FOREGROUND_SERVICE'
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "WAKE_LOCK",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "FOREGROUND_SERVICE",
       ],
       intentFilters: [
         {
-          action: 'VIEW',
+          action: "VIEW",
           data: [
             {
-              scheme: 'tunisiska-mega-service'
-            }
+              scheme: "tunisiska-mega-service",
+            },
           ],
-          category: ['BROWSABLE', 'DEFAULT']
-        }
+          category: ["BROWSABLE", "DEFAULT"],
+        },
       ],
       config: {
         googleMaps: {
-          "apiKey": "AIzaSyD15X03HjphQz3p4GLrooYrIKsBxcxW4s0"
-        }
+          apiKey: "AIzaSyD15X03HjphQz3p4GLrooYrIKsBxcxW4s0",
+        },
       },
     },
     web: {
-      bundler: 'metro',
-      output: 'static',
-      favicon: './app/assets/logo-ios/AppIcon.appiconset/Icon-App-60x60@3x.png'
+      bundler: "metro",
+      output: "static",
+      favicon: "./app/assets/expo-icons/favicon.png",
     },
-    scheme: 'tunisiska-mega-service',
+    scheme: "tunisiska-mega-service",
     plugins: [
       [
-        'expo-router',
+        "expo-router",
         {
           origin:
-            process.env.NODE_ENV === 'development'
-              ? 'http://192.168.8.106:3000'
-              : 'https://tunisiska-services-app.expo.app',
-
-        }
+            process.env.NODE_ENV === "development"
+              ? "http://192.168.8.106:3000"
+              : "https://tunisiska-services-app.expo.app",
+        },
       ],
-      'expo-secure-store',
-      'expo-font',
-      'expo-web-browser',
+      "expo-secure-store",
+      "expo-font",
+      "expo-web-browser",
       [
-        'expo-video',
+        "expo-video",
         {
           supportsBackgroundPlayback: true,
-          supportsPictureInPicture: true
-        }
+          supportsPictureInPicture: true,
+        },
       ],
       [
-        'expo-splash-screen',
+        "expo-splash-screen",
         {
-          backgroundColor: '#232323',
-          image: './app/assets/logo-ios/AppIcon.appiconset/Icon-App-60x60@3x.png',
+          backgroundColor: "#ffffff",
+          image: "./app/assets/expo-icons/splash-icon.png",
           dark: {
-            image: './app/assets/logo-ios/AppIcon.appiconset/Icon-App-60x60@3x.png',
-            backgroundColor: '#000000'
+            image: "./app/assets/expo-icons/splash-icon.png",
+            backgroundColor: "#ffffff",
           },
-          imageWidth: 200
-        }
+          imageWidth: 200,
+        },
       ],
-      'expo-localization',
+      "expo-localization",
       [
-        'expo-notifications',
+        "expo-notifications",
         {
-          icon: './app/assets/logo-ios/AppIcon.appiconset/Icon-App-60x60@3x.png',
-          color: '#ffffff',
-          defaultChannel: 'default',
-          sounds: ['./app/assets/sounds/notification.wav'],
+          icon: "./app/assets/expo-icons/icon.png",
+          color: "#ffffff",
+          defaultChannel: "default",
+          sounds: ["./app/assets/sounds/notification.wav"],
           enableBackgroundRemoteNotifications: true,
           iosDisplayInForeground: true,
-          mode: IS_DEV ? 'development' : 'production',
+          mode: IS_DEV ? "development" : "production",
           ios: {
-            icon: './app/assets/logo-ios/AppIcon.appiconset/Icon-App-60x60@3x.png'
+            icon: "./app/assets/expo-icons/icon.png",
           },
           android: {
-            icon: './app/assets/logo-android/mipmap-xxxhdpi/ic_launcher.png',
-            color: '#ffffff',
-            largeIcon: './app/assets/logo-android/mipmap-xxxhdpi/ic_launcher.png'
-          }
-        }
+            icon: "./app/assets/expo-icons/icon.png",
+            color: "#ffffff",
+            largeIcon: "./app/assets/expo-icons/icon.png",
+          },
+        },
       ],
       "expo-maps",
-     [
+      [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location."
-        }
+          locationAlwaysAndWhenInUsePermission:
+            "Allow $(PRODUCT_NAME) to use your location.",
+        },
       ],
-      "./plugins/withKlarnaRepo"
+      [
+        "expo-splash-screen",
+        {
+          backgroundColor: "#232323",
+          image: "./app/assets/expo-icons/splash-icon.png",
+          dark: {
+            image: "./app/assets/expo-icons/splash-icon.png",
+            backgroundColor: "#ffffff",
+          },
+          imageWidth: 200,
+        },
+      ],
+      "./plugins/withKlarnaRepo",
     ],
 
     experiments: {
-      typedRoutes: true
+      typedRoutes: true,
     },
     extra: {
       router: {},
       eas: {
-        projectId: 'febc1a59-7c3b-4754-a888-3246bca56018'
+        projectId: "febc1a59-7c3b-4754-a888-3246bca56018",
       },
       // Expose Sanity config so it's available at runtime on device/web
       sanity: {
@@ -166,22 +192,26 @@ module.exports = {
         token: process.env.EXPO_PUBLIC_SANITY_TOKEN,
       },
       // Environment variables for different build types
-      env: process.env.APP_VARIANT || 'production',
+      env: process.env.APP_VARIANT || "production",
       isDev: IS_DEV,
       isPreview: IS_PREVIEW,
       // API configuration
-      apiOrigin: process.env.NODE_ENV === 'development'
-        ? process.env.EXPO_PUBLIC_SERVER_URL || 'http://localhost:3000'
-        : 'https://tunisiska-services-app.expo.app',
+      apiOrigin:
+        process.env.NODE_ENV === "development"
+          ? process.env.EXPO_PUBLIC_SERVER_URL || "http://localhost:3000"
+          : "https://tunisiska-services-app.expo.app",
       // Add server configuration for real devices
-      serverUrl: process.env.NODE_ENV === 'development' ? process.env.EXPO_PUBLIC_SERVER_URL || 'http://localhost:3000' : 'https://tunisiska-services-app.expo.app',
+      serverUrl:
+        process.env.NODE_ENV === "development"
+          ? process.env.EXPO_PUBLIC_SERVER_URL || "http://localhost:3000"
+          : "https://tunisiska-services-app.expo.app",
     },
     runtimeVersion: {
-      policy: 'appVersion'
+      policy: "appVersion",
     },
     updates: {
-      url: 'https://u.expo.dev/febc1a59-7c3b-4754-a888-3246bca56018'
+      url: "https://u.expo.dev/febc1a59-7c3b-4754-a888-3246bca56018",
     },
-    owner: 'alcatrazdev'
-  }
+    owner: "alcatrazdev",
+  },
 };

@@ -10,9 +10,11 @@ import moveOrder from "./moveOrder";
 import moveCleaningOrder from "./moveCleaningOrder";
 import shippingOrder from "./shippingOrder";
 import shippingSchedule from "./shippingSchedule";
+import containerShippingOrder from "./containerShippingOrder";
+import containerShippingSchedule from "./containerShippingSchedule";
 
 
 
 import friendRequest from "./friendRequest";
 
-export const schemaTypes = [user , liveStatus, announcement, friendRequest, footer, terms, policy, taxiOrder, moveOrder, moveCleaningOrder, shippingOrder, shippingSchedule ];
+export const schemaTypes = [user , liveStatus, announcement, friendRequest, footer, terms, policy, taxiOrder, moveOrder, moveCleaningOrder, shippingOrder, shippingSchedule, containerShippingOrder, containerShippingSchedule ];

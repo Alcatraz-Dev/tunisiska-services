@@ -9,6 +9,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { TaxiOrderService } from "@/app/services/taxiOrderService";
 import { MoveOrderService } from "@/app/services/moveOrderService";
 import { ShippingOrderService } from "@/app/services/shippingOrderService";
+import { ContainerShippingOrderService } from "@/app/services/containerShippingOrderService";
 import { useAuth } from "@clerk/clerk-expo";
 
 export default function BookingHistoryScreen() {
@@ -35,10 +36,16 @@ export default function BookingHistoryScreen() {
       }
 
       try {
-        const [taxiResult, moveResult, shippingResult] = await Promise.all([
+        const [
+          taxiResult,
+          moveResult,
+          shippingResult,
+          containerShippingResult,
+        ] = await Promise.all([
           TaxiOrderService.getUserTaxiOrders(userId),
           MoveOrderService.getUserMoveOrders(userId),
           ShippingOrderService.getUserShippingOrders(userId),
+          ContainerShippingOrderService.getUserShippingOrders(userId),
         ]);
 
         if (!isMounted) return;
@@ -50,7 +57,9 @@ export default function BookingHistoryScreen() {
           const taxiOrders = taxiResult.orders.map((order: any) => ({
             id: order._id,
             category: "Taxi",
-            dateObj: order.scheduledDateTime ? new Date(order.scheduledDateTime) : null,
+            dateObj: order.scheduledDateTime
+              ? new Date(order.scheduledDateTime)
+              : null,
             pickup: order.pickupAddress || "Plats saknas",
             dropoff: order.destinationAddress || "Plats saknas",
             status: getStatusText(order.status),
@@ -69,7 +78,9 @@ export default function BookingHistoryScreen() {
           const moveOrders = moveResult.orders.map((order: any) => ({
             id: order._id,
             category: "Flytt utan städning",
-            dateObj: order.scheduledDateTime ? new Date(order.scheduledDateTime) : null,
+            dateObj: order.scheduledDateTime
+              ? new Date(order.scheduledDateTime)
+              : null,
             pickup: order.pickupAddress || "Plats saknas",
             dropoff: order.deliveryAddress || "Plats saknas",
             status: getStatusText(order.status),
@@ -88,7 +99,9 @@ export default function BookingHistoryScreen() {
           const shippingOrders = shippingResult.orders.map((order: any) => ({
             id: order._id,
             category: "Frakt",
-            dateObj: order.scheduledDateTime ? new Date(order.scheduledDateTime) : null,
+            dateObj: order.scheduledDateTime
+              ? new Date(order.scheduledDateTime)
+              : null,
             pickup: order.pickupAddress || "Plats saknas",
             dropoff: order.deliveryAddress || "Plats saknas",
             status: getStatusText(order.status),
@@ -96,10 +109,35 @@ export default function BookingHistoryScreen() {
             price: order.totalPrice ? `${order.totalPrice} SEK` : "Pris saknas",
             passengers: order.packageDetails?.weight || 0,
             isRoundTrip: false,
-            notes: order.notes || "",
+            notes: order.packageDetails?.description || "",
             serviceType: "shipping",
           }));
           allOrders.push(...shippingOrders);
+        }
+
+        // Container Shipping
+        if (containerShippingResult.success && containerShippingResult.orders) {
+          const containerShippingOrders = containerShippingResult.orders.map(
+            (order: any) => ({
+              id: order._id,
+              category: "Container shipping",
+              dateObj: order.scheduledDateTime
+                ? new Date(order.scheduledDateTime)
+                : null,
+              pickup: order.pickupAddress || "Plats saknas",
+              dropoff: order.deliveryAddress || "Plats saknas",
+              status: getStatusText(order.status),
+              slug: order._id,
+              price: order.totalPrice
+                ? `${order.totalPrice} SEK`
+                : "Pris saknas",
+              passengers: 0,
+              isRoundTrip: false,
+              notes: order.packageDetails?.description || "",
+              serviceType: "container-shipping",
+            }),
+          );
+          allOrders.push(...containerShippingOrders);
         }
 
         // Sort by date (newest first)
@@ -180,7 +218,11 @@ export default function BookingHistoryScreen() {
 
   const renderBooking = useCallback(
     ({ item, index }: any) => (
-      <Animated.View entering={FadeInUp} exiting={FadeOutDown} style={{ marginBottom: 16 }}>
+      <Animated.View
+        entering={FadeInUp}
+        exiting={FadeOutDown}
+        style={{ marginBottom: 16 }}
+      >
         <View
           style={{
             backgroundColor: isDark ? "#2c2c2e" : "#ffffff",
@@ -194,40 +236,65 @@ export default function BookingHistoryScreen() {
           }}
         >
           <View className="flex-row justify-between items-center mb-3">
-            <AutoText className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
+            <AutoText
+              className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}
+            >
               {item.category}
             </AutoText>
-            <View className={`px-3 py-1 rounded-full ${getStatusColor(item.status)}`}>
-              <AutoText className={`text-xs font-bold ${getStatusTextColor(item.status)}`}>
+            <View
+              className={`px-3 py-1 rounded-full ${getStatusColor(item.status)}`}
+            >
+              <AutoText
+                className={`text-xs font-bold ${getStatusTextColor(item.status)}`}
+              >
                 {item.status}
               </AutoText>
             </View>
           </View>
           <View className="space-y-2">
-            <AutoText className={`text-xs ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-              Datum: {item.dateObj ? item.dateObj.toLocaleDateString("sv-SE") : "Datum saknas"}
+            <AutoText
+              className={`text-xs ${isDark ? "text-gray-300" : "text-gray-700"}`}
+            >
+              Datum:{" "}
+              {item.dateObj
+                ? item.dateObj.toLocaleDateString("sv-SE")
+                : "Datum saknas"}
             </AutoText>
-            <AutoText className={`text-xs ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+            <AutoText
+              className={`text-xs ${isDark ? "text-gray-300" : "text-gray-700"}`}
+            >
               Från: {item.pickup}
             </AutoText>
-            <AutoText className={`text-xs ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+            <AutoText
+              className={`text-xs ${isDark ? "text-gray-300" : "text-gray-700"}`}
+            >
               Till: {item.dropoff}
             </AutoText>
             {item.serviceType === "taxi" ? (
-              <AutoText className={`text-xs ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+              <AutoText
+                className={`text-xs ${isDark ? "text-gray-300" : "text-gray-700"}`}
+              >
                 Passagerare: {item.passengers}
               </AutoText>
             ) : item.serviceType === "shipping" ? (
-              <AutoText className={`text-xs ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                Vikt: {item.passengers} kg
+              <AutoText
+                className={`text-xs ${isDark ? "text-gray-300" : "text-gray-700"}`}
+              >
+                {item.category === "Container shipping"
+                  ? item.notes
+                  : `Vikt: ${item.passengers} kg`}
               </AutoText>
             ) : (
-              <AutoText className={`text-xs ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+              <AutoText
+                className={`text-xs ${isDark ? "text-gray-300" : "text-gray-700"}`}
+              >
                 Personer: {item.passengers}
               </AutoText>
             )}
             {item.isRoundTrip && (
-              <AutoText className={`text-xs ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+              <AutoText
+                className={`text-xs ${isDark ? "text-gray-300" : "text-gray-700"}`}
+              >
                 Tur och retur
               </AutoText>
             )}
@@ -248,14 +315,16 @@ export default function BookingHistoryScreen() {
               alignItems: "center",
             }}
           >
-            <AutoText className={`text-sm font-bold ${isDark ? "text-gray-900" : "text-white"}`}>
+            <AutoText
+              className={`text-sm font-bold ${isDark ? "text-gray-900" : "text-white"}`}
+            >
               Se detaljer
             </AutoText>
           </TouchableOpacity>
         </View>
       </Animated.View>
     ),
-    [isDark]
+    [isDark],
   );
 
   return (
@@ -263,14 +332,25 @@ export default function BookingHistoryScreen() {
       {/* Header */}
       <View className={`px-6 pt-6 pb-3 ${isDark ? "bg-dark" : "bg-light"}`}>
         <View className="flex-row items-center justify-center relative mb-2">
-          <TouchableOpacity onPress={() => router.back()} className="absolute left-0 p-2">
-            <Ionicons name="arrow-back" size={24} color={isDark ? "#fff" : "#000"} />
+          <TouchableOpacity
+            onPress={() => router.back()}
+            className="absolute left-0 p-2"
+          >
+            <Ionicons
+              name="arrow-back"
+              size={24}
+              color={isDark ? "#fff" : "#000"}
+            />
           </TouchableOpacity>
-          <AutoText className={`text-2xl font-extrabold text-center ${isDark ? "text-white" : "text-gray-900"}`}>
+          <AutoText
+            className={`text-2xl font-extrabold text-center ${isDark ? "text-white" : "text-gray-900"}`}
+          >
             Mina bokningar
           </AutoText>
         </View>
-        <AutoText className={`text-sm text-center ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+        <AutoText
+          className={`text-sm text-center ${isDark ? "text-gray-400" : "text-gray-600"}`}
+        >
           Se din historik av bokade tjänster
         </AutoText>
       </View>
@@ -278,15 +358,27 @@ export default function BookingHistoryScreen() {
       {/* Content */}
       {loading && !initialLoadComplete ? (
         <View className="flex-1 justify-center items-center">
-          <AutoText className={`text-base ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+          <AutoText
+            className={`text-base ${isDark ? "text-gray-400" : "text-gray-600"}`}
+          >
             Laddar bokningar...
           </AutoText>
         </View>
       ) : bookings.length === 0 && initialLoadComplete ? (
         <View className="flex-1 justify-center items-center">
-          <Ionicons name="document-text-outline" size={60} color={isDark ? "#6B7280" : "#9CA3AF"} />
-          <AutoText className={`mt-4 text-base ${isDark ? "text-gray-400" : "text-gray-600"}`}>Inga bokningar än</AutoText>
-          <AutoText className={`mt-2 text-sm text-center px-8 ${isDark ? "text-gray-500" : "text-gray-500"}`}>
+          <Ionicons
+            name="document-text-outline"
+            size={60}
+            color={isDark ? "#6B7280" : "#9CA3AF"}
+          />
+          <AutoText
+            className={`mt-4 text-base ${isDark ? "text-gray-400" : "text-gray-600"}`}
+          >
+            Inga bokningar än
+          </AutoText>
+          <AutoText
+            className={`mt-2 text-sm text-center px-8 ${isDark ? "text-gray-500" : "text-gray-500"}`}
+          >
             Dina bokningar kommer att visas här när du har gjort några
           </AutoText>
         </View>
@@ -294,7 +386,7 @@ export default function BookingHistoryScreen() {
         <FlatList
           className="flex-1 px-6 mt-2"
           data={bookings}
-          keyExtractor={(item, index) => `${item?.id || 'unknown'}-${index}`}
+          keyExtractor={(item, index) => `${item?.id || "unknown"}-${index}`}
           renderItem={renderBooking}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 100 }}

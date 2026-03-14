@@ -12,12 +12,11 @@ import { Calendar } from "react-native-calendars";
 import { useTheme } from "../../../context/ThemeContext";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import ShippingCategoryCheckbox from "@/app/components/ShippingCategoryDropdown";
 import { useUser } from "@clerk/clerk-expo";
 import { AutoText } from "@/app/components/ui/AutoText";
 import Input from "@/app/components/ui/Input";
 import { showAlert } from "@/app/utils/showAlert";
-import { ShippingOrderService } from "@/app/services/shippingOrderService";
+import { ContainerShippingOrderService } from "@/app/services/containerShippingOrderService";
 import PaymentStripeJS from "@/app/components/PaymentStripeJS";
 
 // 🔹 Fetch shipping schedules from Sanity
@@ -25,7 +24,7 @@ const fetchShippingSchedules = async () => {
   try {
     const { client } = await import("@/sanityClient");
     const schedules = await client.fetch(`
-      *[_type == "shippingSchedule" && status == "available"] {
+      *[_type == "containerShippingSchedule" && status == "available"] {
         ...,
         _id,
         route,
@@ -52,8 +51,7 @@ export default function ShippingPage() {
   const [selectedTrip, setSelectedTrip] = useState<any>(null);
   const [shippingSchedules, setShippingSchedules] = useState<any[]>([]);
 
-  const [kg, setKg] = useState("");
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [containerSize, setContainerSize] = useState<"20ft" | "40ft">("20ft");
   const [usePoints, setUsePoints] = useState(false);
 
   // Customer info
@@ -153,8 +151,7 @@ export default function ShippingPage() {
 
   // 🔹 Beräkna pris
   const calculateTotal = () => {
-    const weight = parseFloat(kg) || 0;
-    let total = ShippingOrderService.calculateShippingPrice(weight, 'standard', false, undefined, undefined);
+    let total = containerSize === "20ft" ? 20000 : 35000;
 
     // Points discount
     if (
@@ -171,8 +168,7 @@ export default function ShippingPage() {
   const handleBooking = async () => {
     if (
       !selectedTrip ||
-      selectedCategories.length === 0 ||
-      !kg ||
+      !containerSize ||
       !customerName ||
       !customerPhone ||
       !recipientName ||
@@ -209,15 +205,9 @@ export default function ShippingPage() {
         selectedTrip.route?.split("_")[1]?.replace("tunis", "Tunis") || "Tunis",
       scheduledDateTime: selectedTrip.departureTime,
       packageDetails: {
-        weight: parseFloat(kg),
-        dimensions: {
-          length: 30,
-          width: 20,
-          height: 15,
-        },
-        description: selectedCategories.join(", "),
-        value: 1000,
-        isFragile: selectedCategories.includes("fragile"),
+        size: containerSize as "20ft" | "40ft",
+        description: `Container ${containerSize}`,
+        value: 100000,
       },
       shippingSpeed: "standard" as const,
       requiresSignature: true,
@@ -230,7 +220,7 @@ export default function ShippingPage() {
       notes: `Recipient: ${recipientName} (${recipientPhone})`,
     };
 
-    const result = await ShippingOrderService.createShippingOrder(orderData);
+    const result = await ContainerShippingOrderService.createShippingOrder(orderData);
 
     if (result.success) {
       showAlert(
@@ -377,7 +367,7 @@ export default function ShippingPage() {
               isDark ? "text-white" : "text-gray-900"
             }`}
           >
-            Shipping
+            Container shipping
           </AutoText>
         </View>
         <AutoText
@@ -385,7 +375,7 @@ export default function ShippingPage() {
             isDark ? "text-gray-400" : "text-gray-600"
           }`}
         >
-          Book your shipping between Sweden and Tunisia
+          Book large containers for shipping between Sweden and Tunisia
         </AutoText>
       </View>
 
@@ -561,7 +551,6 @@ export default function ShippingPage() {
             >
               Mottagarinformation
             </AutoText>
-
             <AutoText
               className={`my-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}
             >
@@ -593,26 +582,57 @@ export default function ShippingPage() {
               placeholderTextColor={isDark ? "gray" : "gray"}
             />
 
-            <ShippingCategoryCheckbox
-              isDark={isDark}
-              selectedCategories={selectedCategories}
-              setSelectedCategories={setSelectedCategories}
-            />
             <AutoText
-              className={`mb-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}
+              className={`my-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}
             >
-              Vikt (kg) *
+              Containerstorlek *
             </AutoText>
-            <Input
-              placeholder="Ex: 10"
-              value={kg}
-              onChangeText={setKg}
-              keyboardType="numeric"
-              className={`border rounded-lg p-4 mb-4 ${
-                isDark ? "bg-dark-card text-white" : "bg-light-card text-black"
-              }`}
-              placeholderTextColor={isDark ? "gray" : "gray"}
-            />
+            <View className="flex-row gap-4 mb-4">
+              <TouchableOpacity
+                onPress={() => setContainerSize("20ft")}
+                className={`flex-1 p-4 rounded-lg border ${
+                  containerSize === "20ft"
+                    ? "bg-blue-500 border-blue-500"
+                    : isDark
+                      ? "bg-dark-card border-gray-600"
+                      : "bg-light-card border-gray-300"
+                }`}
+              >
+                <AutoText
+                  className={`text-center font-bold ${
+                    containerSize === "20ft"
+                      ? "text-white"
+                      : isDark
+                        ? "text-white"
+                        : "text-black"
+                  }`}
+                >
+                  20ft
+                </AutoText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setContainerSize("40ft")}
+                className={`flex-1 p-4 rounded-lg border ${
+                  containerSize === "40ft"
+                    ? "bg-blue-500 border-blue-500"
+                    : isDark
+                      ? "bg-dark-card border-gray-600"
+                      : "bg-light-card border-gray-300"
+                }`}
+              >
+                <AutoText
+                  className={`text-center font-bold ${
+                    containerSize === "40ft"
+                      ? "text-white"
+                      : isDark
+                        ? "text-white"
+                        : "text-black"
+                  }`}
+                >
+                  40ft
+                </AutoText>
+              </TouchableOpacity>
+            </View>
 
             {/* Payment Method Selection */}
             <AutoText
@@ -870,7 +890,7 @@ export default function ShippingPage() {
                   Grundpris:
                 </AutoText>
                 <AutoText className={isDark ? "text-white" : "text-black"}>
-                  {kg ? calculateTotal() : 0} SEK
+                  {calculateTotal()} SEK
                 </AutoText>
               </View>
               <View className="border-t border-gray-300 pt-2 mt-2">
@@ -883,7 +903,7 @@ export default function ShippingPage() {
                   <AutoText
                     className={`font-bold ${isDark ? "text-white" : "text-black"}`}
                   >
-                    {kg ? calculateTotal() : 0} SEK
+                    {calculateTotal()} SEK
                   </AutoText>
                 </View>
               </View>
@@ -905,8 +925,7 @@ export default function ShippingPage() {
                 }}
                 disabled={
                   !selectedTrip ||
-                  selectedCategories.length === 0 ||
-                  !kg ||
+                  !containerSize ||
                   !customerName.trim() ||
                   !customerPhone.trim() ||
                   !recipientName.trim() ||
@@ -925,8 +944,7 @@ export default function ShippingPage() {
                 className="bg-blue-500 rounded-xl p-4 items-center"
                 disabled={
                   !selectedTrip ||
-                  selectedCategories.length === 0 ||
-                  !kg ||
+                  !containerSize ||
                   !customerName.trim() ||
                   !customerPhone.trim() ||
                   !recipientName.trim() ||

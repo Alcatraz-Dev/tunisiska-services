@@ -78,6 +78,7 @@ export default function OrderManager({ onBack }: OrderManagerProps) {
       case ServiceType.TAXI: return 'car-outline';
       case ServiceType.CLEANING: return 'sparkles-outline';
       case ServiceType.SHIPPING: return 'cube-outline';
+      case ServiceType.CONTAINER_SHIPPING: return 'boat-outline';
       case ServiceType.CLEANING_MOVE: return 'construct-outline';
       case ServiceType.MOVE_CLEANING: return 'construct-outline';
       default: return 'briefcase-outline';
@@ -89,10 +90,11 @@ export default function OrderManager({ onBack }: OrderManagerProps) {
       case ServiceType.MOVE: return 'Flytt';
       case ServiceType.TAXI: return 'Taxi';
       case ServiceType.CLEANING: return 'Städning';
-      case ServiceType.SHIPPING: return 'Frakt';
+      case ServiceType.SHIPPING: return 'Shipping Sweden & Tunisia';
+      case ServiceType.CONTAINER_SHIPPING: return 'Container Shipping';
       case ServiceType.CLEANING_MOVE: return 'Flytt & Städning';
       case ServiceType.MOVE_CLEANING: return 'Flytt och städning hjälp';
-      default: return 'Tjänst';
+      default: return 'Service';
     }
   };
 
@@ -126,28 +128,29 @@ export default function OrderManager({ onBack }: OrderManagerProps) {
     try {
       let shareMessage = '';
 
-      if (order.serviceType === ServiceType.SHIPPING) {
+      if (order.serviceType === ServiceType.SHIPPING || order.serviceType === ServiceType.CONTAINER_SHIPPING) {
         const shippingOrder = order as any;
-        shareMessage = `📦 Fraktbeställning från Tunisiska Mega Service
+        const isContainer = order.serviceType === ServiceType.CONTAINER_SHIPPING;
+        shareMessage = `${isContainer ? '🚢 Container Shipping' : '📦 Shipping'} order from Tunisiska Mega Service
 
-Avsändare: ${shippingOrder.customerInfo?.name}
-Telefon: ${shippingOrder.customerInfo?.phone}
+Sender: ${shippingOrder.customerInfo?.name}
+Phone: ${shippingOrder.customerInfo?.phone}
 
-Mottagare: ${shippingOrder.notes?.split('Recipient: ')[1]?.split(' (')[0] || 'N/A'}
-Mottagarens telefon: ${shippingOrder.notes?.split('Recipient: ')[1]?.split(' (')[1]?.replace(')', '') || 'N/A'}
+Recipient: ${shippingOrder.notes?.split('Recipient: ')[1]?.split(' (')[0] || 'N/A'}
+Recipient Phone: ${shippingOrder.notes?.split('Recipient: ')[1]?.split(' (')[1]?.replace(')', '') || 'N/A'}
 
-Från: ${shippingOrder.pickupAddress}
-Till: ${shippingOrder.deliveryAddress}
+From: ${shippingOrder.pickupAddress}
+To: ${shippingOrder.deliveryAddress}
 
-Vikt: ${shippingOrder.packageDetails?.weight}kg
-Värde: ${shippingOrder.packageDetails?.value} SEK
+${isContainer ? `Size: ${shippingOrder.packageDetails?.size}` : `Weight: ${shippingOrder.packageDetails?.weight}kg`}
+Value: ${shippingOrder.packageDetails?.value} SEK
 
-Datum: ${formatDateTime(shippingOrder.scheduledDateTime)}
+Date: ${formatDateTime(shippingOrder.scheduledDateTime)}
 Status: ${getStatusDisplayName(shippingOrder.status)}
 
-Total kostnad: ${shippingOrder.totalPrice} SEK
+Total Cost: ${shippingOrder.totalPrice} SEK
 
-Bokningsnummer: ${shippingOrder.id?.substring(0, 8) || 'N/A'}`;
+Booking ID: ${shippingOrder.id?.substring(0, 8) || 'N/A'}`;
       } else {
         // Default share message for other order types
         shareMessage = `${getServiceDisplayName(order.serviceType)} beställning
@@ -324,7 +327,7 @@ Bokningsnummer: ${order.id?.substring(0, 8) || 'N/A'}`;
                 </>
               )}
 
-              {order.serviceType === ServiceType.SHIPPING && (
+              {(order.serviceType === ServiceType.SHIPPING || order.serviceType === ServiceType.CONTAINER_SHIPPING) && (
                 <>
                   <AutoText className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                     📍 Från: {(order as any).pickupAddress}
@@ -333,10 +336,12 @@ Bokningsnummer: ${order.id?.substring(0, 8) || 'N/A'}`;
                     📍 Till: {(order as any).deliveryAddress}
                   </AutoText>
                   <AutoText className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                    📦 Vikt: {(order as any).packageDetails?.weight}kg
+                    {order.serviceType === ServiceType.CONTAINER_SHIPPING 
+                      ? `🚢 Size: ${(order as any).packageDetails?.size}` 
+                      : `📦 Weight: ${(order as any).packageDetails?.weight}kg`}
                   </AutoText>
                   <AutoText className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                    📋 Kategorier: {(order as any).packageDetails?.description || 'N/A'}
+                    📋 Details: {(order as any).packageDetails?.description || 'N/A'}
                   </AutoText>
                 </>
               )}
