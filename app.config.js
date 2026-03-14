@@ -16,7 +16,7 @@ module.exports = {
     icon: "./app/assets/expo-icons/icon.png",
     userInterfaceStyle: "automatic",
     splash: {
-      image: "./app/assets/expo-icons/splash.png",
+      image: "./app/assets/expo-icons/splash-icon.png",
       resizeMode: "contain",
       backgroundColor: "#ffffff",
     },
@@ -160,18 +160,6 @@ module.exports = {
         {
           locationAlwaysAndWhenInUsePermission:
             "Allow $(PRODUCT_NAME) to use your location.",
-        },
-      ],
-      [
-        "expo-splash-screen",
-        {
-          backgroundColor: "#232323",
-          image: "./app/assets/expo-icons/splash-icon.png",
-          dark: {
-            image: "./app/assets/expo-icons/splash-icon.png",
-            backgroundColor: "#ffffff",
-          },
-          imageWidth: 200,
         },
       ],
       "./plugins/withKlarnaRepo",
