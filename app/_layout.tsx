@@ -10,6 +10,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { NotificationProvider } from "./context/NotificationContext";
 import { ThemeProvider } from "./context/ThemeContext";
+import { View } from "react-native";
 import "./global.css";
 
 SplashScreen.preventAutoHideAsync();
@@ -57,7 +58,7 @@ export default function RootLayout() {
     }
   }, [loaded]);
 
-  if (!loaded) return null;
+  if (!loaded) return <View style={{ flex: 1, backgroundColor: '#ffffff' }} />;
 
   const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
   if (!clerkPublishableKey) {
@@ -67,7 +68,7 @@ export default function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#ffffff' }}>
       <ClerkProvider
         tokenCache={tokenCache}
         publishableKey={clerkPublishableKey}
