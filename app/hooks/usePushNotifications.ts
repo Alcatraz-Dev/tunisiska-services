@@ -1,292 +1,199 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import * as Device from "expo-device";
-import { Platform, AppState } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Notifications from "expo-notifications";
 import Constants, { ExecutionEnvironment } from "expo-constants";
+import { Platform, Alert, AppState } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNotifications } from "@/app/context/NotificationContext";
-import { showAlert } from "@/app/utils/showAlert";
 import { nativeNotifyAPI } from "@/app/services/nativeNotifyApi";
-import { useAuth } from "@clerk/clerk-expo";
-import { NotificationItem } from "../types/notification";
+import { client } from "@/sanityClient";
+// Removed static import of native-notify to prevent 'missing navigation context' error
+// during initial module load. Functions will be required dynamically.
 
-let Notifications: any = null;
-let NativeNotify: any = null;
-let getNotificationInbox: any = null;
-let getUnreadNotificationInboxCount: any = null;
+const NOTIFICATIONS_KEY = "user_notifications_list";
+const UNREAD_COUNT_KEY = "notification_unread_count";
+const APP_ID = 32172;
+const APP_TOKEN = "PNF5T5VibvtV6lj8i7pbil";
 
-const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
-
-if (Platform.OS === 'android' && isExpoGo) {
-  console.log("📱 Skipping expo-notifications & native-notify modules in Expo Go on Android");
-} else {
-  try {
-    Notifications = require("expo-notifications");
-  } catch (error) {
-    console.log("📱 expo-notifications not available");
-  }
-  
-  try {
-    NativeNotify = require("native-notify");
-    if (NativeNotify) {
-        getNotificationInbox = NativeNotify.getNotificationInbox;
-        getUnreadNotificationInboxCount = NativeNotify.getUnreadNotificationInboxCount;
-    }
-  } catch (error) {
-    console.log("📱 native-notify not available");
-  }
-}
-
-export default function usePushNotifications() {
-  const { notifications, addNotification, addMultipleNotifications, markAsRead } = useNotifications();
-  const { userId } = useAuth();
-  const [expoPushToken, setExpoPushToken] = useState<string>("");
-  const [unreadCount, setUnreadCount] = useState<number>(0);
-
-  const isRealDevice = Platform.OS !== "web" && Device.isDevice;
-  const isUsingOneSignal = isRealDevice && !!process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID;
-
-  // Local storage helpers
-  const saveNotifications = async (notifs: NotificationItem[]) => {
-    await AsyncStorage.setItem("notifications", JSON.stringify(notifs));
-  };
-  const loadNotifications = async () => {
-    const stored = await AsyncStorage.getItem("notifications");
-    if (stored) addMultipleNotifications(JSON.parse(stored));
-  };
-  const saveUnreadCount = async (count: number) => {
-    console.log("🔍 [NOTIFICATION] Saving unread count:", count);
-    await AsyncStorage.setItem("unreadCount", count.toString());
-    if (isRealDevice && Notifications) {
-      try {
-        console.log("🔍 [NOTIFICATION] Setting badge count to:", count);
-        await Notifications.setBadgeCountAsync(count);
-      } catch (error) {
-        console.warn("⚠️ Failed to set badge count:", error);
-      }
-    }
-  };
-  const loadUnreadCount = async () => {
-    const stored = await AsyncStorage.getItem("unreadCount");
-    console.log("🔍 [NOTIFICATION] Loading unread count from storage:", stored);
-    if (stored) {
-      const count = Number(stored);
-      console.log("🔍 [NOTIFICATION] Setting unread count to:", count);
-      setUnreadCount(count);
-      if (isRealDevice && Notifications) {
-        try {
-          console.log("🔍 [NOTIFICATION] Setting badge count to:", count);
-          await Notifications.setBadgeCountAsync(count);
-        } catch (error) {
-          console.warn("⚠️ Failed to set badge count on load:", error);
-        }
-      }
-    } else {
-      console.log("🔍 [NOTIFICATION] No unread count in storage");
-    }
-  };
-
-  // Sync Native Notify inbox
-  const syncNativeNotifyInbox = async () => {
-    if (!userId) {
-      console.log("🔍 [NOTIFICATION] No userId, skipping sync");
-      return;
-    }
-    
-    if (!getNotificationInbox || !getUnreadNotificationInboxCount) {
-      console.log("🔍 [NOTIFICATION] Skipping sync (NativeNotify functions missing)");
-      return;
-    }
-    try {
-      console.log("🔍 [NOTIFICATION] Syncing Native Notify inbox for user:", userId);
-      const inboxResp = await getNotificationInbox(32172, "PNF5T5VibvtV6lj8i7pbil", 50, 0);
-      console.log("🔍 [NOTIFICATION] Inbox response:", inboxResp);
-      const inbox = Array.isArray(inboxResp) ? inboxResp : (inboxResp && typeof inboxResp === 'object' && 'data' in inboxResp ? inboxResp.data : []) || [];
-      console.log("🔍 [NOTIFICATION] Parsed inbox array:", inbox.length, "items");
-      const userInbox = inbox.filter((n: any) => {
-        const subId = n?.subscriber_id ?? n?.subscriberId ?? n?.user_id ?? n?.userId;
-        console.log("🔍 [NOTIFICATION] Checking notification subId:", subId, "vs userId:", userId);
-        return subId?.toString() === userId;
-      });
-      console.log("🔍 [NOTIFICATION] Filtered user inbox:", userInbox.length, "items");
-      const mapped = userInbox.map((n: any) => ({
-        id: n?.notification_id?.toString() || n?.id?.toString(),
-        title: n?.title || "No Title",
-        message: n?.message || "No Message",
-        type: n?.category ?? "default",
-        read: n?.read ?? false,
-        date: n?.date ?? n?.date_sent ?? new Date().toISOString(),
-        image: n?.image ?? n?.image_url,
-      }));
-      console.log("🔍 [NOTIFICATION] Mapped notifications:", mapped.length, "items");
-      if (mapped.length > 0) {
-        addMultipleNotifications(mapped);
-        saveNotifications(mapped);
-      }
-
-      const unreadResp = await getUnreadNotificationInboxCount(32172, "PNF5T5VibvtV6lj8i7pbil");
-      console.log("🔍 [NOTIFICATION] Unread count response:", unreadResp);
-      const apiUnreadCount = typeof unreadResp === "number" ? unreadResp : (unreadResp && typeof unreadResp === 'object' && 'data' in unreadResp ? Number(unreadResp.data) : 0) || 0;
-      console.log("🔍 [NOTIFICATION] Setting unread count to:", apiUnreadCount);
-      setUnreadCount(apiUnreadCount);
-      await saveUnreadCount(apiUnreadCount);
-    } catch (err) {
-      console.warn("Native Notify sync failed, continuing without it", err);
-      // Don't throw error, just continue silently
-    }
-  };
-
-  // Handle incoming notification
-  const handleIncomingNotification = async (notif: any) => {
-    console.log("🔍 [NOTIFICATION] Incoming notification:", JSON.stringify(notif, null, 2));
-    const data = notif?.notification || notif?.request?.content?.data || {};
-    const pushData = data?.pushData || data;
-    const newNotification: NotificationItem = {
-      id: notif.notificationId || notif.request?.identifier || `notif-${Date.now()}`,
-      title: notif.title || notif.request?.content?.title || "No title",
-      message: notif.body || notif.request?.content?.body || "",
-      type: pushData?.notificationType || pushData?.type || data?.type || "general",
-      read: false,
-      date: new Date().toISOString() as any,
-      image: data?.image ?? data?.bigPicture ?? data?.smallIcon,
-      route: pushData?.route,
-      screenImage: pushData?.screenImage,
-    };
-    console.log("🔍 [NOTIFICATION] Processed notification:", newNotification);
-    addNotification(newNotification);
-    saveNotifications([newNotification]);
-    // Update unread count immediately
-    const newCount = unreadCount + 1;
-    console.log("🔍 [NOTIFICATION] Updating unread count:", unreadCount, "->", newCount);
-    setUnreadCount(newCount);
-    await saveUnreadCount(newCount);
-    if (!isRealDevice) showAlert(newNotification.title, newNotification.message);
-  };
-
-  useEffect(() => {
-    loadNotifications();
-    loadUnreadCount();
-
-    // OneSignal initialization
-    if (isUsingOneSignal) {
-      try {
-        const OneSignal = require('react-native-onesignal');
-        OneSignal.initialize(process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID);
-        OneSignal.Notifications.addEventListener("opened", async (e: any) => {
-          const id = e?.notification?.notificationId;
-          if (id) {
-            markAsRead(id);
-            const newCount = Math.max(0, unreadCount - 1);
-            setUnreadCount(newCount);
-            await saveUnreadCount(newCount);
-          }
-        });
-        OneSignal.Notifications.addEventListener("received", handleIncomingNotification);
-      } catch (error) {
-        console.warn('OneSignal not available:', error);
-      }
-    }
-
-    // Expo push notifications
-    registerForPushNotificationsAsync().then(async (token) => {
-      if (token) setExpoPushToken(token);
-      if (token && userId) {
-        await AsyncStorage.setItem(`expo_token_${userId}`, token);
-        await nativeNotifyAPI.registerUser(userId, token);
-        if (isUsingOneSignal) {
-          try {
-            const OneSignal = require('react-native-onesignal');
-            OneSignal.User.addTag('userId', userId);
-          } catch (error) {
-            console.warn('OneSignal not available for user registration:', error);
-          }
-        }
-      }
-    });
-
-    // Sync Native Notify inbox initially
-    syncNativeNotifyInbox();
-
-    // Expo foreground notifications
-    let notificationListener: any = null;
-    let responseListener: any = null;
-
-    if (Notifications) {
-      notificationListener = Notifications.addNotificationReceivedListener(handleIncomingNotification);
-      responseListener = Notifications.addNotificationResponseReceivedListener(async (response: any) => {
-        const id = response.notification.request.identifier;
-        markAsRead(id);
-        const newCount = Math.max(0, unreadCount - 1);
-        setUnreadCount(newCount);
-        await saveUnreadCount(newCount);
-      });
-    }
-
-    // App comes to foreground
-    const appStateSub = AppState.addEventListener("change", (state) => {
-      if (state === "active") syncNativeNotifyInbox();
-    });
-
-    return () => {
-      if (notificationListener) notificationListener.remove();
-      if (responseListener) responseListener.remove();
-      appStateSub.remove();
-      if (isUsingOneSignal) {
-        try {
-          const OneSignal = require('react-native-onesignal');
-          OneSignal.Notifications.removeEventListener("opened");
-          OneSignal.Notifications.removeEventListener("received");
-        } catch (error) {
-          console.warn('OneSignal cleanup failed:', error);
-        }
-      }
-    };
-  }, [userId]); // Add userId as dependency to prevent stale closures
-
-  const testNotification = async () => {
-    if (!userId) return;
-    const result = await nativeNotifyAPI.sendNotification({
-      title: "Test Notification",
-      message: "This is a test",
-      subID: userId,
-    });
-    return result;
-  };
-
-  return {
-    expoPushToken,
-    unreadCount,
-    syncNativeNotifyInbox,
-    testNotification,
-  };
-}
-
-export async function registerForPushNotificationsAsync(): Promise<string | undefined> {
-  if (Platform.OS === "web" || !Device.isDevice) return;
-  
-  if (!Notifications) {
-    console.log("📱 Skipping push token registration (Notifications module missing)");
-    return;
-  }
-
+export async function registerForPushNotificationsAsync() {
+  if (!Device.isDevice) return null;
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
   if (existingStatus !== "granted") {
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
   }
-  if (finalStatus !== "granted") return;
+  if (finalStatus !== "granted") return null;
 
-  const tokenResp = await Notifications.getExpoPushTokenAsync({
-    projectId: Constants.expoConfig?.extra?.eas?.projectId,
-  });
-
-  if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("default", {
-      name: "default",
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: "#FF231F7C",
-    });
-  }
-  return tokenResp.data;
+  return (
+    await Notifications.getExpoPushTokenAsync({
+      projectId: Constants.expoConfig?.extra?.eas?.projectId,
+    })
+  ).data;
 }
+
+export const usePushNotifications = (userId?: string | number | null) => {
+  const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const { addMultipleNotifications, markAsRead } = useNotifications();
+
+  const isRealDevice = Device.isDevice;
+  const isUsingOneSignal =
+    process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID && !Constants.appOwnership;
+
+  const saveNotifications = async (notifs: any[]) => {
+    try {
+      const existing = await AsyncStorage.getItem(NOTIFICATIONS_KEY);
+      const list = existing ? JSON.parse(existing) : [];
+      const merged = [...notifs, ...list];
+      const unique = Array.from(
+        new Map(merged.map((n) => [n.id || n.notification_id, n])).values(),
+      );
+      await AsyncStorage.setItem(
+        NOTIFICATIONS_KEY,
+        JSON.stringify(unique.slice(0, 100)),
+      );
+    } catch {}
+  };
+
+  const saveUnreadCount = async (count: number) => {
+    try {
+      await AsyncStorage.setItem(UNREAD_COUNT_KEY, count.toString());
+    } catch {}
+  };
+
+  const syncSanityNotifications = useCallback(async () => {
+    // Fetch from Sanity (Main source now)
+    try {
+      const sanityData = await client.fetch(
+        `*[_type == "notificationHistory"] | order(sentAt desc)[0...50]{ 
+           ..., 
+           "id": _id, 
+           "title": title, 
+           "message": message, 
+           "type": type, 
+           "date": sentAt, 
+           "image": imageUrl,
+           "video": videoUrl 
+         }`
+      );
+      if (Array.isArray(sanityData)) {
+        const sanityMapped = sanityData.map((n: any) => ({
+          id: n.id || n._id,
+          title: n.title || "Update",
+          message: n.message || "",
+          type: n.type || "admin_broadcast",
+          isSanity: true,
+          read: false,
+          date: n.date || n._createdAt,
+          image: n.image,
+          video: n.video,
+        }));
+        
+        if (sanityMapped.length > 0) {
+          addMultipleNotifications(sanityMapped);
+          saveNotifications(sanityMapped);
+          // Estimate unread based on what we don't have in local state yet
+          setUnreadCount(sanityMapped.filter(n => !n.read).length);
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to fetch Sanity notifications:", e);
+    }
+  }, [addMultipleNotifications]);
+
+  const handleIncomingNotification = async (notification: any) => {
+    setUnreadCount((prev) => prev + 1);
+  };
+
+  // 1. Initial Load
+  useEffect(() => {
+    const loadData = async () => {
+      // Load count
+      const count = await AsyncStorage.getItem(UNREAD_COUNT_KEY);
+      if (count) setUnreadCount(parseInt(count));
+
+      // Load stored notifications
+      const stored = await AsyncStorage.getItem(NOTIFICATIONS_KEY);
+      if (stored) {
+        try {
+          const list = JSON.parse(stored);
+          if (Array.isArray(list) && list.length > 0) {
+            addMultipleNotifications(list);
+          }
+        } catch {}
+      }
+
+      syncSanityNotifications();
+    };
+    loadData();
+  }, [syncSanityNotifications, addMultipleNotifications]);
+
+  // 2. Registration & AppState
+  useEffect(() => {
+    if (isRealDevice) {
+      registerForPushNotificationsAsync().then(async (token) => {
+        if (token) {
+          setExpoPushToken(token);
+          if (userId) {
+             // Save token to Sanity user document
+             try {
+                const users = await client.fetch('*[_type == "users" && clerkId == $id]', { id: userId.toString() });
+                if (users.length > 0) {
+                   await client.patch(users[0]._id).set({ expoPushToken: token }).commit();
+                   console.log("✅ Expo token saved to Sanity for user:", userId);
+                }
+             } catch (e) {
+                console.warn("❌ Failed to save token to Sanity:", e);
+             }
+             
+             // Optionally keep NN as backup if it somehow still works occasionally
+             nativeNotifyAPI.registerUser(userId.toString(), token).catch(() => {});
+          }
+        }
+      });
+    }
+
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        syncSanityNotifications();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [userId, isRealDevice, syncSanityNotifications]);
+
+  // 3. Notification Listeners
+  useEffect(() => {
+    let notificationListener: any = null;
+    let responseListener: any = null;
+
+    if (Notifications) {
+      notificationListener = Notifications.addNotificationReceivedListener(
+        handleIncomingNotification,
+      );
+      responseListener = Notifications.addNotificationResponseReceivedListener(
+        async (response: any) => {
+          const id = response.notification.request.identifier;
+          markAsRead(id);
+          setUnreadCount((prev) => Math.max(0, prev - 1));
+        },
+      );
+    }
+
+    return () => {
+      if (notificationListener) notificationListener.remove();
+      if (responseListener) responseListener.remove();
+    };
+  }, [markAsRead]);
+
+  return {
+    expoPushToken,
+    unreadCount,
+    setUnreadCount,
+    markAsRead,
+    syncNativeNotifyInbox: syncSanityNotifications, // Alias for backward compatibility
+  };
+};

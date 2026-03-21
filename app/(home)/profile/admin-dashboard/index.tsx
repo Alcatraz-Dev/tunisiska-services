@@ -199,7 +199,9 @@ export default function AdminDashboard() {
           client.fetch(
             `count(*[_type in ["shippingOrder", "taxiOrder", "containerShippingOrder", "moveOrder"] && status == "PENDING"])`,
           ),
-          client.fetch(`count(*[_type == "friendRequest" && status == "pending"])`),
+          client.fetch(
+            `count(*[_type == "friendRequest" && status == "pending"])`,
+          ),
         ]);
 
         setStats({
@@ -277,6 +279,13 @@ export default function AdminDashboard() {
       icon: "megaphone",
       href: "/profile/admin-manage/announcements",
       color: "#f43f5e",
+    },
+    {
+      title: "Notifikations Historik",
+      description: "Tidigare skickade",
+      icon: "notifications",
+      href: "/profile/admin-history",
+      color: "#8b5cf6",
     },
     {
       title: "Flyttordrar",
@@ -440,7 +449,7 @@ export default function AdminDashboard() {
             </LinearGradient>
 
             {/* Live Status Overview */}
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => router.push("/profile/admin-manage/live-status")}
               className={`mb-8 p-6 mx-4 rounded-[20px] shadow-sm flex-row items-center border ${isDark ? "bg-dark-card border-white/5" : "bg-white border-gray-100"}`}
             >
@@ -448,12 +457,23 @@ export default function AdminDashboard() {
                 <Ionicons name="pulse" size={24} color="#22c55e" />
               </View>
               <View className="flex-1">
-                <AutoText className={`text-sm font-bold uppercase tracking-widest ${isDark ? "text-gray-400" : "text-gray-500"}`}>Aktiv Status</AutoText>
-                <AutoText className={`text-base font-black mt-1 ${isDark ? "text-white" : "text-gray-900"}`} numberOfLines={1}>
+                <AutoText
+                  className={`text-sm font-bold uppercase tracking-widest ${isDark ? "text-gray-400" : "text-gray-500"}`}
+                >
+                  Aktiv Status
+                </AutoText>
+                <AutoText
+                  className={`text-base font-black mt-1 ${isDark ? "text-white" : "text-gray-900"}`}
+                  numberOfLines={1}
+                >
                   Systemet är aktivt och snurrar
                 </AutoText>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={isDark ? "#555" : "#ccc"} />
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={isDark ? "#555" : "#ccc"}
+              />
             </TouchableOpacity>
 
             {/* Stats Grid */}

@@ -1,26 +1,33 @@
 import { AutoText } from "@/app/components/ui/AutoText";
 import { useNotifications } from "@/app/context/NotificationContext";
 import { useTheme } from "@/app/context/ThemeContext";
-import usePushNotifications from "@/app/hooks/usePushNotifications";
+import { usePushNotifications } from "@/app/hooks/usePushNotifications";
 import { showAlert } from "@/app/utils/showAlert";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter, useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import { Platform } from "react-native";
+import { client } from "@/sanityClient";
 
 // Conditionally import getNotificationInbox
-const getNotificationInbox = (() => {
-  const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
-  if (Platform.OS === 'android' && isExpoGo) return null;
+const { getNotificationInbox, getIndieNotificationInbox } = (() => {
+  const isExpoGo =
+    Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+  if (Platform.OS === "android" && isExpoGo)
+    return { getNotificationInbox: null, getIndieNotificationInbox: null };
 
   try {
-    return require("native-notify").getNotificationInbox;
+    const nn = require("native-notify");
+    return {
+      getNotificationInbox: nn.getNotificationInbox,
+      getIndieNotificationInbox: nn.getIndieNotificationInbox,
+    };
   } catch {
-    return null;
+    return { getNotificationInbox: null, getIndieNotificationInbox: null };
   }
 })();
 
@@ -44,6 +51,7 @@ import {
   NotificationType,
 } from "@/app/types/notification";
 
+
 export default function Notification() {
   const { notifications, markAllAsRead, markAsRead } = useNotifications();
   const { unreadCount, syncNativeNotifyInbox } = usePushNotifications();
@@ -51,13 +59,13 @@ export default function Notification() {
   const APP_ID = 32172;
   const APP_TOKEN = "PNF5T5VibvtV6lj8i7pbil";
   const isDark = resolvedTheme === "dark";
-  const router = useRouter();
   const { userId } = useAuth();
   const [data, setData] = useState<NotificationItem[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   const [readIds, setReadIds] = useState<string[]>([]);
   const [hiddenIds, setHiddenIds] = useState<string[]>([]);
+  const [globallyDeletedIds, setGloballyDeletedIds] = useState<Set<string>>(new Set());
   const [iconsReady, setIconsReady] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -80,27 +88,28 @@ export default function Notification() {
     () => `notification_hidden_ids:${userId ?? "anon"}`,
     [userId]
   );
+  const fetchGlobalDeletions = useCallback(async () => {
+    try {
+      const deletedRecords = await client.fetch('*[_type == "notificationHistory" && status == "deleted"].nativeNotifyId');
+      setGloballyDeletedIds(new Set(deletedRecords.filter(Boolean)));
+    } catch (e) {
+      console.error("Failed fetching global deletions", e);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      (async () => {
-        try {
-          const response = getNotificationInbox
-            ? await getNotificationInbox(APP_ID, APP_TOKEN, PAGE_SIZE, 0)
-            : [];
-          const notifications: NotificationItem[] = (response);
-          setData(applyOverlays(filterForUser(notifications)));
-        } catch (err) {
-          console.error("Failed fetching notifications:", err);
-        }
-      })();
-    }, [userId])
+      fetchGlobalDeletions();
+      syncNativeNotifyInbox();
+    }, [userId, fetchGlobalDeletions])
   );
   const getId = (n: NotificationItem) =>
     ((n.id || n.notification_id) ?? "").toString();
 
   const filterForUser = (items: any[]): NotificationItem[] => {
     if (!userId) return items as NotificationItem[];
-    const keys = [
+
+    const userKeys = [
       "subscriber_id",
       "subscriberId",
       "user_id",
@@ -110,22 +119,34 @@ export default function Notification() {
       "sub_id",
       "subId",
     ];
-    const hasAnyKey = items.some((it) =>
-      keys.some((k) => it && typeof it === "object" && k in it)
-    );
-    if (!hasAnyKey) return items as NotificationItem[];
-    const isBroadcast = items.some((it) =>
-      ["admin_broadcast", "announcement"].includes(
-        it?.type || it?.category || it?.pushData?.type
-      )
-    );
-    if (isBroadcast) return items as NotificationItem[];
+
     return items.filter((it) => {
-      const hasUserKey = keys.some((k) => it?.[k] !== undefined);
-      if (!hasUserKey) return true;
-      return keys.some((k) => it?.[k]?.toString?.() === userId?.toString());
+      // 1. Detect if it's a broadcast
+      let pushData = it?.pushData;
+      if (typeof pushData === "string") {
+        try {
+          pushData = JSON.parse(pushData);
+        } catch {
+          pushData = {};
+        }
+      }
+
+      const isBroadcast = ["admin_broadcast", "announcement"].includes(
+        it?.type || it?.category || pushData?.type || pushData?.notificationType
+      ) || it.isSanity; // Anything from Sanity at this point is considered intentional for the user
+
+      if (isBroadcast) return true;
+
+      // 2. Otherwise, check if it's assigned to the current user
+      const match = userKeys.some((k) => {
+        const v = it?.[k] || pushData?.[k];
+        return v && (v.toString() === userId.toString());
+      });
+
+      return match;
     }) as NotificationItem[];
   };
+
 
   const applyOverlays = (
     items: NotificationItem[],
@@ -133,13 +154,27 @@ export default function Notification() {
   ) => {
     const readSet = new Set(opts?.read ?? readIds);
     const hiddenSet = new Set(opts?.hidden ?? hiddenIds);
+    
     return items
-      .filter((n) => !hiddenSet.has(getId(n)))
+      .filter((n) => !hiddenSet.has(getId(n)) && !globallyDeletedIds.has(getId(n)))
       .map(
         (n) =>
-          ({ ...n, read: n.read || readSet.has(getId(n)) }) as NotificationItem
+          ({ ...n, read: !!n.read || readSet.has(getId(n)) }) as NotificationItem
       );
   };
+
+  // Sync state — when global notifications list or global deletes change, update visible data
+  useEffect(() => {
+    const filtered = filterForUser(notifications);
+    const final = applyOverlays(filtered);
+    setData(final);
+    if (loading && notifications.length > 0) setLoading(false);
+    else if (loading && notifications.length === 0) {
+        // Just in case it's truly empty
+        const timer = setTimeout(() => setLoading(false), 2000);
+        return () => clearTimeout(timer);
+    }
+  }, [notifications, globallyDeletedIds, readIds, hiddenIds, userId]);
 
   const saveReadIds = async (ids: string[]) => {
     try {
@@ -216,18 +251,65 @@ export default function Notification() {
   }) => {
     if (loadingRef.current) return;
     loadingRef.current = true;
-    if (!opts?.append) setLoading(true); // Show loading only for initial load
+    if (!opts?.append && data.length === 0) setLoading(true); // Show loading only if we have nothing yet
     try {
       const currentPage = opts?.page ?? 0;
-      const response = getNotificationInbox
-        ? await getNotificationInbox(
-          APP_ID,
-          APP_TOKEN,
-          PAGE_SIZE,
-          currentPage * PAGE_SIZE
-        )
-        : [];
-      const notificationData = response?.data || response || [];
+      
+      // 1. Fetch from NativeNotify (Global + Indie)
+      let globalInbox: any[] = [];
+      let indieInbox: any[] = [];
+
+      try {
+        if (getNotificationInbox) {
+          const response = await getNotificationInbox(APP_ID, APP_TOKEN, PAGE_SIZE, currentPage * PAGE_SIZE);
+          globalInbox = Array.isArray(response) ? response : (response?.data || []);
+        }
+        
+        if (userId && getIndieNotificationInbox && currentPage === 0) {
+          const indieResp = await getIndieNotificationInbox(userId.toString(), APP_ID, APP_TOKEN, 50, 0);
+          indieInbox = Array.isArray(indieResp) ? indieResp : (indieResp?.data || []);
+        }
+      } catch (err) {
+        console.warn("⚠️ NativeNotify fetch failed (likely trial expired):", err);
+      }
+
+      // 2. Fetch from Sanity (Fallback/Reference)
+      let sanityInbox: any[] = [];
+      try {
+        if (currentPage === 0) {
+          sanityInbox = await client.fetch(
+            `*[_type == "notificationHistory" && status != "deleted"] | order(dateSent desc)[0...100]`
+          );
+        }
+      } catch (err) {
+        console.error("❌ Sanity fetch failed:", err);
+      }
+
+      // 3. Combine and Merge
+      const combined = [...globalInbox, ...indieInbox];
+      
+      // Convert sanity items to match NN format
+      const formattedSanity = sanityInbox.map(s => ({
+        ...s,
+        notification_id: s.nativeNotifyId || s._id,
+        id: s.nativeNotifyId || s._id,
+        date: s.dateSent || s._createdAt,
+        type: s.notificationType || "general",
+        isSanity: true
+      }));
+
+      // Merge — use a Map to deduplicate by ID, preferring NativeNotify data if available
+      const mergeMap = new Map();
+      
+      // Sanity first as baseline
+      formattedSanity.forEach(item => mergeMap.set(item.id, item));
+      // NN overwrites/adds
+      combined.forEach(item => {
+        const id = (item.notification_id || item.id || item.push_id)?.toString();
+        if (id) mergeMap.set(id, { ...mergeMap.get(id), ...item });
+      });
+
+      const notificationData = Array.from(mergeMap.values());
       const typedData: NotificationItem[] = Array.isArray(notificationData)
         ? notificationData.map((n: any) => {
           let imageUrl =
@@ -267,7 +349,7 @@ export default function Notification() {
             }
           }
           return {
-            id: n.notification_id?.toString() || n.id?.toString(),
+            id: n.notification_id?.toString() || n.id?.toString() || `nn-hash-${(n.title + (n.message || "") + (n.date || n.date_sent)).replace(/\s+/g, '')}`,
             notification_id: n.notification_id?.toString(),
             title: n.title,
             message: n.message,
@@ -319,7 +401,17 @@ export default function Notification() {
         const hidden = storedHidden ? JSON.parse(storedHidden) : [];
         setReadIds(read);
         setHiddenIds(hidden);
-        await notiser({ read, hidden, page: 0, append: false });
+        
+        // If we already have notifications in context, use them as initial data
+        if (notifications && notifications.length > 0) {
+          const filtered = filterForUser(notifications);
+          setData(filtered);
+          setLoading(false);
+          // Still fetch fresh to be sure, but without setting loading=true
+          notiser({ read, hidden, page: 0, append: false });
+        } else {
+          await notiser({ read, hidden, page: 0, append: false });
+        }
       } catch {
         setReadIds([]);
         setHiddenIds([]);
@@ -593,7 +685,7 @@ export default function Notification() {
               Laddar notifikationer...
             </AutoText>
           </View>
-        ) : data.length === 0 && notifications.length === 0 ? (
+        ) : data.length === 0 ? (
           <View className="flex-1 justify-center items-center">
             <Ionicons
               name="notifications-off-outline"

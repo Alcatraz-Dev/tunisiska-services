@@ -174,22 +174,22 @@ export default function PaymentStripeJS({
             source={{ uri: checkoutUrl }}
             onMessage={handleWebViewMessage}
             onNavigationStateChange={(navState) => {
-              // Handle success/cancel URLs
-              if (navState.url.includes("/success")) {
+              const url = navState.url;
+              if (!url) return;
+              // Detect our HTTP cancel/success endpoint pages
+              if (url.includes('/payment-success') || url.includes('success?session_id')) {
                 const earnedPoints = points || amount * 10;
-                if (onPaymentSuccess) {
-                  onPaymentSuccess(earnedPoints, amount);
-                }
+                if (onPaymentSuccess) onPaymentSuccess(earnedPoints, amount);
                 setShowModal(false);
                 setCheckoutUrl("");
                 showAlert(
                   "Betalning genomförd! 🎉",
                   `Din betalning på ${amount} SEK är bekräftad!\n\n🎁 Du fick ${earnedPoints} poäng!`
                 );
-              } else if (navState.url.includes("/cancel")) {
+              } else if (url.includes('/payment-cancel')) {
                 setShowModal(false);
                 setCheckoutUrl("");
-                showAlert("Avbruten", "Betalningen avbröts");
+                showAlert("Avbruten", "Betalningen avbröts.");
               }
             }}
             javaScriptEnabled={true}

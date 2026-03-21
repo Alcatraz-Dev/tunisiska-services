@@ -1,8 +1,8 @@
-import usePushNotifications from "@/app/hooks/usePushNotifications";
+import { usePushNotifications } from "@/app/hooks/usePushNotifications";
 import { ClerkProvider } from "@clerk/clerk-expo";
 import { tokenCache } from "@clerk/clerk-expo/token-cache";
 import { useFonts } from "expo-font";
-import { Slot } from "expo-router";
+import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import Constants from "expo-constants";
 import { useEffect } from "react";
@@ -62,9 +62,7 @@ export default function RootLayout() {
 
   const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
   if (!clerkPublishableKey) {
-    throw new Error(
-      "Missing Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env"
-    );
+    throw new Error("Add EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY to your .env file");
   }
 
   return (
@@ -79,7 +77,10 @@ export default function RootLayout() {
           <NotificationProvider>
             <SafeAreaProvider>
               <PushBootstrap />
-              <Slot screenOptions={{ headerShown: false }} />
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="(home)" />
+                <Stack.Screen name="+not-found" />
+              </Stack>
             </SafeAreaProvider>
           </NotificationProvider>
         </ThemeProvider>

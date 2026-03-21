@@ -23,20 +23,20 @@ export default function AdminManageScreen() {
       "Är du säker på att du vill radera detta objekt? Detta går inte att ångra.",
       [
         { text: "Avbryt", style: "cancel" },
-        { 
-          text: "Radera", 
+        {
+          text: "Radera",
           style: "destructive",
           onPress: async () => {
             try {
               await client.delete(item._id);
-              setRefreshKey(prev => prev + 1);
+              setRefreshKey((prev) => prev + 1);
             } catch (error) {
               console.error("Delete failed:", error);
               Alert.alert("Fel", "Kunde inte radera objektet.");
             }
-          }
-        }
-      ]
+          },
+        },
+      ],
     );
   };
 
@@ -60,7 +60,8 @@ export default function AdminManageScreen() {
         return {
           title: "Sändningar",
           subtitle: "Hantera logistik och frakt",
-          query: '*[_type == "shippingOrder"] { _id, "customerName": customerInfo.name, status, scheduledDateTime, totalPrice, route } | order(scheduledDateTime desc)',
+          query:
+            '*[_type == "shippingOrder"] { _id, "customerName": customerInfo.name, status, scheduledDateTime, totalPrice, route } | order(scheduledDateTime desc)',
           columns: [
             { key: "customerName", label: "Kund" },
             { key: "status", label: "Status", type: "status" as const },
@@ -72,9 +73,10 @@ export default function AdminManageScreen() {
         };
       case "container-shipping-orders":
         return {
-          title: "Containerbokningar",
+          title: "Container Bokningar",
           subtitle: "Större fraktuppdrag",
-          query: '*[_type == "containerShippingOrder"] { _id, "customerName": customerInfo.name, status, scheduledDateTime, totalPrice } | order(scheduledDateTime desc)',
+          query:
+            '*[_type == "containerShippingOrder"] { _id, "customerName": customerInfo.name, status, scheduledDateTime, totalPrice } | order(scheduledDateTime desc)',
           columns: [
             { key: "customerName", label: "Kund" },
             { key: "status", label: "Status", type: "status" as const },
@@ -86,9 +88,10 @@ export default function AdminManageScreen() {
         };
       case "shipping-schedules":
         return {
-          title: "Sändningsschema",
+          title: "Sändnings Schema",
           subtitle: "Planera rutter och avgångar",
-          query: '*[_type == "shippingSchedule"] { _id, route, departureTime, status, isActive } | order(departureTime desc)',
+          query:
+            '*[_type == "shippingSchedule"] { _id, route, departureTime, status, isActive } | order(departureTime desc)',
           columns: [
             { key: "route", label: "Rutt" },
             { key: "departureTime", label: "Avgång", type: "date" as const },
@@ -100,9 +103,10 @@ export default function AdminManageScreen() {
         };
       case "container-shipping-schedules":
         return {
-          title: "Containerschema",
+          title: "Container Schema",
           subtitle: "Båtrutter och tider",
-          query: '*[_type == "containerShippingSchedule"] { _id, route, departureTime, status } | order(departureTime desc)',
+          query:
+            '*[_type == "containerShippingSchedule"] { _id, route, departureTime, status } | order(departureTime desc)',
           columns: [
             { key: "route", label: "Rutt" },
             { key: "departureTime", label: "Avgång", type: "date" as const },
@@ -115,7 +119,8 @@ export default function AdminManageScreen() {
         return {
           title: "Taxibokningar",
           subtitle: "Övervaka och hantera taxiresor",
-          query: '*[_type == "taxiOrder"] { _id, "customerName": customerInfo.name, status, scheduledDateTime, pickupAddress } | order(scheduledDateTime desc)',
+          query:
+            '*[_type == "taxiOrder"] { _id, "customerName": customerInfo.name, status, scheduledDateTime, pickupAddress } | order(scheduledDateTime desc)',
           columns: [
             { key: "customerName", label: "Kund" },
             { key: "status", label: "Status", type: "status" as const },
@@ -129,7 +134,8 @@ export default function AdminManageScreen() {
         return {
           title: "Flyttordrar",
           subtitle: "Hantera flyttbeställningar",
-          query: '*[_type == "moveOrder"] { _id, "customerName": customerInfo.name, status, scheduledDateTime, pickupAddress } | order(scheduledDateTime desc)',
+          query:
+            '*[_type == "moveOrder"] { _id, "customerName": customerInfo.name, status, scheduledDateTime, pickupAddress } | order(scheduledDateTime desc)',
           columns: [
             { key: "customerName", label: "Kund" },
             { key: "status", label: "Status", type: "status" as const },
@@ -139,11 +145,26 @@ export default function AdminManageScreen() {
           searchField: "customerName",
           canAdd: true,
         };
+      case "notification-history":
+        return {
+          title: "Notifikations Historik",
+          subtitle: "Tidigare utskickade notiser",
+          query: '*[_type == "notificationHistory"] | order(dateSent desc)',
+          columns: [
+            { key: "title", label: "Rubrik" },
+            { key: "message", label: "Meddelande" },
+            { key: "dateSent", label: "Datum", type: "date" as const },
+            { key: "notificationType", label: "Typ" },
+          ],
+          searchField: "title",
+          canAdd: false,
+        };
       case "move-clean-orders":
         return {
           title: "Flytt & Städ",
           subtitle: "Kombinerade uppdrag",
-          query: '*[_type == "moveCleaningOrder"] { _id, "customerName": customerInfo.name, status, scheduledDateTime, totalPrice } | order(scheduledDateTime desc)',
+          query:
+            '*[_type == "moveCleaningOrder"] { _id, "customerName": customerInfo.name, status, scheduledDateTime, totalPrice } | order(scheduledDateTime desc)',
           columns: [
             { key: "customerName", label: "Kund" },
             { key: "status", label: "Status", type: "status" as const },
@@ -170,7 +191,8 @@ export default function AdminManageScreen() {
         return {
           title: "Vänförfrågningar",
           subtitle: "Hantera nätverk & Poäng",
-          query: '*[_type == "friendRequest"] { _id, fromUserName, toUserId, status, pointsToTransfer, _createdAt } | order(_createdAt desc)',
+          query:
+            '*[_type == "friendRequest"] { _id, fromUserName, toUserId, status, pointsToTransfer, _createdAt } | order(_createdAt desc)',
           columns: [
             { key: "fromUserName", label: "Från" },
             { key: "toUserId", label: "Till (ID)" },
@@ -239,8 +261,12 @@ export default function AdminManageScreen() {
 
   if (!config) {
     return (
-      <View className={`flex-1 justify-center items-center ${isDark ? "bg-dark" : "bg-white"}`}>
-        <AutoText className={isDark ? "text-white" : "text-black"}>Ogiltig kategori</AutoText>
+      <View
+        className={`flex-1 justify-center items-center ${isDark ? "bg-dark" : "bg-white"}`}
+      >
+        <AutoText className={isDark ? "text-white" : "text-black"}>
+          Ogiltig kategori
+        </AutoText>
       </View>
     );
   }
@@ -248,29 +274,35 @@ export default function AdminManageScreen() {
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-white"}`}>
       <Stack.Screen options={{ headerShown: false }} />
-      
+
       {/* Custom Header with Back Button */}
       <View className="px-6 pt-6 pb-2 flex-row items-center justify-between">
-        <TouchableOpacity 
-          onPress={() => router.back()} 
+        <TouchableOpacity
+          onPress={() => router.back()}
           className={`p-2 rounded-2xl ${isDark ? "bg-white/5" : "bg-gray-100"}`}
         >
-          <Ionicons name="arrow-back" size={20} color={isDark ? "#fff" : "#000"} />
+          <Ionicons
+            name="arrow-back"
+            size={20}
+            color={isDark ? "#fff" : "#000"}
+          />
         </TouchableOpacity>
-        
+
         <View className="flex-1 items-center">
-          <AutoText className={`text-xl font-black ${isDark ? "text-white" : "text-gray-900"}`}>
+          <AutoText
+            className={`text-xl font-black ${isDark ? "text-white" : "text-gray-900"}`}
+          >
             {config.title}
           </AutoText>
         </View>
 
         {config.canAdd ? (
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={() => {
-                router.push({
-                    pathname: "/profile/admin-form/[type]/[id]",
-                    params: { type: type, id: "new" }
-                });
+              router.push({
+                pathname: "/profile/admin-form/[type]/[id]",
+                params: { type: type, id: "new" },
+              });
             }}
             className="p-2 rounded-2xl bg-primary/10"
           >
@@ -283,10 +315,12 @@ export default function AdminManageScreen() {
 
       <View className="flex-1 mt-4">
         <View className="px-6 mb-6">
-            <AutoText className="text-gray-500 text-sm font-bold uppercase tracking-widest">{config.subtitle}</AutoText>
+          <AutoText className="text-gray-500 text-sm font-bold uppercase tracking-widest">
+            {config.subtitle}
+          </AutoText>
         </View>
 
-        <AdminDataList 
+        <AdminDataList
           key={refreshKey}
           title={config.title}
           query={config.query}
@@ -294,8 +328,8 @@ export default function AdminManageScreen() {
           searchField={config.searchField}
           onItemPress={(item) => {
             router.push({
-                pathname: "/profile/admin-form/[type]/[id]",
-                params: { type: type, id: item._id }
+              pathname: "/profile/admin-form/[type]/[id]",
+              params: { type: type, id: item._id },
             });
           }}
           onDelete={handleDelete}

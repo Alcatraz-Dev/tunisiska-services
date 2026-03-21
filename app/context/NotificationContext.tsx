@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import { NotificationItem } from "@/app/types/notification";
@@ -7,10 +14,13 @@ import Constants, { ExecutionEnvironment } from "expo-constants";
 // Conditionally import expo-notifications
 let Notifications: any = null;
 
-const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+const isExpoGo =
+  Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
-if (Platform.OS === 'android' && isExpoGo) {
-  console.log("📱 Skipping expo-notifications in Expo Go on Android (functionality removed in SDK 53)");
+if (Platform.OS === "android" && isExpoGo) {
+  console.log(
+    "📱 Skipping expo-notifications in Expo Go on Android (functionality removed in SDK 53)",
+  );
 } else {
   try {
     Notifications = require("expo-notifications");
@@ -18,7 +28,10 @@ if (Platform.OS === 'android' && isExpoGo) {
     // Configure notification handler for production if module is available
     Notifications.setNotificationHandler({
       handleNotification: async (notification: any) => {
-        console.log('🔔 Notification handler called:', JSON.stringify(notification, null, 2));
+        console.log(
+          "🔔 Notification handler called:",
+          JSON.stringify(notification, null, 2),
+        );
 
         // Always show notifications when app is in foreground
         // For background notifications, let the system decide based on user preferences
@@ -50,7 +63,7 @@ interface NotificationContextProps {
 }
 
 const NotificationContext = createContext<NotificationContextProps | undefined>(
-  undefined
+  undefined,
 );
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
@@ -68,7 +81,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
       if (value !== null) setNotificationsEnabled(value === "true");
 
       if (!Notifications) {
-        console.log("📱 Skipping notification initialization (Notifications module missing)");
+        console.log(
+          "📱 Skipping notification initialization (Notifications module missing)",
+        );
         return;
       }
 
@@ -82,7 +97,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
           await Notifications.setBadgeCountAsync(0);
         }
 
-        console.log('📱 Notification permissions:', status);
+        console.log("📱 Notification permissions:", status);
       } catch (error) {
         console.warn("⚠️ Failed to initialize notifications:", error);
       }
@@ -91,9 +106,11 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
     initializeNotifications();
   }, []);
 
-  const requestPermissions = async (): Promise<boolean> => {
+  const requestPermissions = useCallback(async (): Promise<boolean> => {
     if (!Notifications) {
-      console.log("📱 Skipping permission request (Notifications module missing)");
+      console.log(
+        "📱 Skipping permission request (Notifications module missing)",
+      );
       return false;
     }
 
@@ -113,61 +130,70 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
       const newStatus = await Notifications.getPermissionsAsync();
       setPermissionStatus(newStatus);
 
-      console.log('🔔 Permission request result:', status, newStatus);
-      return status === 'granted' || newStatus.granted;
+      console.log("🔔 Permission request result:", status, newStatus);
+      return status === "granted" || newStatus.granted;
     } catch (error) {
-      console.error('❌ Error requesting permissions:', error);
+      console.error("❌ Error requesting permissions:", error);
       return false;
     }
-  };
+  }, []);
 
-  const saveNotificationsEnabled = async (value: boolean) => {
-    if (value && permissionStatus && !permissionStatus.granted) {
-      const granted = await requestPermissions();
-      if (!granted) {
-        console.log('⚠️ Permissions not granted, keeping notifications disabled');
-        return;
+  const saveNotificationsEnabled = useCallback(
+    async (value: boolean) => {
+      if (value && permissionStatus && !permissionStatus.granted) {
+        const granted = await requestPermissions();
+        if (!granted) {
+          console.log(
+            "⚠️ Permissions not granted, keeping notifications disabled",
+          );
+          return;
+        }
       }
-    }
 
-    setNotificationsEnabled(value);
-    await AsyncStorage.setItem("notificationsEnabled", value.toString());
-  };
+      setNotificationsEnabled(value);
+      await AsyncStorage.setItem("notificationsEnabled", value.toString());
+    },
+    [permissionStatus, requestPermissions],
+  );
 
-  const addNotification = (notif: NotificationItem) => {
+  const addNotification = useCallback((notif: NotificationItem) => {
     setNotifications((prev) => [notif, ...prev]);
-  };
+  }, []);
 
-  const addMultipleNotifications = (notifs: NotificationItem[]) => {
+  const addMultipleNotifications = useCallback((notifs: NotificationItem[]) => {
     setNotifications((prev) => {
       const merged = [...notifs, ...prev];
       const unique = Array.from(new Map(merged.map((n) => [n.id, n])).values());
       return unique;
     });
-  };
+  }, []);
 
-  const markAsRead = async (id: string) => {
-    console.log("🔍 [NOTIFICATION] Marking notification as read:", id);
-    setNotifications((prev) => {
-      const updated = prev.map((n) => (n.id === id ? { ...n, read: true } : n));
-      // Update badge count only if permissions are granted
-      const unreadCount = updated.filter(n => !n.read).length;
-      console.log("🔍 [NOTIFICATION] New unread count after marking read:", unreadCount);
+  const markAsRead = useCallback(
+    async (id: string) => {
+      setNotifications((prev) => {
+        const updated = prev.map((n) =>
+          n.id === id ? { ...n, read: true } : n,
+        );
+        // Update badge count only if permissions are granted
+        const unreadCount = updated.filter((n) => !n.read).length;
 
-      if (Notifications && permissionStatus?.granted && notificationsEnabled) {
-        console.log("🔍 [NOTIFICATION] Setting badge count to:", unreadCount);
-        Notifications.setBadgeCountAsync(unreadCount).catch((error: any) => {
-          console.warn('⚠️ Failed to set badge count:', error);
-        });
-      } else {
-        console.log("🔍 [NOTIFICATION] Not setting badge - permissions:", permissionStatus?.granted, "enabled:", notificationsEnabled);
-      }
+        if (
+          Notifications &&
+          permissionStatus?.granted &&
+          notificationsEnabled
+        ) {
+          Notifications.setBadgeCountAsync(unreadCount).catch((error: any) => {
+            console.warn("⚠️ Failed to set badge count:", error);
+          });
+        }
 
-      return updated;
-    });
-  };
+        return updated;
+      });
+    },
+    [permissionStatus, notificationsEnabled],
+  );
 
-  const markAllAsRead = async () => {
+  const markAllAsRead = useCallback(async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
 
     // Clear badge when all notifications are read, only if permissions granted
@@ -175,26 +201,39 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
       try {
         await Notifications.setBadgeCountAsync(0);
       } catch (error) {
-        console.warn('⚠️ Failed to clear badge count:', error);
+        console.warn("⚠️ Failed to clear badge count:", error);
       }
     }
-  };
+  }, [permissionStatus, notificationsEnabled]);
+
+  const contextValue = useMemo(
+    () => ({
+      notifications,
+      setNotifications,
+      addNotification,
+      addMultipleNotifications,
+      markAsRead,
+      markAllAsRead,
+      notificationsEnabled,
+      setNotificationsEnabled: saveNotificationsEnabled,
+      permissionStatus,
+      requestPermissions,
+    }),
+    [
+      notifications,
+      addNotification,
+      addMultipleNotifications,
+      markAsRead,
+      markAllAsRead,
+      notificationsEnabled,
+      saveNotificationsEnabled,
+      permissionStatus,
+      requestPermissions,
+    ],
+  );
 
   return (
-    <NotificationContext.Provider
-      value={{
-        notifications,
-        setNotifications,
-        addNotification,
-        addMultipleNotifications,
-        markAsRead,
-        markAllAsRead,
-        notificationsEnabled,
-        setNotificationsEnabled: saveNotificationsEnabled,
-        permissionStatus,
-        requestPermissions,
-      }}
-    >
+    <NotificationContext.Provider value={contextValue}>
       {children}
     </NotificationContext.Provider>
   );
@@ -202,6 +241,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
 
 export const useNotifications = () => {
   const context = useContext(NotificationContext);
-  if (!context) throw new Error("useNotifications must be used within a Provider");
+  if (!context)
+    throw new Error("useNotifications must be used within a Provider");
   return context;
 };

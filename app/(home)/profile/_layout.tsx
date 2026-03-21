@@ -1,6 +1,4 @@
-import { ThemeProvider } from "@/app/context/ThemeContext";
-import { Slot } from "expo-router";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { Stack } from "expo-router";
 import Constants from "expo-constants";
 
 export default function ProfileLayout() {
@@ -16,10 +14,11 @@ export default function ProfileLayout() {
   }
 
   return (
-    <ThemeProvider>
-      <SafeAreaProvider>
-        <Slot screenOptions={{ headerShown: false }} />
-      </SafeAreaProvider>
-    </ThemeProvider>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" />
+      <Stack.Screen name="admin-notifications/index" />
+      <Stack.Screen name="admin-form/[type]/[id]" />
+      <Stack.Screen name="notification-history/index" />
+    </Stack>
   );
 }

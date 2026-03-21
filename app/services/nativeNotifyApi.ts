@@ -1,22 +1,17 @@
 import { Platform } from "react-native";
 import Constants, { ExecutionEnvironment } from "expo-constants";
 
-let registerIndieID: any = null;
-let unregisterIndieDevice: any = null;
-
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
-if (Platform.OS === 'android' && isExpoGo) {
-  console.log("📱 Skipping native-notify module in Expo Go on Android");
-} else {
+const getNativeNotify = () => {
+  if (Platform.OS === 'android' && isExpoGo) return null;
   try {
-    const NativeNotify = require("native-notify");
-    registerIndieID = NativeNotify.registerIndieID;
-    unregisterIndieDevice = NativeNotify.unregisterIndieDevice;
+    return require("native-notify");
   } catch (error) {
     console.log("📱 native-notify not available");
+    return null;
   }
-}
+};
 
 const NATIVE_NOTIFY_CONFIG = {
   APP_ID: parseInt(process.env.EXPO_PUBLIC_NATIVE_NOTIFY_APP_ID || "32172"),
@@ -96,13 +91,14 @@ export class NativeNotifyAPI {
     userId: string,
     expoPushToken?: string
   ): Promise<NotificationResponse> {
-    if (!registerIndieID) {
+    const nn = getNativeNotify();
+    if (!nn?.registerIndieID) {
       console.log("📱 Skipping native notify registration (module missing)");
       return { success: false, message: "Native Notify module missing" };
     }
     try {
       await retryApiCall(async () =>
-        registerIndieID(userId, this.appId, this.appToken)
+        nn.registerIndieID(userId, this.appId, this.appToken)
       );
       return {
         success: true,
@@ -118,13 +114,14 @@ export class NativeNotifyAPI {
   }
 
   async unregisterUser(userId: string): Promise<NotificationResponse> {
-    if (!unregisterIndieDevice) {
+    const nn = getNativeNotify();
+    if (!nn?.unregisterIndieDevice) {
       console.log("📱 Skipping native notify unregistration (module missing)");
       return { success: false, message: "Native Notify module missing" };
     }
     try {
       await retryApiCall(async () =>
-        unregisterIndieDevice(userId, this.appId, this.appToken)
+        nn.unregisterIndieDevice(userId, this.appId, this.appToken)
       );
       return {
         success: true,
@@ -193,13 +190,32 @@ export class NativeNotifyAPI {
       }
       const responseText = await fetchResponse.text();
       // Handle non-JSON responses
+      const isTrialExpired = responseText.toLowerCase().includes("pay") || 
+                            responseText.toLowerCase().includes("trial") ||
+                            responseText.toLowerCase().includes("login");
+      
       try {
-        return JSON.parse(responseText);
+        const parsed = JSON.parse(responseText);
+        if (isTrialExpired && !parsed.notification_id && !parsed.id) {
+           return { success: false, error: responseText };
+        }
+        return parsed;
       } catch (parseError) {
+        if (isTrialExpired) {
+          return { success: false, error: responseText };
+        }
         console.warn('Response is not valid JSON, treating as success:', responseText);
         return { success: true, message: responseText };
       }
     });
+
+    if (response && response.success === false) {
+       return {
+         success: false,
+         error: response.error || "Request failed",
+         data: response
+       };
+    }
 
     return {
       success: true,
@@ -208,6 +224,30 @@ export class NativeNotifyAPI {
     };
   }
 
+  // --- Fetch sent notification history from NativeNotify ---
+  async getNotificationHistory(): Promise<any[]> {
+    try {
+      // NativeNotify notification inbox endpoint - returns all sent notifications
+      const url = `${NATIVE_NOTIFY_CONFIG.BASE_URL}/api/notification/inbox/${this.appId}/${this.appToken}?take=200&skip=0`;
+      const fetchResponse = await fetch(url);
+      if (!fetchResponse.ok) {
+        console.warn('Could not fetch notification history:', fetchResponse.status);
+        return [];
+      }
+      const text = await fetchResponse.text();
+      try {
+        const data = JSON.parse(text);
+        return Array.isArray(data) ? data : [];
+      } catch {
+        return [];
+      }
+    } catch (error) {
+      console.error('Error fetching notification history:', error);
+      return [];
+    }
+  }
+
 }
 
 export const nativeNotifyAPI = NativeNotifyAPI.getInstance();
+

@@ -43,7 +43,7 @@ export default function AdminUsersScreen() {
 
         <AdminDataList 
           title="Användare"
-          query='*[_type == "user"] | order(_createdAt desc)'
+          query='*[_type == "users"] | order(_createdAt desc)'
           columns={columns}
           searchField="userName"
           onItemPress={(item) => {

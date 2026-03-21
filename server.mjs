@@ -92,6 +92,16 @@ app.get("/health", (req, res) => {
   res.json({ status: "OK", message: "Server is running", timestamp: new Date() });
 });
 
+// Stripe payment result pages (used as WebView redirect targets)
+app.get("/payment-success", (req, res) => {
+  const { points, amount, session_id } = req.query;
+  res.send(`<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Betalning genomf\u00f6rd</title></head><body style="background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;margin:0;"><div style="text-align:center;padding:40px;"><div style="font-size:64px;margin-bottom:16px;">\u2705</div><h1 style="color:#fff;font-size:24px;margin-bottom:8px;">Betalning genomf\u00f6rd!</h1><p style="color:#9ca3af;font-size:16px;">Din betalning har bekr\u00e4ftats.</p></div></body></html>`);
+});
+
+app.get("/payment-cancel", (req, res) => {
+  res.send(`<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Avbruten</title></head><body style="background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;margin:0;"><div style="text-align:center;padding:40px;"><div style="font-size:64px;margin-bottom:16px;">\u274c</div><h1 style="color:#fff;font-size:24px;margin-bottom:8px;">Betalning avbruten</h1><p style="color:#9ca3af;font-size:16px;">Betalningen avbr\u00f6ts. Stäng detta f\u00f6nster.</p></div></body></html>`);
+});
+
 // API endpoint for updating user points
 app.post("/api/update-user-points", async (req, res) => {
   try {
@@ -312,8 +322,8 @@ app.post("/create-checkout-session", async (req, res) => {
         },
       ],
       mode: "payment",
-      success_url: successUrl || `tunisiska-mega-service://success?session_id={CHECKOUT_SESSION_ID}&points=${displayPoints}&amount=${displayAmount}`,
-      cancel_url: cancelUrl || `tunisiska-mega-service://cancel`,
+      success_url: successUrl || `${process.env.EXPO_PUBLIC_SERVER_URL || 'http://localhost:3000'}/payment-success?session_id={CHECKOUT_SESSION_ID}&points=${displayPoints}&amount=${displayAmount}`,
+      cancel_url: cancelUrl || `${process.env.EXPO_PUBLIC_SERVER_URL || 'http://localhost:3000'}/payment-cancel`,
       metadata: {
         integration: "web_checkout",
         points: displayPoints.toString(),

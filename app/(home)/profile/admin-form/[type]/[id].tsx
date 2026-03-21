@@ -10,6 +10,7 @@ import {
   Alert,
   Platform,
   Modal,
+  Image,
 } from "react-native";
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -18,6 +19,30 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/app/context/ThemeContext";
 import { AutoText } from "@/app/components/ui/AutoText";
 import { client } from "@/sanityClient";
+import imageUrlBuilder from '@sanity/image-url';
+import { useVideoPlayer, VideoView } from 'expo-video';
+
+const builder = imageUrlBuilder(client);
+function urlFor(source: any) {
+  return builder.image(source);
+}
+
+const VideoPreview = ({ url }: { url: string }) => {
+  const player = useVideoPlayer(url, player => {
+    player.loop = true;
+    player.pause();
+  });
+  return (
+    <View className="mb-4 overflow-hidden rounded-2xl w-full" style={{ height: 200 }}>
+      <VideoView 
+        player={player} 
+        style={{ width: '100%', height: '100%' }}
+        allowsFullscreen 
+        allowsPictureInPicture 
+      />
+    </View>
+  );
+};
 
 export default function AdminFormScreen() {
   const { resolvedTheme } = useTheme();
@@ -249,6 +274,13 @@ export default function AdminFormScreen() {
           { name: "media", label: "Media (Bild/Video)", type: "media" },
           { name: "link", label: "Länk (URL)", type: "text" },
         ];
+      case "notification-history":
+        return [
+          { name: "title", label: "Rubrik", type: "text" },
+          { name: "message", label: "Meddelande", type: "text", multiline: true },
+          { name: "dateSent", label: "Skickades", type: "datetime" },
+          { name: "notificationType", label: "Kategori", type: "text" },
+        ];
       case "shipping-schedules":
       case "container-shipping-schedules":
         return [
@@ -426,6 +458,12 @@ export default function AdminFormScreen() {
   };
 
   const pickMedia = async (fieldName: string, mediaType: 'Images' | 'Videos' | 'All') => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Behörighet nekad', 'Vi behöver åtkomst till ditt bildbibliotek för att ladda upp media.');
+      return;
+    }
+
     let typeOptions = ImagePicker.MediaTypeOptions.Images;
     if (mediaType === 'Videos') typeOptions = ImagePicker.MediaTypeOptions.Videos;
     if (mediaType === 'All') typeOptions = ImagePicker.MediaTypeOptions.All;
@@ -442,12 +480,21 @@ export default function AdminFormScreen() {
       
       try {
         setSaving(true);
+        const fileInfo = {
+          uri: uri,
+          type: isVideo ? 'video/mp4' : 'image/jpeg',
+          name: uri.split('/').pop() || (isVideo ? 'upload.mp4' : 'upload.jpg')
+        };
+        
         const response = await fetch(uri);
         const blob = await response.blob();
+        const file = new File([blob], fileInfo.name, { type: fileInfo.type });
         
-        const asset = await client.assets.upload(isVideo || mediaType === 'Videos' ? 'file' : 'image', blob, {
-          filename: uri.split('/').pop() || (isVideo ? 'upload.mp4' : 'upload.jpg'),
-        });
+        const asset = await client.assets.upload(
+          isVideo || mediaType === 'Videos' ? 'file' : 'image', 
+          file, 
+          { filename: fileInfo.name }
+        );
         
         const reference = {
           _type: isVideo || mediaType === 'Videos' ? 'file' : 'image',
@@ -768,24 +815,46 @@ export default function AdminFormScreen() {
             ) : field.type === 'media' ? (
               <View>
                 {(getNestedValue(formData, "media.image") || getNestedValue(formData, "media.video")) ? (
-                  <View className={`mb-3 p-5 rounded-[24px] flex-row items-center justify-between ${isDark ? "bg-dark-card border border-white/5" : "bg-white border border-gray-100"}`}>
-                    <View className="flex-row items-center flex-1">
-                      <Ionicons name={getNestedValue(formData, "media.type") === 'image' ? "image" : "videocam"} size={24} color={isDark ? "#3b82f6" : "#2563eb"} className="mr-3" />
-                      <AutoText className={`text-base font-bold flex-1 truncate ${isDark ? "text-white" : "text-gray-900"}`}>
-                        {getNestedValue(formData, "media.type") === 'image' ? "Bild uppladdad" : "Video uppladdad"}
-                      </AutoText>
+                  <View className={`mb-3 p-5 rounded-[24px] ${isDark ? "bg-dark-card border border-white/5" : "bg-white border border-gray-100"}`}>
+                    
+                    {getNestedValue(formData, "media.type") === 'image' && getNestedValue(formData, "media.image")?.asset?._ref ? (
+                      <View className="items-center mb-4">
+                        <Image 
+                          source={{ uri: urlFor(getNestedValue(formData, "media.image")).width(600).url() }} 
+                          style={{ width: '100%', height: 200, borderRadius: 16 }} 
+                          resizeMode="cover" 
+                        />
+                      </View>
+                    ) : getNestedValue(formData, "media.type") === 'video' && getNestedValue(formData, "media.video")?.asset?._ref ? (() => {
+                        const rawRef: string = getNestedValue(formData, "media.video").asset._ref;
+                        // ref format: "file-{hash}-{ext}"  e.g. "file-abc123-mp4"
+                        const withoutPrefix = rawRef.replace(/^file-/, '');
+                        const lastDash = withoutPrefix.lastIndexOf('-');
+                        const fileId = lastDash !== -1 ? withoutPrefix.slice(0, lastDash) : withoutPrefix;
+                        const ext = lastDash !== -1 ? withoutPrefix.slice(lastDash + 1) : 'mp4';
+                        const videoUrl = `https://cdn.sanity.io/files/${client.config().projectId}/${client.config().dataset}/${fileId}.${ext}`;
+                        return <VideoPreview url={videoUrl} />;
+                      })() : null}
+
+                    <View className="flex-row items-center justify-between">
+                      <View className="flex-row items-center flex-1">
+                        <Ionicons name={getNestedValue(formData, "media.type") === 'image' ? "image" : "videocam"} size={24} color={isDark ? "#3b82f6" : "#2563eb"} className="mr-3" />
+                        <AutoText className={`text-base font-bold flex-1 truncate ${isDark ? "text-white" : "text-gray-900"}`}>
+                          {getNestedValue(formData, "media.type") === 'image' ? "Bild uppladdad" : "Video uppladdad"}
+                        </AutoText>
+                      </View>
+                      <TouchableOpacity 
+                        onPress={() => {
+                          let newForm = setNestedValue({ ...formData }, "media.image", null);
+                          newForm = setNestedValue(newForm, "media.video", null);
+                          newForm = setNestedValue(newForm, "media.type", null);
+                          setFormData(newForm);
+                        }}
+                        className={`w-10 h-10 rounded-full items-center justify-center ${isDark ? "bg-red-500/10" : "bg-red-50"}`}
+                      >
+                        <Ionicons name="trash-outline" size={20} color="#f43f5e" />
+                      </TouchableOpacity>
                     </View>
-                    <TouchableOpacity 
-                      onPress={() => {
-                        let newForm = setNestedValue({ ...formData }, "media.image", null);
-                        newForm = setNestedValue(newForm, "media.video", null);
-                        newForm = setNestedValue(newForm, "media.type", null);
-                        setFormData(newForm);
-                      }}
-                      className={`w-10 h-10 rounded-full items-center justify-center ${isDark ? "bg-red-500/10" : "bg-red-50"}`}
-                    >
-                      <Ionicons name="trash-outline" size={20} color="#f43f5e" />
-                    </TouchableOpacity>
                   </View>
                 ) : (
                   <TouchableOpacity
