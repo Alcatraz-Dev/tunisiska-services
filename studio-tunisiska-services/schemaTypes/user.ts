@@ -77,7 +77,7 @@ export default defineType({
       name: 'driverLocation',
       title: 'Driver Location',
       type: 'geopoint',
-      hidden: ({parent}) => !parent?.isDriver, // only relevant for drivers
+      hidden: ({parent}: any) => !parent?.isDriver, // only relevant for drivers
     }),
     // Add admin field
     defineField({

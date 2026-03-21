@@ -566,6 +566,11 @@ const Profile = () => {
                 ...(userProfile?.isAdmin
                   ? [
                       {
+                        icon: icons.system,
+                        text: "Admin Dashboard",
+                        href: "/profile/admin-dashboard",
+                      },
+                      {
                         icon: icons.bell,
                         text: "Skicka Notifikationer",
                         href: "/profile/admin-notifications",

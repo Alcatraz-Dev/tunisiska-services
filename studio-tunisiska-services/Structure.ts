@@ -10,7 +10,7 @@ export const Structure = (S: any) =>
       S.listItem()
         .title(' Users')
         .icon(FaUsers)
-        .child(S.documentList().title('All Users').filter('_type == "users"')),
+        .child(S.documentList().title('All Users').filter('_type == "user"')),
 
       S.listItem()
         .title(' Friend Requests')
@@ -44,6 +44,18 @@ export const Structure = (S: any) =>
         .icon(FaShippingFast)
         .child(
           S.documentList().title('All Shipping Schedules').filter('_type == "shippingSchedule"'),
+        ),
+      S.listItem()
+        .title(' Container Orders')
+        .icon(FaTruck)
+        .child(
+          S.documentList().title('All Container Orders').filter('_type == "containerShippingOrder"'),
+        ),
+      S.listItem()
+        .title(' Container Schedules')
+        .icon(FaTruck)
+        .child(
+          S.documentList().title('All Container Schedules').filter('_type == "containerShippingSchedule"'),
         ),
 
       S.listItem()
