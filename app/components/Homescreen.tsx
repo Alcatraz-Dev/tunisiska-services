@@ -50,7 +50,8 @@ const services = [
   {
     id: "1",
     title: "Shipping Sweden & Tunisia",
-    description: "Fast and secure shipping of packages between Sweden and Tunisia.",
+    description:
+      "Fast and secure shipping of packages between Sweden and Tunisia.",
     icon: "cube-outline",
     color: "#3B82F6",
     route: "/(home)/services/shipping",
@@ -86,7 +87,8 @@ const services = [
   {
     id: "5",
     title: "Container shipping",
-    description: "Book large containers for shipping between Sweden and Tunisia.",
+    description:
+      "Book large containers for shipping between Sweden and Tunisia.",
     icon: "boat-outline",
     color: "#6366F1",
     route: "/(home)/services/container-shipping",
@@ -115,8 +117,14 @@ export default function HomePage() {
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [readIds, setReadIds] = useState<string[]>([]);
   const [hiddenIds, setHiddenIds] = useState<string[]>([]);
-  const READ_IDS_KEY = useMemo(() => `notification_read_ids:${userId ?? "anon"}`, [userId]);
-  const HIDDEN_IDS_KEY = useMemo(() => `notification_hidden_ids:${userId ?? "anon"}`, [userId]);
+  const READ_IDS_KEY = useMemo(
+    () => `notification_read_ids:${userId ?? "anon"}`,
+    [userId],
+  );
+  const HIDDEN_IDS_KEY = useMemo(
+    () => `notification_hidden_ids:${userId ?? "anon"}`,
+    [userId],
+  );
 
   const router = useRouter();
 
@@ -124,49 +132,64 @@ export default function HomePage() {
   const [userCreated, setUserCreated] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const getId = (n: any) => (n.id ?? n.notification_id ?? '').toString();
+  const getId = (n: any) => (n.id ?? n.notification_id ?? "").toString();
   const filterForUser = (items: any[]) => {
     if (!userId) return items;
-    const keys = ['subscriber_id', 'subscriberId', 'user_id', 'userId', 'indie_id', 'indieId', 'sub_id', 'subId'];
-    const hasAny = items.some((it) => keys.some((k) => it && typeof it === 'object' && k in it));
+    const keys = [
+      "subscriber_id",
+      "subscriberId",
+      "user_id",
+      "userId",
+      "indie_id",
+      "indieId",
+      "sub_id",
+      "subId",
+    ];
+    const hasAny = items.some((it) =>
+      keys.some((k) => it && typeof it === "object" && k in it),
+    );
     if (!hasAny) return items;
-    return items.filter((it) => keys.some((k) => it?.[k]?.toString?.() === userId?.toString()))
+    return items.filter((it) =>
+      keys.some((k) => it?.[k]?.toString?.() === userId?.toString()),
+    );
   };
   const applyOverlays = (items: any[], read: string[], hidden: string[]) => {
     const readSet = new Set(read);
     const hiddenSet = new Set(hidden);
-    return items.filter((n) => !hiddenSet.has(getId(n))).map((n) => ({ ...n, read: n.read || readSet.has(getId(n)) }));
+    return items
+      .filter((n) => !hiddenSet.has(getId(n)))
+      .map((n) => ({ ...n, read: n.read || readSet.has(getId(n)) }));
   };
 
   const unCountNotifications = async () => {
-    console.log('🔢 Calculating unread notification count...');
+    console.log("🔢 Calculating unread notification count...");
 
     // Always try to get the count, even in Expo Go - just handle failures gracefully
     if (getUnreadNotificationInboxCount) {
       try {
         // Try Native Notify API first (works in Expo Go on device)
-        console.log('📱 Trying Native Notify API for unread count');
+        console.log("📱 Trying Native Notify API for unread count");
         const unreadResp = await getUnreadNotificationInboxCount(
           32172,
-          "PNF5T5VibvtV6lj8i7pbil"
+          "PNF5T5VibvtV6lj8i7pbil",
         );
 
         let count = 0;
-        if (unreadResp && typeof unreadResp === 'object') {
-          if ('data' in unreadResp) {
+        if (unreadResp && typeof unreadResp === "object") {
+          if ("data" in unreadResp) {
             count = Number(unreadResp.data) || 0;
-          } else if (typeof unreadResp === 'number') {
+          } else if (typeof unreadResp === "number") {
             count = unreadResp;
           }
-        } else if (typeof unreadResp === 'number') {
+        } else if (typeof unreadResp === "number") {
           count = unreadResp;
         }
 
-        console.log('📊 Native Notify unread count:', count);
+        console.log("📊 Native Notify unread count:", count);
         setUnreadNotificationCount(count);
         return;
       } catch (error) {
-        console.warn('Native Notify API failed, trying fallback:', error);
+        console.warn("Native Notify API failed, trying fallback:", error);
       }
     }
 
@@ -184,24 +207,30 @@ export default function HomePage() {
           32172,
           "PNF5T5VibvtV6lj8i7pbil",
           50,
-          0
+          0,
         );
-        const raw = Array.isArray(response) ? response : response?.data ?? [];
+        const raw = Array.isArray(response) ? response : (response?.data ?? []);
         const scoped = filterForUser(raw);
         const processed = applyOverlays(scoped, read, hidden);
         const unreadCount = processed.filter((n: any) => !n.read).length;
-        console.log('📊 Fallback unread count from inbox:', unreadCount);
+        console.log("📊 Fallback unread count from inbox:", unreadCount);
         setUnreadNotificationCount(unreadCount);
       } catch (error) {
         // Final fallback: use local notification state from context
         const localUnreadCount = notifications.filter((n) => !n.read).length;
-        console.log('📊 Final fallback unread count from context:', localUnreadCount);
+        console.log(
+          "📊 Final fallback unread count from context:",
+          localUnreadCount,
+        );
         setUnreadNotificationCount(localUnreadCount);
       }
     } else {
       // If native-notify is not available (Expo Go), use context
       const localUnreadCount = notifications.filter((n) => !n.read).length;
-      console.log('📊 Native Notify not available, using context unread count:', localUnreadCount);
+      console.log(
+        "📊 Native Notify not available, using context unread count:",
+        localUnreadCount,
+      );
       setUnreadNotificationCount(localUnreadCount);
     }
   };
@@ -277,7 +306,6 @@ export default function HomePage() {
     });
   }, [searchQuery, activeCategory]);
 
-
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
       <SignedIn>
@@ -294,15 +322,16 @@ export default function HomePage() {
                 <View className="ml-2 ">
                   {/* Name */}
                   <AutoText
-                    className={`font-semibold text-sm ml-3 mb-2 ${isDark ? "text-dark-text" : "text-light-text"
-                      }`}
+                    className={`font-semibold text-sm ml-3 mb-2 ${
+                      isDark ? "text-dark-text" : "text-light-text"
+                    }`}
                   >
                     {getGreeting(
                       !userProfile
                         ? ((user?.firstName + " " + user?.lastName) as string)
                         : userProfile?.firstName && userProfile?.lastName
                           ? `${userProfile.firstName} ${userProfile.lastName}`
-                          : user?.firstName ?? "Användare"
+                          : (user?.firstName ?? "Användare"),
                     )}
                   </AutoText>
                   {/* Location Row */}
@@ -314,8 +343,9 @@ export default function HomePage() {
                       style={{ marginRight: 3 }}
                     />
                     <AutoText
-                      className={`text-xs  ${isDark ? "text-dark-text/60" : "text-light-text/60"
-                        }`}
+                      className={`text-xs  ${
+                        isDark ? "text-dark-text/60" : "text-light-text/60"
+                      }`}
                     >
                       {(userProfile?.country || "") +
                         ", " +
@@ -350,10 +380,11 @@ export default function HomePage() {
             <LiveStatus />
             {/* Search + Filter Row */}
             <View
-              className={`flex-row items-center rounded-full border px-2 h-14 mt-3 ${isDark
+              className={`flex-row items-center rounded-full border px-2 h-14 mt-3 ${
+                isDark
                   ? "bg-dark-card border-gray-700"
                   : "bg-light-card border-gray-300"
-                }`}
+              }`}
             >
               {/* Search Icon */}
               <Ionicons
@@ -404,8 +435,9 @@ export default function HomePage() {
             className={`px-6 flex-1 ${isDark ? "bg-dark" : "bg-light"}`}
           >
             <AutoText
-              className={`text-xl font-bold my-4 ${isDark ? "text-dark-text" : "text-light-text"
-                }`}
+              className={`text-xl font-bold my-4 ${
+                isDark ? "text-dark-text" : "text-light-text"
+              }`}
             >
               Våra Tjänster
             </AutoText>
@@ -433,8 +465,9 @@ export default function HomePage() {
                     color={isDark ? "#9CA3AF" : "#6B7280"}
                   />
                   <AutoText
-                    className={`mt-3 text-base ${isDark ? "text-dark-text/60" : "text-light-text/60"
-                      }`}
+                    className={`mt-3 text-base ${
+                      isDark ? "text-dark-text/60" : "text-light-text/60"
+                    }`}
                   >
                     Inga tjänster hittades
                   </AutoText>

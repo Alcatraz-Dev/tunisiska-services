@@ -7,16 +7,14 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Image, ScrollView, TouchableOpacity, View } from "react-native";
-import VideoPlayer from "@/app/components/VideoPlayer";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { client } from "@/sanityClient";
 import {
   NotificationType,
   NOTIFICATION_TYPE_CONFIGS,
 } from "@/app/types/notification";
-import { VideoView, useVideoPlayer } from "expo-video";
 
 export default function AdminNotificationsScreen() {
   const { resolvedTheme } = useTheme();
@@ -28,101 +26,85 @@ export default function AdminNotificationsScreen() {
   const [imageUrl, setImageUrl] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [notificationType, setNotificationType] =
-    useState<NotificationType>("general");
+  const [notificationType, setNotificationType] = useState<NotificationType>("general");
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<string>("");
-  // const [videoPlayers, setVideoPlayers] = useState<{ [key: string]: any }>({});
+  const [activeTab, setActiveTab] = useState<"send" | "inbox">("send");
+  const [pendingItems, setPendingItems] = useState<any[]>([]);
+  const [fetchingPending, setFetchingPending] = useState(false);
 
-  // Fetch announcements for selection
-  useEffect(() => {
-    const fetchAnnouncements = async () => {
-      try {
-        const response = await client.fetch(
-          '*[_type == "announcement" && !(_id in path("drafts.**"))] | order(date desc)[0...10]{ ..., title, slug, media, _id }'
-        );
+  const fetchAnnouncements = useCallback(async () => {
+    try {
+      const response = await client.fetch(
+        '*[_type == "announcement" && !(_id in path("drafts.**"))] | order(date desc)[0...10]{ ..., title, slug, media, _id }'
+      );
 
-        // Process announcements to get real URLs
-        const processedAnnouncements = (response || []).map(
-          (announcement: any) => {
-            let processedMedia = announcement.media;
-
-            if (processedMedia) {
-              if (
-                processedMedia.type === "image" &&
-                processedMedia.image?.asset?._ref
-              ) {
-                // Construct real image URL from Sanity asset reference
-                const imageAssetRef = processedMedia.image.asset._ref;
-                const imageId = imageAssetRef
-                  .replace("image-", "")
-                  .replace(/-[a-z]+$/g, "");
-                processedMedia.imageUrl = `https://cdn.sanity.io/images/ci4uj541/production/${imageId}.jpg`;
-              } else if (
-                processedMedia.type === "video" &&
-                processedMedia.video?.asset?._ref
-              ) {
-                // Construct real video URL from Sanity asset reference
-                const videoAssetRef = processedMedia.video.asset._ref;
-                const videoId = videoAssetRef
-                  .replace("file-", "")
-                  .replace(/-[a-z]+$/g, "");
-                processedMedia.videoUrl = `https://cdn.sanity.io/files/ci4uj541/production/${videoId}.mov`;
-
-                // Also construct thumbnail URL from the image asset if available
-                if (processedMedia.image?.asset?._ref) {
-                  const imageAssetRef = processedMedia.image.asset._ref;
-                  const imageId = imageAssetRef
-                    .replace("image-", "")
-                    .replace(/-[a-z]+$/g, "");
-                  processedMedia.thumbnailUrl = `https://cdn.sanity.io/images/ci4uj541/production/${imageId}.jpg`;
-                }
-              }
+      const processedAnnouncements = (response || []).map((announcement: any) => {
+        let processedMedia = announcement.media;
+        if (processedMedia) {
+          if (processedMedia.type === "image" && processedMedia.image?.asset?._ref) {
+            const imageAssetRef = processedMedia.image.asset._ref;
+            const imageId = imageAssetRef.replace("image-", "").replace(/-[a-z]+$/g, "");
+            processedMedia.imageUrl = `https://cdn.sanity.io/images/ci4uj541/production/${imageId}.jpg`;
+          } else if (processedMedia.type === "video" && processedMedia.video?.asset?._ref) {
+            const videoAssetRef = processedMedia.video.asset._ref;
+            const videoId = videoAssetRef.replace("file-", "").replace(/-[a-z]+$/g, "");
+            processedMedia.videoUrl = `https://cdn.sanity.io/files/ci4uj541/production/${videoId}.mov`;
+            if (processedMedia.image?.asset?._ref) {
+              const imageAssetRef = processedMedia.image.asset._ref;
+              const imageId = imageAssetRef.replace("image-", "").replace(/-[a-z]+$/g, "");
+              processedMedia.thumbnailUrl = `https://cdn.sanity.io/images/ci4uj541/production/${imageId}.jpg`;
             }
-
-            return {
-              ...announcement,
-              media: processedMedia,
-            };
           }
-        );
+        }
+        return { ...announcement, media: processedMedia, slug: announcement.slug?.current || announcement.slug };
+      });
 
-        setAnnouncements(processedAnnouncements);
-      } catch (error) {
-        console.error("Error fetching announcements:", error);
-      }
-    };
+      setAnnouncements(processedAnnouncements);
+    } catch (error) {
+      console.error("Error fetching announcements:", error);
+    }
+  }, []);
 
+  const fetchPendingItems = useCallback(async () => {
+    setFetchingPending(true);
+    try {
+      const response = await client.fetch(`
+        *[_type in ["shippingOrder", "taxiOrder", "containerShippingOrder", "moveOrder", "moveCleaningOrder"] && status == "PENDING"] | order(_createdAt desc) [0...20] {
+          _id,
+          _type,
+          status,
+          _createdAt,
+          totalPrice,
+          "customerName": customerInfo.name,
+          "title": coalesce(title, _type)
+        }
+      `);
+      setPendingItems(response || []);
+    } catch (err) {
+      console.error("Error fetching pending items:", err);
+    } finally {
+      setFetchingPending(false);
+    }
+  }, []);
+
+  useEffect(() => {
     if (notificationType === "announcement") {
       fetchAnnouncements();
     }
-  }, [notificationType]);
+  }, [notificationType, fetchAnnouncements]);
 
-  const uploadImageToSanity = async (
-    imageUri: string
-  ): Promise<string | null> => {
+  useEffect(() => {
+    fetchPendingItems();
+  }, [fetchPendingItems, activeTab]);
+
+  const uploadImageToSanity = async (imageUri: string): Promise<string | null> => {
     try {
-      console.log("Uploading image to Sanity:", imageUri);
-
-      // Convert image URI to blob for upload
       const response = await fetch(imageUri);
       const blob = await response.blob();
-
-      // Create a File object from the blob
-      const file = new File([blob], `notification-image-${Date.now()}.jpg`, {
-        type: "image/jpeg",
-      });
-
-      // Upload to Sanity
-      const result = await client.assets.upload("image", file, {
-        filename: `notification-image-${Date.now()}.jpg`,
-      });
-
-      // Get the URL of the uploaded image
-      const uploadedUrl = result.url;
-
-      console.log("Image uploaded to Sanity successfully:", uploadedUrl);
-      return uploadedUrl;
+      const file = new File([blob], `notification-image-${Date.now()}.jpg`, { type: "image/jpeg" });
+      const result = await client.assets.upload("image", file, { filename: `notification-image-${Date.now()}.jpg` });
+      return result.url;
     } catch (error) {
       console.error("Error uploading image to Sanity:", error);
       return null;
@@ -131,41 +113,27 @@ export default function AdminNotificationsScreen() {
 
   const pickImage = async () => {
     try {
-      // Request permissions
-      const { status } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
-        showAlert(
-          "Behörighet nekad",
-          "Vi behöver åtkomst till ditt bildbibliotek för att välja bilder"
-        );
+        showAlert("Behörighet nekad", "Vi behöver åtkomst till ditt bildbibliotek");
         return;
       }
-
-      // Launch image picker
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [16, 9],
         quality: 0.8,
       });
-
       if (!result.canceled && result.assets && result.assets[0]) {
         const imageUri = result.assets[0].uri;
         setSelectedImage(imageUri);
-
-        // Upload image and get URL
-        showAlert("Laddar upp...", "Vänligen vänta medan bilden laddas upp");
+        showAlert("Laddar upp...", "Vänligen vänta");
         const uploadedUrl = await uploadImageToSanity(imageUri);
-
         if (uploadedUrl) {
           setImageUrl(uploadedUrl);
-          showAlert(
-            "Lyckades",
-            "Bilden har laddats upp och är klar att användas"
-          );
+          showAlert("Lyckades", "Bilden har laddats upp");
         } else {
-          showAlert("Fel", "Kunde inte ladda upp bilden. Försök igen.");
+          showAlert("Fel", "Kunde inte ladda upp bilden");
           setSelectedImage(null);
         }
       }
@@ -180,28 +148,9 @@ export default function AdminNotificationsScreen() {
       showAlert("Fel", "Titel och meddelande krävs");
       return;
     }
-
-    // For announcement type, announcement selection is required
-    if (
-      notificationType === "announcement" &&
-      (!selectedAnnouncement ||
-        (typeof selectedAnnouncement === "string" &&
-          selectedAnnouncement.trim() === ""))
-    ) {
+    if (notificationType === "announcement" && !selectedAnnouncement) {
       showAlert("Fel", "Välj en annons att länka till");
       return;
-    }
-
-    // For announcement type, ensure we have the selected announcement data
-    let selectedAnnouncementData = null;
-    if (notificationType === "announcement" && selectedAnnouncement) {
-      selectedAnnouncementData = announcements.find(
-        (a) => a.slug === selectedAnnouncement
-      );
-      if (!selectedAnnouncementData) {
-        showAlert("Fel", "Kunde inte hitta vald annons");
-        return;
-      }
     }
 
     setLoading(true);
@@ -210,595 +159,298 @@ export default function AdminNotificationsScreen() {
         title: title.trim(),
         message: message.trim(),
         pushData: {
-          type:
-            notificationType === "announcement"
-              ? "announcement"
-              : "admin_broadcast",
+          type: notificationType === "announcement" ? "announcement" : "admin_broadcast",
           notificationType: notificationType,
           timestamp: new Date().toISOString(),
         },
       };
 
-      // Add image if provided
       if (imageUrl.trim()) {
         notificationData.image = imageUrl.trim();
         notificationData.pushData.image = imageUrl.trim();
       }
 
-      // Add route and media for announcements
       if (notificationType === "announcement") {
-        const selectedAnnouncementData = announcements.find(
-          (a) => a.slug === selectedAnnouncement
-        );
-        const routeSlug =
-          typeof selectedAnnouncement === "string"
-            ? selectedAnnouncement
-            : (selectedAnnouncement as any)?.current ||
-              String(selectedAnnouncement);
-        notificationData.pushData.route = `/(home)/announcements/${routeSlug}`;
-        console.log(
-          "Setting route to:",
-          notificationData.pushData.route,
-          "from selectedAnnouncement:",
-          selectedAnnouncement,
-          "routeSlug:",
-          routeSlug
-        );
-        const announcementSlug =
-          typeof selectedAnnouncement === "string"
-            ? selectedAnnouncement
-            : (selectedAnnouncement as any)?.current ||
-              String(selectedAnnouncement);
-        notificationData.pushData.announcementSlug = announcementSlug;
-        notificationData.pushData.announcementTitle =
-          selectedAnnouncementData?.title || "";
+        const selectedAnnouncementData = announcements.find((a) => a.slug === selectedAnnouncement);
+        notificationData.pushData.route = `/(home)/announcements/${selectedAnnouncement}`;
+        notificationData.pushData.announcementSlug = selectedAnnouncement;
+        notificationData.pushData.announcementTitle = selectedAnnouncementData?.title || "";
 
-        // Use the announcement's media (image or video) for the notification
         if (selectedAnnouncementData?.media) {
-          console.log(
-            "Announcement media found:",
-            selectedAnnouncementData.media
-          );
-          console.log("Media type:", selectedAnnouncementData.media.type);
-
-          if (selectedAnnouncementData.media.type === "video") {
-            console.log("Processing video announcement");
-            // Priority: resolved videoUrl > constructed from asset reference
-            let videoUrl = selectedAnnouncementData.media.videoUrl;
-
-            if (
-              !videoUrl &&
-              selectedAnnouncementData.media.video?.asset?._ref
-            ) {
-              // Construct video URL from asset reference
-              const videoAssetRef =
-                selectedAnnouncementData.media.video.asset._ref;
-              const videoId = videoAssetRef
-                .replace("file-", "")
-                .replace("-mov", "")
-                .replace("-mp4", "")
-                .replace("-webm", "");
-              videoUrl = `https://cdn.sanity.io/files/ci4uj541/production/${videoId}.mov`;
-              console.log("Constructed video URL from asset ref:", videoUrl);
-            }
-
-            if (videoUrl) {
-              console.log("Using video URL:", videoUrl);
-              notificationData.image = videoUrl;
-              notificationData.pushData.image = videoUrl;
-              notificationData.pushData.screenImage = videoUrl;
-              notificationData.pushData.mediaType = "video";
-              notificationData.pushData.videoUrl = videoUrl;
-            } else {
-              console.log(
-                "No video URL found, falling back to image if available"
-              );
-              // Fallback to image if video URL construction failed
-              if (selectedAnnouncementData.media.imageUrl) {
-                notificationData.image =
-                  selectedAnnouncementData.media.imageUrl;
-                notificationData.pushData.image =
-                  selectedAnnouncementData.media.imageUrl;
-                notificationData.pushData.screenImage =
-                  selectedAnnouncementData.media.imageUrl;
-                notificationData.pushData.mediaType = "image";
-              }
-            }
-          } else if (selectedAnnouncementData.media.type === "image") {
-            console.log("Processing image announcement");
-            // Priority: resolved imageUrl > constructed from asset reference
-            let imageUrl = selectedAnnouncementData.media.imageUrl;
-
-            if (
-              !imageUrl &&
-              selectedAnnouncementData.media.image?.asset?._ref
-            ) {
-              // Construct image URL from asset reference
-              const imageAssetRef =
-                selectedAnnouncementData.media.image.asset._ref;
-              const imageId = imageAssetRef
-                .replace("image-", "")
-                .replace("-jpg", "")
-                .replace("-png", "")
-                .replace("-webp", "");
-              imageUrl = `https://cdn.sanity.io/images/ci4uj541/production/${imageId}.jpg`;
-              console.log("Constructed image URL from asset ref:", imageUrl);
-            }
-
-            if (imageUrl) {
-              console.log("Using image URL:", imageUrl);
-              notificationData.image = imageUrl;
-              notificationData.pushData.image = imageUrl;
-              notificationData.pushData.screenImage = imageUrl;
-              notificationData.pushData.mediaType = "image";
-            }
-          } else {
-            console.log(
-              "Unknown media type:",
-              selectedAnnouncementData.media.type
-            );
-          }
-        } else {
-          console.log("No announcement media found, using fallback");
-          if (imageUrl.trim()) {
-            // Fallback to uploaded image if announcement has no media
-            notificationData.pushData.screenImage = imageUrl.trim();
+          if (selectedAnnouncementData.media.type === "video" && selectedAnnouncementData.media.videoUrl) {
+            notificationData.image = selectedAnnouncementData.media.videoUrl;
+            notificationData.pushData.image = selectedAnnouncementData.media.videoUrl;
+            notificationData.pushData.mediaType = "video";
+            notificationData.pushData.videoUrl = selectedAnnouncementData.media.videoUrl;
+          } else if (selectedAnnouncementData.media.type === "image" && selectedAnnouncementData.media.imageUrl) {
+            notificationData.image = selectedAnnouncementData.media.imageUrl;
+            notificationData.pushData.image = selectedAnnouncementData.media.imageUrl;
             notificationData.pushData.mediaType = "image";
           }
         }
       }
 
-      console.log("Sending notification with data:", notificationData);
-
-      // Try the suggested approach with mediaURL
-      const mediaURL =
-        notificationData.pushData.screenImage || notificationData.image;
-      console.log("Using mediaURL:", mediaURL);
-
-      let result;
-      // Send broadcast notification (no subID for all users)
-      result = await nativeNotifyAPI.sendNotification({
+      const mediaURL = notificationData.pushData.image || notificationData.image;
+      const result = await nativeNotifyAPI.sendNotification({
         title: notificationData.title,
         message: notificationData.message,
         mediaURL: mediaURL,
         pushData: notificationData.pushData,
       });
-      console.log("Notification result:", result);
-
-      console.log("Notification send result:", result);
 
       if (result.success) {
-        const successMessage =
-          notificationType === "announcement"
-            ? "Annonsnotifikation skickad till alla användare! Bilden kommer att visas och länka till annonssidan."
-            : "Notifikation skickad till alla användare!";
-        showAlert("Lyckades", successMessage);
+        showAlert("Framgång", "Notifikationen har skickats!");
         setTitle("");
         setMessage("");
         setImageUrl("");
         setSelectedImage(null);
-        setNotificationType("general");
         setSelectedAnnouncement("");
       } else {
-        showAlert("Fel", result.error || "Kunde inte skicka notifikation");
+        showAlert("Fel", "Kunde inte skicka: " + result.error);
       }
-    } catch (error) {
-      console.error("Error sending notification:", error);
-      showAlert("Fel", "Ett fel uppstod när notifikationen skulle skickas");
+    } catch (error: any) {
+      showAlert("Fel", "Systemfel: " + error.message);
     } finally {
       setLoading(false);
     }
   };
+
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
-      {/* Header */}
       <View className={`px-6 pt-6 pb-4 ${isDark ? "bg-dark" : "bg-light"}`}>
         <View className="flex-row items-center justify-center mb-4 relative">
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="absolute left-0 p-2"
-          >
-            <Ionicons
-              name="arrow-back"
-              size={24}
-              color={isDark ? "#fff" : "#000"}
-            />
+          <TouchableOpacity onPress={() => router.back()} className="absolute left-0 p-2">
+            <Ionicons name="arrow-back" size={24} color={isDark ? "#fff" : "#000"} />
           </TouchableOpacity>
-          <AutoText
-            className={`text-2xl font-extrabold text-center ${
-              isDark ? "text-white" : "text-gray-900"
-            }`}
-          >
-            Skicka Notifikation
+          <AutoText className={`text-2xl font-extrabold text-center ${isDark ? "text-white" : "text-gray-900"}`}>
+            Notifikationscenter
           </AutoText>
         </View>
-        <AutoText
-          className={`text-sm text-center mt-3 mx-5 ${
-            isDark ? "text-gray-400" : "text-gray-600"
-          }`}
-        >
-          Skicka notifikationer till alla användare
+        <AutoText className={`text-sm text-center mt-1 mx-5 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+          Hantera utskick och inkommande händelser
         </AutoText>
       </View>
 
-      <ScrollView
-        className={`flex-1 px-6 ${isDark ? "bg-dark" : "bg-light"}`}
-        showsVerticalScrollIndicator={false}
-      >
-        <View className="my-6">
-          {/* Notification Type Selector */}
-          <View>
-            <AutoText
-              className={`text-lg font-semibold mt-2 mb-3 ${
-                isDark ? "text-white" : "text-gray-900"
-              }`}
-            >
-              Typ av notifikation
+      <View className="flex-1 px-6">
+        <View className="flex-row mb-6 mt-2">
+          <TouchableOpacity
+            onPress={() => setActiveTab("send")}
+            className={`flex-1 py-3 items-center border-b-2 ${activeTab === "send" ? "border-blue-500" : "border-transparent"}`}
+          >
+            <AutoText className={`font-bold ${activeTab === "send" ? (isDark ? "text-white" : "text-gray-900") : "text-gray-500"}`}>
+              Skicka
             </AutoText>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              className="mb-4"
-            >
-              <View className="flex-row gap-2">
-                {(Object.keys(NOTIFICATION_TYPE_CONFIGS) as NotificationType[])
-                  .map((type) => {
-                    const config = NOTIFICATION_TYPE_CONFIGS[type];
-                    return {
-                      value: type,
-                      label: config.label,
-                      icon: config.icon,
-                    };
-                  })
-                  .map((type) => (
-                    <TouchableOpacity
-                      key={type.value}
-                      onPress={() =>
-                        setNotificationType(type.value as NotificationType)
-                      }
-                      onPressIn={() =>
-                        setNotificationType(type.value as NotificationType)
-                      }
-                      className={`flex-row items-center px-4 py-3 rounded-xl border ${
-                        notificationType === type.value
-                          ? isDark
-                            ? "border-blue-500 bg-blue-500/20"
-                            : "border-blue-500 bg-blue-50"
-                          : isDark
-                            ? "border-gray-700 bg-dark-card"
-                            : "border-gray-300 bg-white"
-                      }`}
-                    >
-                      <Ionicons
-                        name={type.icon as any}
-                        size={18}
-                        color={
-                          notificationType === type.value
-                            ? "#3B82F6"
-                            : isDark
-                              ? "#9CA3AF"
-                              : "#6B7280"
-                        }
-                        style={{ marginRight: 8 }}
-                      />
-                      <AutoText
-                        className={`text-sm font-medium ${
-                          notificationType === type.value
-                            ? "text-blue-600"
-                            : isDark
-                              ? "text-gray-300"
-                              : "text-gray-700"
-                        }`}
-                      >
-                        {type.label}
-                      </AutoText>
-                    </TouchableOpacity>
-                  ))}
-              </View>
-            </ScrollView>
-            {notificationType === "announcement" && (
-              <View className="my-3 ">
-                <AutoText
-                  className={`text-sm  mb-4 font-semibold ${isDark ? "text-amber-400" : "text-amber-600 "}`}
-                >
-                  Välj en annons att länka till
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setActiveTab("inbox")}
+            className={`flex-1 py-3 items-center border-b-2 ${activeTab === "inbox" ? "border-blue-500" : "border-transparent"}`}
+          >
+            <View className="flex-row items-center">
+              <AutoText className={`font-bold ${activeTab === "inbox" ? (isDark ? "text-white" : "text-gray-900") : "text-gray-500"}`}>
+                Inkorg
+              </AutoText>
+              {pendingItems.length > 0 && (
+                <View className="ml-2 bg-red-500 rounded-full px-1.5 py-0.5">
+                  <AutoText className="text-white text-[10px] font-bold">{pendingItems.length}</AutoText>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
+          <View className="pb-10">
+            {activeTab === "send" ? (
+              <View>
+                <AutoText className={`text-lg font-semibold mt-2 mb-3 ${isDark ? "text-white" : "text-gray-900"}`}>
+                  Typ av notifikation
                 </AutoText>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  className="mb-4"
-                >
-                  <View className="flex-row gap-3">
-                    {announcements.map((announcement, index) => (
-                      <TouchableOpacity
-                        key={`${announcement.slug}-${index}`}
-                        onPress={() =>
-                          setSelectedAnnouncement(announcement.slug)
-                        }
-                        onPressIn={() =>
-                          setSelectedAnnouncement(announcement.slug)
-                        }
-                        className={`p-3 rounded-xl border min-w-[280px] ${
-                          selectedAnnouncement === announcement.slug
-                            ? isDark
-                              ? "border-blue-500 bg-blue-500/20"
-                              : "border-blue-500 bg-blue-50"
-                            : isDark
-                              ? "border-gray-700 bg-dark-card"
-                              : "border-gray-300 bg-white"
-                        }`}
-                      >
-                        <View className="flex-row items-center">
-                          {/* Media Preview */}
-                          {announcement.media && (
-                            <View className="mr-3">
-                              {announcement.media.type === "image" &&
-                              announcement.media.imageUrl ? (
-                                <Image
-                                  source={{ uri: announcement.media.imageUrl }}
-                                  style={{
-                                    width: 60,
-                                    height: 60,
-                                    borderRadius: 8,
-                                    resizeMode: "cover",
-                                  }}
-                                />
-                              ) : announcement.media.type === "video" &&
-                                announcement.media.videoUrl ? (
-                                <>
-                                  <View className="w-[60px] h-[60px] rounded-lg overflow-hidden relative">
-                                    <View
-                                      style={{
-                                        width: 60,
-                                        height: 60,
-                                        borderRadius: 8,
-                                        borderWidth: 1,
-                                        borderColor: isDark
-                                          ? "#374151"
-                                          : "#e5e7eb",
-                                        overflow: "hidden",
-                                      }}
-                                    >
-                                      <VideoPlayer
-                                        uri={announcement.media.videoUrl}
-                                        muted
-                                        aspectRatio={1}
-                                      />
-                                    </View>
-                                  </View>
-                                </>
-                              ) : null}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
+                  <View className="flex-row gap-2">
+                    {(Object.keys(NOTIFICATION_TYPE_CONFIGS) as NotificationType[]).map((type) => {
+                      const config = NOTIFICATION_TYPE_CONFIGS[type];
+                      return (
+                        <TouchableOpacity
+                          key={type}
+                          onPress={() => setNotificationType(type)}
+                          className={`flex-row items-center px-4 py-3 rounded-xl border ${
+                            notificationType === type
+                              ? (isDark ? "border-blue-500 bg-blue-500/20" : "border-blue-500 bg-blue-50")
+                              : (isDark ? "border-gray-700 bg-dark-card" : "border-gray-300 bg-white")
+                          }`}
+                        >
+                          <Ionicons
+                            name={config.icon as any}
+                            size={20}
+                            color={notificationType === type ? "#3b82f6" : (isDark ? "#9ca3af" : "#4b5563")}
+                            style={{ marginRight: 8 }}
+                          />
+                          <AutoText className={`font-medium ${notificationType === type ? "text-blue-500" : (isDark ? "text-gray-400" : "text-gray-600")}`}>
+                            {config.label}
+                          </AutoText>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+
+                <View className="mb-4">
+                  <AutoText className={`text-base font-bold mb-2 ${isDark ? "text-gray-200" : "text-gray-800"}`}>
+                    Titel
+                  </AutoText>
+                  <Input value={title} onChangeText={setTitle} placeholder="Ange rubrik" className={`mb-1 p-4 rounded-2xl ${isDark ? "bg-white/5" : "bg-gray-100"}`} />
+                </View>
+
+                <View className="mb-4">
+                  <AutoText className={`text-base font-bold mb-2 ${isDark ? "text-gray-200" : "text-gray-800"}`}>
+                    Meddelande
+                  </AutoText>
+                  <Input value={message} onChangeText={setMessage} placeholder="Skriv ditt meddelande..." multiline numberOfLines={4} textAlignVertical="top" className={`p-4 rounded-2xl ${isDark ? "bg-white/5" : "bg-gray-100"}`} />
+                </View>
+
+                {notificationType === "announcement" && announcements.length > 0 && (
+                  <View className="mb-4">
+                    <AutoText className={`text-base font-bold mb-2 ${isDark ? "text-gray-200" : "text-gray-800"}`}>
+                      Länka till annons
+                    </AutoText>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-1">
+                      <View className="flex-row gap-4 px-1 py-1">
+                        {announcements.map((item) => (
+                          <TouchableOpacity
+                            key={item._id}
+                            onPress={() => setSelectedAnnouncement(item.slug)}
+                            className={`w-60 rounded-2xl overflow-hidden border ${
+                              selectedAnnouncement === item.slug
+                                ? "border-blue-500"
+                                : isDark ? "border-gray-700" : "border-gray-200"
+                            }`}
+                          >
+                            <View className="h-32 bg-gray-100 dark:bg-gray-800">
+                              {item.media?.imageUrl ? (
+                                <Image source={{ uri: item.media.imageUrl }} className="w-full h-full" resizeMode="cover" />
+                              ) : item.media?.thumbnailUrl ? (
+                                <Image source={{ uri: item.media.thumbnailUrl }} className="w-full h-full" resizeMode="cover" />
+                              ) : (
+                                <View className="w-full h-full items-center justify-center">
+                                  <Ionicons name="megaphone-outline" size={40} color="#ccc" />
+                                </View>
+                              )}
                             </View>
-                          )}
+                            <View className={`p-3 ${isDark ? "bg-dark-card" : "bg-white"}`}>
+                              <AutoText numberOfLines={1} className={`font-bold text-sm ${isDark ? "text-white" : "text-gray-900"}`}>
+                                {item.title}
+                              </AutoText>
+                              <AutoText className="text-xs text-gray-400 mt-1">{new Date(item._createdAt).toLocaleDateString()}</AutoText>
+                            </View>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </ScrollView>
+                  </View>
+                )}
 
-                          <View className="flex-1 mb-8 max-w-[300px] ">
-                            <AutoText
-                              className={`text-sm font-semibold mb-1  line-clamp-1 ${
-                                selectedAnnouncement === announcement.slug
-                                  ? "text-blue-600"
-                                  : isDark
-                                    ? "text-gray-300"
-                                    : "text-gray-700"
-                              }`}
-                            >
-                              {announcement.title}
-                            </AutoText>
-                            <AutoText
-                              className={`text-xs font-semibold  line-clamp-1 mr-5 ${
-                                selectedAnnouncement === announcement.slug
-                                  ? "text-blue-600"
-                                  : isDark
-                                    ? "text-gray-300"
-                                    : "text-gray-700"
-                              }`}
-                            >
-                              {announcement.message}
-                            </AutoText>
-                             
+                <View className="mb-4 mt-2">
+                  <AutoText className={`text-base font-bold mb-3 ${isDark ? "text-gray-200" : "text-gray-800"}`}>
+                    Media (Frivilligt)
+                  </AutoText>
+                  <TouchableOpacity
+                    onPress={pickImage}
+                    className={`h-48 rounded-2xl border-2 border-dashed items-center justify-center overflow-hidden ${
+                      selectedImage ? "border-blue-500" : (isDark ? "border-gray-700 bg-white/5" : "border-gray-200 bg-gray-50")
+                    }`}
+                  >
+                    {selectedImage ? (
+                      <Image source={{ uri: selectedImage }} className="w-full h-full" />
+                    ) : (
+                      <View className="items-center">
+                        <Ionicons name="cloud-upload-outline" size={40} color="#3b82f6" />
+                        <AutoText className="text-blue-500 font-semibold mt-2">Lägg till bild</AutoText>
+                        <AutoText className="text-gray-500 text-xs mt-1">Stödjer JPG, PNG, WEBP</AutoText>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity
+                  onPress={sendNotification}
+                  disabled={loading}
+                  className={`w-full p-4 rounded-xl items-center mt-4 ${isDark ? "bg-blue-600" : "bg-blue-500"} ${loading ? "opacity-50" : ""}`}
+                >
+                  <AutoText className="text-white font-semibold text-lg">
+                    {loading ? "Skickar..." : "Skicka Notifikation"}
+                  </AutoText>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View>
+                {fetchingPending ? (
+                  <View className="items-center py-20">
+                    <AutoText className={isDark ? "text-gray-400" : "text-gray-600"}>Laddar inkorg...</AutoText>
+                  </View>
+                ) : pendingItems.length === 0 ? (
+                  <View className="items-center py-20 bg-white/5 rounded-3xl border border-dashed border-gray-700">
+                    <Ionicons name="mail-open-outline" size={48} color={isDark ? "#444" : "#ccc"} />
+                    <AutoText className={`mt-4 ${isDark ? "text-gray-400" : "text-gray-600"} font-medium`}>
+                      Din inkorg är tom
+                    </AutoText>
+                  </View>
+                ) : (
+                  <View className="gap-4">
+                    <AutoText className={`text-lg font-bold mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>
+                      Väntande åtgärder
+                    </AutoText>
+                    {pendingItems.map((item) => (
+                      <TouchableOpacity
+                        key={item._id}
+                        onPress={() => {
+                          const manageType = item._type === "shippingOrder" ? "shipping-orders" : 
+                                           item._type === "taxiOrder" ? "taxi-orders" : 
+                                           item._type === "containerShippingOrder" ? "container-shipping-orders" :
+                                           item._type === "moveCleaningOrder" ? "move-clean-orders" :
+                                           "move-orders";
+                          router.push(`/(home)/profile/admin-form/${manageType}/${item._id}`);
+                        }}
+                        className={`p-4 rounded-3xl border ${isDark ? "bg-white/5 border-white/10" : "bg-white border-gray-100 shadow-sm"}`}
+                      >
+                        <View className="flex-row items-center justify-between">
+                          <View className="flex-row items-center flex-1">
+                            <View className={`w-12 h-12 rounded-2xl items-center justify-center ${
+                              item._type === 'shippingOrder' ? 'bg-blue-500/10' : 
+                              item._type === 'taxiOrder' ? 'bg-amber-500/10' : 'bg-emerald-500/10'
+                            }`}>
+                              <Ionicons 
+                                name={item._type === 'shippingOrder' ? 'cube' : item._type === 'taxiOrder' ? 'car' : 'boat'} 
+                                size={24} 
+                                color={item._type === 'shippingOrder' ? '#3b82f6' : item._type === 'taxiOrder' ? '#f59e0b' : '#10b981'} 
+                              />
+                            </View>
+                            <View className="ml-4 flex-1">
+                              <AutoText className={`font-bold text-base ${isDark ? "text-white" : "text-gray-900"}`}>
+                                {item.customerName || "Ny Order"}
+                              </AutoText>
+                              <AutoText className={`text-xs ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                                {item._type === 'shippingOrder' ? 'Sändning' : item._type === 'taxiOrder' ? 'Taxi' : 'Container'} • {new Date(item._createdAt).toLocaleDateString()}
+                              </AutoText>
+                            </View>
                           </View>
-
-                          {selectedAnnouncement === announcement.slug && (
-                            <Ionicons
-                              name="checkmark-circle"
-                              size={20}
-                              color="#3B82F6"
-                            />
-                          )}
+                          <View className="items-end">
+                            <AutoText className="text-red-500 font-bold text-sm">VÄNTAR</AutoText>
+                            {item.totalPrice && (
+                              <AutoText className={`text-xs mt-1 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                                {item.totalPrice} SEK
+                              </AutoText>
+                            )}
+                          </View>
                         </View>
                       </TouchableOpacity>
                     ))}
                   </View>
-                </ScrollView>
+                )}
               </View>
             )}
           </View>
-
-          {/* Title Input */}
-          <View>
-            <AutoText
-              className={`text-lg font-semibold mb-2 ${
-                isDark ? "text-white" : "text-gray-900"
-              }`}
-            >
-              Titel
-            </AutoText>
-            <Input
-              value={title}
-              onChangeText={setTitle}
-              placeholder="Ange notifikationstitel"
-              className={`w-full p-4 rounded-xl border mb-4 ${
-                isDark
-                  ? "border-gray-700 bg-dark-card text-white"
-                  : "border-gray-300 bg-white text-gray-900"
-              }`}
-            />
-          </View>
-
-          {/* Message Input */}
-          <View>
-            <AutoText
-              className={`text-lg font-semibold mb-2 ${
-                isDark ? "text-white" : "text-gray-900"
-              }`}
-            >
-              Meddelande
-            </AutoText>
-            <Input
-              value={message}
-              onChangeText={setMessage}
-              placeholder="Ange notifikationsmeddelande"
-              multiline
-              numberOfLines={4}
-              className={`w-full p-4 rounded-xl border mb-4 ${
-                isDark
-                  ? "border-gray-700 bg-dark-card text-white"
-                  : "border-gray-300 bg-white text-gray-900"
-              }`}
-              style={{ height: 120, textAlignVertical: "top" }}
-            />
-          </View>
-
-          {/* Image Selection */}
-          {notificationType !== "announcement" && (
-            <View>
-              <AutoText
-                className={`text-lg font-semibold mb-2 ${
-                  isDark ? "text-white" : "text-gray-900"
-                }`}
-              >
-                Bild (valfritt)
-              </AutoText>
-
-              {/* Image Picker Button */}
-              <TouchableOpacity
-                onPress={pickImage}
-                className={`w-full p-4 rounded-xl border mb-4 items-center ${
-                  isDark
-                    ? "border-gray-700 bg-dark-card"
-                    : "border-gray-300 bg-white"
-                }`}
-              >
-                <View className="flex-row items-center">
-                  <Ionicons
-                    name="image-outline"
-                    size={20}
-                    color={isDark ? "#fff" : "#666"}
-                  />
-                  <AutoText
-                    className={`ml-2 ${
-                      isDark ? "text-white" : "text-gray-900"
-                    }`}
-                  >
-                    {selectedImage ? "Ändra bild" : "Välj bild från galleri"}
-                  </AutoText>
-                </View>
-              </TouchableOpacity>
-
-              {/* Selected Image Preview */}
-              {selectedImage && (
-                <View className="mb-4">
-                  <Image
-                    source={{ uri: selectedImage }}
-                    style={{
-                      width: "100%",
-                      height: 200,
-                      borderRadius: 12,
-                      resizeMode: "cover",
-                    }}
-                  />
-                  <TouchableOpacity
-                    onPress={() => {
-                      setSelectedImage(null);
-                      setImageUrl("");
-                    }}
-                    className="absolute top-2 right-2 bg-red-500 rounded-full p-1"
-                  >
-                    <Ionicons name="close" size={16} color="white" />
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* URL Display (read-only) */}
-              {imageUrl && (
-                <View className="mb-2">
-                  <AutoText
-                    className={`text-sm font-medium mb-1 ${
-                      isDark ? "text-gray-300" : "text-gray-700"
-                    }`}
-                  >
-                    Bild-URL:
-                  </AutoText>
-                  <View
-                    className={`p-3 rounded-xl border ${
-                      isDark
-                        ? "border-gray-700 bg-dark-card"
-                        : "border-gray-300 bg-gray-50"
-                    }`}
-                  >
-                    <AutoText
-                      className={`text-xs break-all ${
-                        isDark ? "text-gray-400" : "text-gray-600"
-                      }`}
-                    >
-                      {imageUrl}
-                    </AutoText>
-                  </View>
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* Send Button */}
-          <TouchableOpacity
-            onPress={sendNotification}
-            disabled={loading}
-            className={`w-full p-4 rounded-xl items-center mt-2 ${
-              isDark ? "bg-blue-600" : "bg-blue-500"
-            } ${loading ? "opacity-50" : ""}`}
-          >
-            <AutoText className="text-white font-semibold text-lg">
-              {loading ? "Skickar..." : "Skicka Notifikation"}
-            </AutoText>
-          </TouchableOpacity>
-
-          {/* Info Section */}
-          <View
-            className={`rounded-2xl p-5 mt-5 ${
-              isDark ? "bg-dark-card" : "bg-gray-100"
-            }`}
-          >
-            <AutoText
-              className={`text-base font-semibold mb-3 ${
-                isDark ? "text-white" : "text-gray-900"
-              }`}
-            >
-              Information
-            </AutoText>
-            <AutoText
-              className={`text-xs mb-2 ${
-                isDark ? "text-gray-300" : "text-gray-600"
-              }`}
-            >
-              • Notifikationer skickas till alla registrerade användare
-            </AutoText>
-            <AutoText
-              className={`text-xs mb-2 ${
-                isDark ? "text-gray-300" : "text-gray-600"
-              }`}
-            >
-              • Användare måste ha push-notifikationer aktiverade
-            </AutoText>
-            <AutoText
-              className={`text-xs ${
-                isDark ? "text-gray-300" : "text-gray-600"
-              }`}
-            >
-              • Notifikationer visas även i appens notifikationsflöde
-            </AutoText>
-          </View>
-        </View>
-      </ScrollView>
-
+        </ScrollView>
+      </View>
       <StatusBar style={isDark ? "light" : "dark"} />
     </SafeAreaView>
   );

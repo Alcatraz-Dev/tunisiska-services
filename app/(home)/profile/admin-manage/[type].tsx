@@ -46,25 +46,25 @@ export default function AdminManageScreen() {
         return {
           title: "Användare",
           subtitle: "Hantera alla registrerade brukare",
-          query: '*[_type == "user"] | order(_createdAt desc)',
+          query: '*[_type == "users"] | order(_createdAt desc)',
           columns: [
-            { key: "userName", label: "Namn" },
-            { key: "emailAddress", label: "Email" },
+            { key: "email", label: "Email" },
+            { key: "clerkId", label: "Clerk ID" },
             { key: "isAdmin", label: "Admin", type: "status" as const },
             { key: "_createdAt", label: "Skapad", type: "date" as const },
           ],
-          searchField: "userName",
+          searchField: "email",
           canAdd: true,
         };
       case "shipping-orders":
         return {
           title: "Sändningar",
           subtitle: "Hantera logistik och frakt",
-          query: '*[_type == "shippingOrder"] { _id, "customerName": customerInfo.name, status, scheduledDateTime, totalPrice } | order(scheduledDateTime desc)',
+          query: '*[_type == "shippingOrder"] { _id, "customerName": customerInfo.name, status, scheduledDateTime, totalPrice, route } | order(scheduledDateTime desc)',
           columns: [
             { key: "customerName", label: "Kund" },
             { key: "status", label: "Status", type: "status" as const },
-            { key: "totalPrice", label: "Pris", type: "currency" as const },
+            { key: "route", label: "Rutt" },
             { key: "scheduledDateTime", label: "Datum", type: "date" as const },
           ],
           searchField: "customerName",
@@ -72,7 +72,7 @@ export default function AdminManageScreen() {
         };
       case "container-shipping-orders":
         return {
-          title: "Container Ordrar",
+          title: "Containerbokningar",
           subtitle: "Större fraktuppdrag",
           query: '*[_type == "containerShippingOrder"] { _id, "customerName": customerInfo.name, status, scheduledDateTime, totalPrice } | order(scheduledDateTime desc)',
           columns: [
@@ -88,11 +88,12 @@ export default function AdminManageScreen() {
         return {
           title: "Sändningsschema",
           subtitle: "Planera rutter och avgångar",
-          query: '*[_type == "shippingSchedule"] | order(departureDate desc)',
+          query: '*[_type == "shippingSchedule"] { _id, route, departureTime, status, isActive } | order(departureTime desc)',
           columns: [
             { key: "route", label: "Rutt" },
-            { key: "departureDate", label: "Avgång", type: "date" as const },
+            { key: "departureTime", label: "Avgång", type: "date" as const },
             { key: "status", label: "Status", type: "status" as const },
+            { key: "isActive", label: "Aktiv", type: "status" as const },
           ],
           searchField: "route",
           canAdd: true,
@@ -101,7 +102,7 @@ export default function AdminManageScreen() {
         return {
           title: "Containerschema",
           subtitle: "Båtrutter och tider",
-          query: '*[_type == "containerShippingSchedule"] | order(departureTime desc)',
+          query: '*[_type == "containerShippingSchedule"] { _id, route, departureTime, status } | order(departureTime desc)',
           columns: [
             { key: "route", label: "Rutt" },
             { key: "departureTime", label: "Avgång", type: "date" as const },
@@ -112,13 +113,13 @@ export default function AdminManageScreen() {
         };
       case "taxi-orders":
         return {
-          title: "Taxi Ordrar",
-          subtitle: "Övervaka och hantera taxibokningar",
-          query: '*[_type == "taxiOrder"] { _id, "customerName": customerInfo.name, status, scheduledDateTime, totalPrice } | order(scheduledDateTime desc)',
+          title: "Taxibokningar",
+          subtitle: "Övervaka och hantera taxiresor",
+          query: '*[_type == "taxiOrder"] { _id, "customerName": customerInfo.name, status, scheduledDateTime, pickupAddress } | order(scheduledDateTime desc)',
           columns: [
             { key: "customerName", label: "Kund" },
             { key: "status", label: "Status", type: "status" as const },
-            { key: "totalPrice", label: "Pris", type: "currency" as const },
+            { key: "pickupAddress", label: "Upphämtning" },
             { key: "scheduledDateTime", label: "Datum", type: "date" as const },
           ],
           searchField: "customerName",
@@ -126,13 +127,13 @@ export default function AdminManageScreen() {
         };
       case "move-orders":
         return {
-          title: "Flytt Ordrar",
+          title: "Flyttordrar",
           subtitle: "Hantera flyttbeställningar",
-          query: '*[_type == "moveOrder"] { _id, "customerName": customerInfo.name, status, scheduledDateTime, totalPrice } | order(scheduledDateTime desc)',
+          query: '*[_type == "moveOrder"] { _id, "customerName": customerInfo.name, status, scheduledDateTime, pickupAddress } | order(scheduledDateTime desc)',
           columns: [
             { key: "customerName", label: "Kund" },
             { key: "status", label: "Status", type: "status" as const },
-            { key: "totalPrice", label: "Pris", type: "currency" as const },
+            { key: "pickupAddress", label: "Från" },
             { key: "scheduledDateTime", label: "Datum", type: "date" as const },
           ],
           searchField: "customerName",
@@ -141,12 +142,13 @@ export default function AdminManageScreen() {
       case "move-clean-orders":
         return {
           title: "Flytt & Städ",
-          subtitle: "Flytt med städning",
+          subtitle: "Kombinerade uppdrag",
           query: '*[_type == "moveCleaningOrder"] { _id, "customerName": customerInfo.name, status, scheduledDateTime, totalPrice } | order(scheduledDateTime desc)',
           columns: [
             { key: "customerName", label: "Kund" },
             { key: "status", label: "Status", type: "status" as const },
             { key: "totalPrice", label: "Pris", type: "currency" as const },
+            { key: "scheduledDateTime", label: "Datum", type: "date" as const },
           ],
           searchField: "customerName",
           canAdd: true,
@@ -166,27 +168,28 @@ export default function AdminManageScreen() {
         };
       case "friend-requests":
         return {
-            title: "Vänförfrågningar",
-            subtitle: "Hantera nätverk",
-            query: '*[_type == "friendRequest"] { _id, "senderName": fromUser->userName, "receiverName": toUser->userName, status, _createdAt } | order(_createdAt desc)',
-            columns: [
-              { key: "senderName", label: "Från" },
-              { key: "receiverName", label: "Till" },
-              { key: "status", label: "Status", type: "status" as const },
-            ],
-            searchField: "senderName",
-            canAdd: false,
-          };
+          title: "Vänförfrågningar",
+          subtitle: "Hantera nätverk & Poäng",
+          query: '*[_type == "friendRequest"] { _id, fromUserName, toUserId, status, pointsToTransfer, _createdAt } | order(_createdAt desc)',
+          columns: [
+            { key: "fromUserName", label: "Från" },
+            { key: "toUserId", label: "Till (ID)" },
+            { key: "pointsToTransfer", label: "Poäng" },
+            { key: "status", label: "Status", type: "status" as const },
+          ],
+          searchField: "fromUserName",
+          canAdd: false,
+        };
       case "live-status":
         return {
           title: "Live Status",
           subtitle: "Systemets hälsa",
           query: '*[_type == "liveStatus"]',
           columns: [
-            { key: "service", label: "Tjänst" },
-            { key: "status", label: "Status", type: "status" as const },
+            { key: "title", label: "Titel" },
+            { key: "isActive", label: "Status", type: "status" as const },
           ],
-          searchField: "service",
+          searchField: "title",
           canAdd: true,
         };
       case "footer":
@@ -195,9 +198,11 @@ export default function AdminManageScreen() {
           subtitle: "Applikationens fot",
           query: '*[_type == "footer"]',
           columns: [
-            { key: "copyright", label: "Copyright" },
+            { key: "copyrightText", label: "Copyright" },
+            { key: "footerLinks", label: "Länkar" },
+            { key: "socialMedia", label: "Sociala Medier" },
           ],
-          searchField: "copyright",
+          searchField: "copyrightText",
           canAdd: true,
         };
       case "terms":

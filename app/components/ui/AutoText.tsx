@@ -21,9 +21,13 @@ export function AutoText({
   const translated = useTranslationText(children, language);
   const isRTL = rtlLanguages.includes(language);
   return (
-    <Text className={className} style={[style]} numberOfLines={numberOfLines}
-     ellipsizeMode={ellipsizeMode}>
-      {translated || `${children}` || children || [children]}
+    <Text
+      className={className}
+      style={[style]}
+      numberOfLines={numberOfLines}
+      ellipsizeMode={ellipsizeMode}
+    >
+      {translated || children}
     </Text>
   );
 }

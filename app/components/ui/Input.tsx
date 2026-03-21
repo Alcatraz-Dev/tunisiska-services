@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { TextInput, View, TextInputProps, TouchableOpacity, StyleSheet } from "react-native";
 import { useLanguage } from "@/app/hooks/useLanguage";
 import { useTranslationText } from "@/app/hooks/useTranslation";
+import { useTheme } from "@/app/context/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 
 const rtlLanguages = ["ar"];
@@ -24,18 +25,23 @@ export default function Input(props: InputProps) {
   const containerClasses = className.split(" ").filter(c => c.startsWith("m") || c.startsWith("p-")).join(" ");
   const inputClasses = className.split(" ").filter(c => !c.startsWith("m")).join(" ");
 
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
+
   return (
     <View className={containerClasses} style={styles.container}>
       <TextInput
         {...props}
         placeholder={placeholder}
+        placeholderTextColor={isDark ? "#9CA3AF" : "#6B7280"}
         secureTextEntry={shouldBeSecure}
         style={[
           props.style,
           {
             textAlign: isRTL ? "right" : "left",
             paddingRight: isPasswordField ? 45 : undefined,
-            marginBottom: 0, // Reset margin on input itself
+            marginBottom: 0,
+            color: isDark ? "#FFFFFF" : "#000000",
           }
         ]}
         className={inputClasses}

@@ -103,8 +103,10 @@ export const AdminDataList = ({
     }
 
     if (column.type === "status") {
-      const getStatusColor = (s: string) => {
-        switch (s?.toLowerCase()) {
+      const getStatusColor = (s: any) => {
+        const val = String(s || "").toLowerCase();
+        switch (val) {
+          case "true":
           case "confirmed":
           case "completed":
           case "active":
@@ -112,6 +114,7 @@ export const AdminDataList = ({
             return "bg-green-500/20 text-green-500";
           case "pending":
             return "bg-yellow-500/20 text-yellow-500";
+          case "false":
           case "cancelled":
           case "rejected":
             return "bg-red-500/20 text-red-500";
@@ -128,7 +131,7 @@ export const AdminDataList = ({
       return (
         <View className={`${bgClass} px-2 py-0.5 rounded-full`}>
           <AutoText className={`${textClass} text-[10px] font-black uppercase`}>
-            {value || "Unknown"}
+            {String(value)}
           </AutoText>
         </View>
       );
@@ -142,14 +145,35 @@ export const AdminDataList = ({
       );
     }
 
+    if (Array.isArray(value)) {
+      return `${value.length} objekt`;
+    }
+
     if (typeof value === "object") {
       // Try common sub-fields for Sanity objects/references
       return (
-        value.userName || value.name || value.title || value.label || "[Objekt]"
+        value.email ||
+        value.userName ||
+        value.name ||
+        value.title ||
+        value.label ||
+        value.copyrightText ||
+        "[Objekt]"
       );
     }
 
     return String(value);
+  };
+
+  const getItemTitle = (item: any) => {
+    const primaryKey = columns[0].key;
+    const value = item[primaryKey];
+    
+    if (value && typeof value === 'string') return value;
+    if (value && typeof value === 'boolean') return String(value);
+    
+    // Fallback search in item
+    return item.email || item.userName || item.name || item.title || item.clerkId || "Utan titel";
   };
 
   return (
@@ -194,54 +218,58 @@ export const AdminDataList = ({
             <View key={item._id || index} className="relative">
               <TouchableOpacity
                 onPress={() => (onItemPress ? onItemPress(item) : null)}
-                className={`mb-3 p-5 rounded-[32px] flex-row items-center justify-between shadow-sm ${isDark ? "bg-dark-card border border-white/5" : "bg-white border border-gray-100"}`}
+                className={`mb-3 p-5 rounded-[32px] shadow-sm ${isDark ? "bg-dark-card border border-white/5" : "bg-white border border-gray-100"}`}
               >
-                <View className="flex-1 mr-2">
+                <View className="flex-row items-center justify-between mb-2">
                   <AutoText
-                    className={`text-base font-black ${isDark ? "text-white" : "text-gray-900"}`}
+                    className={`text-base font-black flex-1 mr-4 ${isDark ? "text-white" : "text-gray-900"}`}
                     numberOfLines={1}
                   >
-                    {item[columns[0].key] || "Utan titel"}
+                    {getItemTitle(item)}
                   </AutoText>
 
-                  <View className="flex-row flex-wrap mt-2">
-                    {columns.slice(1).map((col, idx) => (
-                      <View
-                        key={col.key}
-                        className="flex-row items-center mr-4 mt-1"
-                      >
-                        {col.type !== "status" && (
-                          <AutoText className="text-gray-500 text-[9px] uppercase font-black mr-1 tracking-tighter">
-                            {col.label}:
-                          </AutoText>
-                        )}
-                        <AutoText
-                          className={`text-[10px] font-bold ${col.type === "status" ? "" : isDark ? "text-gray-400" : "text-gray-600"}`}
-                        >
-                          {renderValue(item, col)}
-                        </AutoText>
-                      </View>
-                    ))}
+                  <View className="flex-row items-center">
+                    <TouchableOpacity
+                      onPress={() => (onDelete ? onDelete(item) : null)}
+                      className={`w-8 h-8 rounded-full items-center justify-center mr-2 ${isDark ? "bg-red-500/10" : "bg-red-50"}`}
+                    >
+                      <Ionicons name="trash-outline" size={16} color="#ef4444" />
+                    </TouchableOpacity>
+
+                    <View
+                      className={`w-8 h-8 rounded-full items-center justify-center ${isDark ? "bg-white/5" : "bg-gray-50"}`}
+                    >
+                      <Ionicons
+                        name="chevron-forward"
+                        size={16}
+                        color={isDark ? "#3b82f6" : "#2563eb"}
+                      />
+                    </View>
                   </View>
                 </View>
 
-                <View className="flex-row items-center">
-                  <TouchableOpacity
-                    onPress={() => (onDelete ? onDelete(item) : null)}
-                    className={`w-8 h-8 rounded-full items-center justify-center mr-2 ${isDark ? "bg-red-500/10" : "bg-red-50"}`}
-                  >
-                    <Ionicons name="trash-outline" size={16} color="#ef4444" />
-                  </TouchableOpacity>
+                <View className="flex-row flex-wrap">
+                  {columns.slice(1).map((col) => {
+                    const val = renderValue(item, col);
+                    const isJSX = typeof val !== "string";
 
-                  <View
-                    className={`w-8 h-8 rounded-full items-center justify-center ${isDark ? "bg-white/5" : "bg-gray-50"}`}
-                  >
-                    <Ionicons
-                      name="chevron-forward"
-                      size={16}
-                      color={isDark ? "#3b82f6" : "#2563eb"}
-                    />
-                  </View>
+                    return (
+                      <View key={col.key} className="flex-row items-center mr-4 mt-1">
+                        {col.type !== "status" && col.type !== "image" && (
+                          <AutoText className={`${isDark ? "text-gray-400" : "text-gray-500"} text-[9px] uppercase font-black mr-1 tracking-tighter`}>
+                            {col.label}:
+                          </AutoText>
+                        )}
+                        {isJSX ? (
+                          val
+                        ) : (
+                          <AutoText className={`text-[10px] font-bold ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                            {val}
+                          </AutoText>
+                        )}
+                      </View>
+                    );
+                  })}
                 </View>
               </TouchableOpacity>
             </View>

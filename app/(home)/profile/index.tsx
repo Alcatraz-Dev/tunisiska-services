@@ -86,10 +86,10 @@ const Profile = () => {
 
   const totalReferrals = (userProfile?.referrals ?? []).length;
   const pendingReferrals = (userProfile?.referrals ?? []).filter(
-    (r) => r.status === "pending"
+    (r) => r.status === "pending",
   ).length;
   const activeReferrals = (userProfile?.referrals ?? []).filter(
-    (r) => r.status === "active" || r.status === "completed"
+    (r) => r.status === "active" || r.status === "completed",
   ).length;
 
   // Get pending friend requests count from Sanity
@@ -103,7 +103,7 @@ const Profile = () => {
         const { client } = await import("@/sanityClient");
         const pendingRequests = await client.fetch(
           `count(*[_type == "friendRequest" && toUserId == $userId && status == "pending"])`,
-          { userId: user.id }
+          { userId: user.id },
         );
         setPendingFriendRequests(pendingRequests);
       } catch (error) {
@@ -175,7 +175,7 @@ const Profile = () => {
     }
   };
   const tierColors = getTierColors(
-    userProfile?.membershipTier || "Standardmedlem"
+    userProfile?.membershipTier || "Standardmedlem",
   );
   // Load user profile data
   useEffect(() => {
@@ -190,7 +190,7 @@ const Profile = () => {
         const { client } = await import("@/sanityClient");
         userDoc = await client.fetch(
           `*[_type == "users" && clerkId == $clerkId][0]`,
-          { clerkId: user.id }
+          { clerkId: user.id },
         );
         if (userDoc?.referrals && Array.isArray(userDoc.referrals)) {
           referrals = userDoc.referrals;
@@ -217,7 +217,7 @@ const Profile = () => {
         const { client } = await import("@/sanityClient");
         const friendRequests = await client.fetch(
           `*[_type == "friendRequest" && status == "accepted" && (fromUserId == $userId || toUserId == $userId)]`,
-          { userId: user.id }
+          { userId: user.id },
         );
         friendsCount = friendRequests.length;
       } catch (error) {
@@ -272,7 +272,6 @@ const Profile = () => {
     showAlert("Kopierad", "Referenskoden har kopierats till urklipp!");
   };
 
-
   // Show loading state while user data is being fetched
   if (!isLoaded || loading) {
     return (
@@ -291,7 +290,7 @@ const Profile = () => {
 
   // Check if user signed in with Google
   const isGoogleUser = user?.externalAccounts.some(
-    (acc) => acc.provider === "google"
+    (acc) => acc.provider === "google",
   );
   const userAvatar = imageUrl || userProfile?.imageUrl;
 
@@ -528,6 +527,25 @@ const Profile = () => {
               }`}
             >
               {[
+                ...(userProfile?.isAdmin
+                  ? [
+                      {
+                        icon: icons.system,
+                        text: "Admin Dashboard",
+                        href: "/profile/admin-dashboard",
+                      },
+                      {
+                        icon: icons.bell,
+                        text: "Skicka Notifikationer",
+                        href: "/profile/admin-notifications",
+                      },
+                      {
+                        icon: icons.backup,
+                        text: "Backup Data",
+                        href: "/profile/admin-backup",
+                      },
+                    ]
+                  : []),
                 {
                   icon: icons.person,
                   text: "Personlig information",
@@ -563,25 +581,6 @@ const Profile = () => {
                   text: "Dela appen",
                   href: "/profile/sheare-app",
                 },
-                ...(userProfile?.isAdmin
-                  ? [
-                      {
-                        icon: icons.system,
-                        text: "Admin Dashboard",
-                        href: "/profile/admin-dashboard",
-                      },
-                      {
-                        icon: icons.bell,
-                        text: "Skicka Notifikationer",
-                        href: "/profile/admin-notifications",
-                      },
-                      {
-                        icon: icons.backup,
-                        text: "Backup Data",
-                        href: "/profile/admin-backup",
-                      },
-                    ]
-                  : []),
               ].map((item, index) => (
                 <TouchableOpacity
                   onPress={() =>
@@ -672,7 +671,7 @@ const Profile = () => {
                   text: "Hjälpcenter",
                   onPress: () =>
                     Linking.openURL(
-                      `https://wa.me/${process.env.EXPO_PUBLIC_SUPPORT_WHATSAPP}`
+                      `https://wa.me/${process.env.EXPO_PUBLIC_SUPPORT_WHATSAPP}`,
                     ), // byt till ditt WhatsApp-nummer
                 },
                 {

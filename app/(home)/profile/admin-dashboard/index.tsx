@@ -29,7 +29,8 @@ const StatCard = ({ title, value, icon, colors, isDark }: StatCardProps) => (
   <View
     className="mb-4"
     style={{
-      width: (width - 48 - 16) / 2, // Accounting for screen padding (24*2) and gap (16)
+      width: (width - 48 - 16) / 2,
+      // Accounting for screen padding (24*2) and gap (16)
     }}
   >
     <LinearGradient
@@ -43,6 +44,9 @@ const StatCard = ({ title, value, icon, colors, isDark }: StatCardProps) => (
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
+        borderRadius: 15,
+        paddingHorizontal: 10,
+        paddingVertical: 10,
       }}
     >
       <View className="flex-row justify-between items-center">
@@ -53,8 +57,8 @@ const StatCard = ({ title, value, icon, colors, isDark }: StatCardProps) => (
       </View>
 
       <View>
-        <AutoText className="text-white text-2xl font-bold">{value}</AutoText>
-        <AutoText className="text-white/70 text-[10px] font-semibold uppercase tracking-widest mt-1">
+        <AutoText className="text-white text-2xl font-black">{value}</AutoText>
+        <AutoText className="text-white/80 text-[11px] font-black uppercase tracking-widest mt-1">
           {title}
         </AutoText>
       </View>
@@ -91,7 +95,9 @@ const RecentOrderCard = ({
         >
           {order.customerName || "Okänd Kund"}
         </AutoText>
-        <AutoText className="text-gray-500 text-[10px] font-black mt-1 uppercase tracking-tighter">
+        <AutoText
+          className={`${isDark ? "text-gray-400" : "text-gray-500"} text-[10px] font-black mt-1 uppercase tracking-tighter`}
+        >
           {order._createdAt
             ? new Date(order._createdAt).toLocaleDateString("sv-SE", {
                 month: "short",
@@ -142,10 +148,14 @@ export default function AdminDashboard() {
     users: 0,
     shippingOrders: 0,
     taxiOrders: 0,
+    containers: 0,
+    moves: 0,
     announcements: 0,
+    friendRequests: 0,
     revenue: 0,
   });
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -154,17 +164,31 @@ export default function AdminDashboard() {
           users,
           shipping,
           taxi,
+          containers,
+          moves,
           announcements,
           totalRevenueShipping,
           totalRevenueTaxi,
+          totalRevenueContainer,
+          totalRevenueMove,
           recent,
+          pending,
+          pendingFriends,
         ] = await Promise.all([
-          client.fetch(`count(*[_type == "user"])`),
+          client.fetch(`count(*[_type == "users"])`),
           client.fetch(`count(*[_type == "shippingOrder"])`),
           client.fetch(`count(*[_type == "taxiOrder"])`),
+          client.fetch(`count(*[_type == "containerShippingOrder"])`),
+          client.fetch(
+            `count(*[_type == "moveOrder" || _type == "moveCleaningOrder"])`,
+          ),
           client.fetch(`count(*[_type == "announcement"])`),
           client.fetch(`math::sum(*[_type == "shippingOrder"].totalPrice)`),
           client.fetch(`math::sum(*[_type == "taxiOrder"].totalPrice)`),
+          client.fetch(
+            `math::sum(*[_type == "containerShippingOrder"].totalPrice)`,
+          ),
+          client.fetch(`math::sum(*[_type == "moveOrder"].totalPrice)`),
           client.fetch(`*[_type == "shippingOrder"] | order(_createdAt desc)[0...5] {
             _id,
             "customerName": customerInfo.name,
@@ -172,16 +196,28 @@ export default function AdminDashboard() {
             status,
             _createdAt
           }`),
+          client.fetch(
+            `count(*[_type in ["shippingOrder", "taxiOrder", "containerShippingOrder", "moveOrder"] && status == "PENDING"])`,
+          ),
+          client.fetch(`count(*[_type == "friendRequest" && status == "pending"])`),
         ]);
 
         setStats({
-          users,
-          shippingOrders: shipping,
-          taxiOrders: taxi,
-          announcements,
-          revenue: (totalRevenueShipping || 0) + (totalRevenueTaxi || 0),
+          users: users || 0,
+          shippingOrders: shipping || 0,
+          taxiOrders: taxi || 0,
+          containers: containers || 0,
+          moves: moves || 0,
+          announcements: announcements || 0,
+          friendRequests: pendingFriends || 0,
+          revenue:
+            (totalRevenueShipping || 0) +
+            (totalRevenueTaxi || 0) +
+            (totalRevenueContainer || 0) +
+            (totalRevenueMove || 0),
         });
         setRecentOrders(recent || []);
+        setPendingCount(pending || 0);
       } catch (error) {
         console.error("Error fetching stats:", error);
       } finally {
@@ -195,7 +231,7 @@ export default function AdminDashboard() {
   const adminActions = [
     {
       title: "Användare",
-      description: "Brukare & Rättigheter",
+      description: "Hantering & Roller",
       icon: "people",
       href: "/profile/admin-manage/users",
       color: "#3b82f6",
@@ -209,28 +245,28 @@ export default function AdminDashboard() {
     },
     {
       title: "Containers",
-      description: "Container Frakt",
+      description: "Frakt & Logistik",
       icon: "boat",
       href: "/profile/admin-manage/container-shipping-orders",
       color: "#0ea5e9",
     },
     {
       title: "Sändningsschema",
-      description: "Rutter & Planering",
+      description: "Schema & Planering",
       icon: "calendar",
       href: "/profile/admin-manage/shipping-schedules",
       color: "#ec4899",
     },
     {
       title: "Containerschema",
-      description: "Båtrutter & Planering",
+      description: "Schema & Rutter",
       icon: "time",
       href: "/profile/admin-manage/container-shipping-schedules",
       color: "#6366f1",
     },
     {
-      title: "Taxi Ordrar",
-      description: "Bokningar & Live",
+      title: "Taxibokningar",
+      description: "Resor & Drift",
       icon: "car",
       href: "/profile/admin-manage/taxi-orders",
       color: "#f59e0b",
@@ -243,7 +279,7 @@ export default function AdminDashboard() {
       color: "#f43f5e",
     },
     {
-      title: "Flytt Ordrar",
+      title: "Flyttordrar",
       description: "Flyttuppdrag",
       icon: "bus",
       href: "/profile/admin-manage/move-orders",
@@ -251,45 +287,45 @@ export default function AdminDashboard() {
     },
     {
       title: "Flytt & Städ",
-      description: "Kombinerade uppdrag",
+      description: "Kombinerade jobb",
       icon: "home",
       href: "/profile/admin-manage/move-clean-orders",
       color: "#06b6d4",
     },
     {
       title: "Vänförfrågningar",
-      description: "Anslutningar",
+      description: "Poäng & Nätverk",
       icon: "person-add",
       href: "/profile/admin-manage/friend-requests",
       color: "#6366f1",
     },
     {
-      title: "Live Status",
-      description: "Appens Driftsstatus",
+      title: "Livestatus",
+      description: "Systemets hälsa",
       icon: "pulse",
       href: "/profile/admin-manage/live-status",
       color: "#84cc16",
     },
     {
       title: "Footer",
-      description: "Footer Information",
-      icon: "list",
+      description: "Design & Copy",
+      icon: "reorder-four",
       href: "/profile/admin-manage/footer",
       color: "#64748b",
     },
     {
       title: "Användarvillkor",
-      description: "Legal Text",
+      description: "Regler & Krav",
       icon: "document-text",
       href: "/profile/admin-manage/terms",
-      color: "#475569",
+      color: "#94a3b8",
     },
     {
-      title: "Integritetspolicy",
+      title: "Policy",
       description: "GDPR & Data",
       icon: "shield-checkmark",
       href: "/profile/admin-manage/privacy",
-      color: "#334155",
+      color: "#475569",
     },
   ];
 
@@ -328,6 +364,7 @@ export default function AdminDashboard() {
           Admin Kontrollpanel
         </AutoText>
         <TouchableOpacity
+          onPress={() => router.push("/(home)/profile/admin-notifications")}
           className={`p-2 rounded-2xl ${isDark ? "bg-white/5" : "bg-gray-100"}`}
         >
           <Ionicons
@@ -335,6 +372,16 @@ export default function AdminDashboard() {
             size={20}
             color={isDark ? "#fff" : "#000"}
           />
+          {pendingCount > 0 && (
+            <View
+              className="absolute -top-1 -right-1 bg-red-500 rounded-full w-5 h-5 items-center justify-center border-2"
+              style={{ borderColor: isDark ? "#000" : "#fff" }}
+            >
+              <AutoText className="text-white text-[10px] font-bold">
+                {pendingCount > 9 ? "9+" : pendingCount}
+              </AutoText>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -354,12 +401,15 @@ export default function AdminDashboard() {
               colors={isDark ? ["#1e293b", "#0f172a"] : ["#3b82f6", "#2563eb"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              className="rounded-[40px] p-8 mb-8 mt-6 overflow-hidden relative shadow-2xl"
+              className="rounded-3xl  p-8 mb-8 mt-6 overflow-hidden relative shadow-2xl"
               style={{
                 shadowColor: isDark ? "#000" : "#3b82f6",
                 shadowOffset: { width: 0, height: 10 },
                 shadowOpacity: 0.3,
                 shadowRadius: 20,
+                borderRadius: 15,
+                padding: 15,
+                margin: 15,
               }}
             >
               <View className="absolute -right-10 -top-10 opacity-10">
@@ -389,10 +439,27 @@ export default function AdminDashboard() {
               </View>
             </LinearGradient>
 
+            {/* Live Status Overview */}
+            <TouchableOpacity 
+              onPress={() => router.push("/profile/admin-manage/live-status")}
+              className={`mb-8 p-6 mx-4 rounded-[20px] shadow-sm flex-row items-center border ${isDark ? "bg-dark-card border-white/5" : "bg-white border-gray-100"}`}
+            >
+              <View className="w-12 h-12 rounded-2xl bg-green-500/10 items-center justify-center mr-4">
+                <Ionicons name="pulse" size={24} color="#22c55e" />
+              </View>
+              <View className="flex-1">
+                <AutoText className={`text-sm font-bold uppercase tracking-widest ${isDark ? "text-gray-400" : "text-gray-500"}`}>Aktiv Status</AutoText>
+                <AutoText className={`text-base font-black mt-1 ${isDark ? "text-white" : "text-gray-900"}`} numberOfLines={1}>
+                  Systemet är aktivt och snurrar
+                </AutoText>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={isDark ? "#555" : "#ccc"} />
+            </TouchableOpacity>
+
             {/* Stats Grid */}
             <View className="flex-row flex-wrap justify-between">
               <StatCard
-                title="Brukare"
+                title="Användare"
                 value={stats.users.toString()}
                 icon="people"
                 colors={["#00d2ff", "#3a7bd5"]}
@@ -406,6 +473,13 @@ export default function AdminDashboard() {
                 isDark={isDark}
               />
               <StatCard
+                title="Containrar"
+                value={stats.containers.toString()}
+                icon="boat"
+                colors={["#0ea5e9", "#2563eb"]}
+                isDark={isDark}
+              />
+              <StatCard
                 title="Taxi"
                 value={stats.taxiOrders.toString()}
                 icon="car"
@@ -413,10 +487,17 @@ export default function AdminDashboard() {
                 isDark={isDark}
               />
               <StatCard
-                title="Annonser"
-                value={stats.announcements.toString()}
-                icon="megaphone"
-                colors={["#ed4264", "#ffedbc"]}
+                title="Flytt"
+                value={stats.moves.toString()}
+                icon="bus"
+                colors={["#10b981", "#059669"]}
+                isDark={isDark}
+              />
+              <StatCard
+                title="Vänner"
+                value={stats.friendRequests.toString()}
+                icon="person-add"
+                colors={["#6366f1", "#a855f7"]}
                 isDark={isDark}
               />
             </View>
@@ -486,12 +567,13 @@ export default function AdminDashboard() {
                     />
                   </View>
                   <AutoText
-                    className={`text-xs font-black text-center ${isDark ? "text-white" : "text-gray-900"}`}
+                    className={`text-[13px] font-black text-center px-1 ${isDark ? "text-white" : "text-gray-900"}`}
+                    numberOfLines={1}
                   >
                     {action.title}
                   </AutoText>
                   <AutoText
-                    className="text-[9px] text-gray-500 mt-1 text-center font-bold"
+                    className={`${isDark ? "text-gray-400" : "text-gray-500"} text-[9px] mt-0.5 text-center font-bold tracking-tighter`}
                     numberOfLines={1}
                   >
                     {action.description.toUpperCase()}
