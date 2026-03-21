@@ -558,6 +558,8 @@ export default function ServiceBooking({
           value={scheduledDate}
           mode="date"
           display={Platform.OS === "ios" ? "spinner" : "default"}
+          themeVariant={isDark ? "dark" : "light"}
+          textColor={isDark ? "#fff" : "#000"}
           minimumDate={new Date()}
           onChange={(_, selectedDate) => {
             setShowDatePicker(false);
@@ -589,6 +591,8 @@ export default function ServiceBooking({
           value={scheduledTime}
           mode="time"
           display={Platform.OS === "ios" ? "spinner" : "default"}
+          themeVariant={isDark ? "dark" : "light"}
+          textColor={isDark ? "#fff" : "#000"}
           onChange={(_, selectedTime) => {
             setShowTimePicker(false);
             if (selectedTime) setScheduledTime(selectedTime);

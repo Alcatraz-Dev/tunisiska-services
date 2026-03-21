@@ -206,7 +206,7 @@ export const AdminDataList = ({
         <FlatList
           data={filteredData}
           keyExtractor={(item) => item._id}
-          contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40 }}
+          contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 150 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -220,7 +220,7 @@ export const AdminDataList = ({
                 onPress={() => (onItemPress ? onItemPress(item) : null)}
                 className={`mb-3 p-5 rounded-[32px] shadow-sm ${isDark ? "bg-dark-card border border-white/5" : "bg-white border border-gray-100"}`}
               >
-                <View className="flex-row items-center justify-between mb-2">
+                <View className="flex-row items-start justify-between mb-2">
                   <AutoText
                     className={`text-base font-black flex-1 mr-4 ${isDark ? "text-white" : "text-gray-900"}`}
                     numberOfLines={1}

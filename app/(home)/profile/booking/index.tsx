@@ -328,7 +328,10 @@ export default function BookingHistoryScreen() {
   );
 
   return (
-    <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
+    <SafeAreaView 
+      edges={["top", "left", "right"]} 
+      className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}
+    >
       {/* Header */}
       <View className={`px-6 pt-6 pb-3 ${isDark ? "bg-dark" : "bg-light"}`}>
         <View className="flex-row items-center justify-center relative mb-2">
@@ -389,7 +392,7 @@ export default function BookingHistoryScreen() {
           keyExtractor={(item, index) => `${item?.id || "unknown"}-${index}`}
           renderItem={renderBooking}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 100 }}
+          contentContainerStyle={{ paddingBottom: 120 }}
           initialNumToRender={10}
           maxToRenderPerBatch={10}
           windowSize={10}

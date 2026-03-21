@@ -187,6 +187,7 @@ export default function AdminManageScreen() {
           query: '*[_type == "liveStatus"]',
           columns: [
             { key: "title", label: "Titel" },
+            { key: "statuses", label: "Meddelanden" },
             { key: "isActive", label: "Status", type: "status" as const },
           ],
           searchField: "title",

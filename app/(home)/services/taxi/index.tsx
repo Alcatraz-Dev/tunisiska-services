@@ -682,6 +682,7 @@ export default function Taxi() {
             value={date}
             mode="date"
             display={Platform.OS === "ios" ? "spinner" : "default"}
+            themeVariant={isDark ? "dark" : "light"}
             textColor={isDark ? "#fff" : "#000"} // iOS only
             onChange={handleDateChange}
           />
@@ -711,6 +712,7 @@ export default function Taxi() {
             value={time}
             mode="time"
             display={Platform.OS === "ios" ? "spinner" : "default"}
+            themeVariant={isDark ? "dark" : "light"}
             textColor={isDark ? "#fff" : "#000"} // iOS only
             onChange={handleTimeChange}
           />
@@ -803,6 +805,7 @@ export default function Taxi() {
                 value={returnDate}
                 mode="date"
                 display={Platform.OS === "ios" ? "spinner" : "default"}
+                themeVariant={isDark ? "dark" : "light"}
                 textColor={isDark ? "#fff" : "#000"}
                 onChange={handleReturnDateChange}
               />
@@ -831,6 +834,7 @@ export default function Taxi() {
                 value={returnTime}
                 mode="time"
                 display={Platform.OS === "ios" ? "spinner" : "default"}
+                themeVariant={isDark ? "dark" : "light"}
                 textColor={isDark ? "#fff" : "#000"}
                 onChange={handleReturnTimeChange}
               />

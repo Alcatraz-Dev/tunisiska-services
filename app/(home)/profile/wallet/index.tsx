@@ -317,7 +317,10 @@ export default function Wallet() {
   // No deep link handling needed for universal Stripe implementation
 
   return (
-    <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
+    <SafeAreaView 
+      edges={["top", "left", "right"]} 
+      className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}
+    >
       {/* Header */}
       <View className={`px-6 pt-6 pb-4 ${isDark ? "bg-dark" : "bg-light"}`}>
         <View className="flex-row items-center justify-center relative mb-4">

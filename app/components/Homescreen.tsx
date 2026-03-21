@@ -307,7 +307,10 @@ export default function HomePage() {
   }, [searchQuery, activeCategory]);
 
   return (
-    <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
+    <SafeAreaView 
+      edges={["top", "left", "right"]} 
+      className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}
+    >
       <SignedIn>
         <View className="flex-1">
           {/* Header */}
@@ -433,6 +436,7 @@ export default function HomePage() {
           <ScrollView
             showsVerticalScrollIndicator={false}
             className={`px-6 flex-1 ${isDark ? "bg-dark" : "bg-light"}`}
+            contentContainerStyle={{ paddingBottom: 110 }}
           >
             <AutoText
               className={`text-xl font-bold my-4 ${

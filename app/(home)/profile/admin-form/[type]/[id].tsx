@@ -11,6 +11,7 @@ import {
   Platform,
   Modal,
 } from "react-native";
+import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -176,7 +177,15 @@ export default function AdminFormScreen() {
           { name: "numberOfItems", label: "Antal föremål", type: "number" },
           { name: "numberOfPersons", label: "Antal personer", type: "number" },
           { name: "hasElevator", label: "Hiss finns", type: "boolean" },
-          { name: "itemCategories", label: "Kategorier (en per rad)", type: "array-string", multiline: true },
+          { name: "itemCategories", label: "Kategorier", type: "multi-select", options: [
+            { title: "Möbler", value: "furniture" },
+            { title: "Elektronik", value: "electronics" },
+            { title: "Lådor", value: "boxes" },
+            { title: "Kläder", value: "clothing" },
+            { title: "Skör", value: "fragile" },
+            { title: "Tunga föremål", value: "heavy_items" },
+            { title: "Vitvaror", value: "appliances" },
+          ]},
           { name: "estimatedHours", label: "Estimerade timmar", type: "number" },
           { name: "totalPrice", label: "Totalpris (SEK)", type: "number" },
           { name: "pointsUsed", label: "Poäng använda", type: "number" },
@@ -194,8 +203,25 @@ export default function AdminFormScreen() {
           { name: "numberOfItems", label: "Antal föremål", type: "number" },
           { name: "numberOfPersons", label: "Antal personer", type: "number" },
           { name: "hasElevator", label: "Hiss finns", type: "boolean" },
-          { name: "itemCategories", label: "Kategorier (en per rad)", type: "array-string", multiline: true },
-          { name: "cleaningAreas", label: "Städområden (en per rad)", type: "array-string", multiline: true },
+          { name: "itemCategories", label: "Kategorier", type: "multi-select", options: [
+            { title: "Möbler", value: "furniture" },
+            { title: "Elektronik", value: "electronics" },
+            { title: "Lådor", value: "boxes" },
+            { title: "Kläder", value: "clothing" },
+            { title: "Skör", value: "fragile" },
+            { title: "Tunga föremål", value: "heavy_items" },
+            { title: "Vitvaror", value: "appliances" },
+          ]},
+          { name: "cleaningAreas", label: "Städområden", type: "multi-select", options: [
+            { title: "Kök", value: "kitchen" },
+            { title: "Badrum", value: "bathroom" },
+            { title: "Vardagsrum", value: "living_room" },
+            { title: "Sovrum", value: "bedroom" },
+            { title: "Korridor", value: "hallway" },
+            { title: "Fönster", value: "windows" },
+            { title: "Golv", value: "floors" },
+            { title: "Hela lägenheten", value: "entire_apartment" },
+          ]},
           { name: "cleaningIntensity", label: "Städintensitet", type: "select", options: [
             { title: "Standard", value: "basic" },
             { title: "Djuprengöring", value: "deep" },
@@ -212,9 +238,15 @@ export default function AdminFormScreen() {
       case "announcements":
         return [
           { name: "title", label: "Rubrik", type: "text" },
+          { name: "slug.current", label: "Slug", type: "text" },
           { name: "message", label: "Kort text", type: "text" },
           { name: "description", label: "Lång text", type: "text", multiline: true },
+          { name: "date", label: "Datum", type: "datetime" },
+          { name: "color.hex", label: "Färg", type: "color-picker", options: [
+            "#FF6900", "#FCB900", "#7BDCB5", "#00D084", "#0693E3", "#EB144C", "#F78DA7", "#9900EF"
+          ]},
           { name: "icon", label: "Ikon (Ionicons)", type: "text" },
+          { name: "media", label: "Media (Bild/Video)", type: "media" },
           { name: "link", label: "Länk (URL)", type: "text" },
         ];
       case "shipping-schedules":
@@ -376,7 +408,70 @@ export default function AdminFormScreen() {
         }
       }
     });
+
+    // Add _type to slug if it exists
+    if (result.slug && result.slug.current) {
+      result.slug._type = "slug";
+    }
+    // Add _type to color if it exists
+    if (result.color && typeof result.color === 'object') {
+      result.color._type = "color";
+    }
+    // Set default route for slug if title exists and slug doesn't
+    if (result.title && (!result.slug || !result.slug.current)) {
+      result.slug = { _type: 'slug', current: result.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') };
+    }
+
     return result;
+  };
+
+  const pickMedia = async (fieldName: string, mediaType: 'Images' | 'Videos' | 'All') => {
+    let typeOptions = ImagePicker.MediaTypeOptions.Images;
+    if (mediaType === 'Videos') typeOptions = ImagePicker.MediaTypeOptions.Videos;
+    if (mediaType === 'All') typeOptions = ImagePicker.MediaTypeOptions.All;
+
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: typeOptions,
+      allowsEditing: mediaType === 'Images',
+      quality: 1,
+    });
+
+    if (!result.canceled) {
+      const uri = result.assets[0].uri;
+      const isVideo = result.assets[0].type === 'video';
+      
+      try {
+        setSaving(true);
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        
+        const asset = await client.assets.upload(isVideo || mediaType === 'Videos' ? 'file' : 'image', blob, {
+          filename: uri.split('/').pop() || (isVideo ? 'upload.mp4' : 'upload.jpg'),
+        });
+        
+        const reference = {
+          _type: isVideo || mediaType === 'Videos' ? 'file' : 'image',
+          asset: {
+            _type: 'reference',
+            _ref: asset._id,
+          }
+        };
+        
+        if (mediaType === 'All') {
+          let newForm = setNestedValue({ ...formData }, isVideo ? "media.video" : "media.image", reference);
+          newForm = setNestedValue(newForm, "media.type", isVideo ? "video" : "image");
+          newForm = setNestedValue(newForm, isVideo ? "media.image" : "media.video", null);
+          setFormData(newForm);
+        } else {
+          setFormData(setNestedValue({ ...formData }, fieldName, reference));
+        }
+      } catch(err: any) {
+        console.error(err);
+        Alert.alert('Fel', 'Misslyckades att ladda upp media: ' + (err.message || String(err)));
+      } finally {
+        setSaving(false);
+      }
+    }
   };
 
   const handleSave = async () => {
@@ -523,8 +618,13 @@ export default function AdminFormScreen() {
            </AutoText>
       </View>
 
-      <ScrollView className="flex-1 px-6 pt-6">
-        {schema.map((field) => (
+      <ScrollView className="flex-1 px-6 pt-6 mb-16">
+        {schema.map((field) => {
+          if (field.name === 'media.image') return null;
+          if (field.name === 'media.video') return null;
+          if (field.name === 'media.type') return null;
+
+          return (
           <View key={field.name} className="mb-6">
             <AutoText
               className={`text-sm font-bold mb-2 uppercase tracking-widest ${isDark ? "text-gray-300" : "text-gray-700"}`}
@@ -573,6 +673,32 @@ export default function AdminFormScreen() {
                 </AutoText>
                 <Ionicons name="chevron-down" size={20} color={isDark ? "#aaa" : "#666"} />
               </TouchableOpacity>
+            ) : field.type === "multi-select" ? (
+              <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+                {field.options.map((opt: any, idx: number) => {
+                  const currentValues = Array.isArray(getNestedValue(formData, field.name)) ? getNestedValue(formData, field.name) : [];
+                  const isSelected = currentValues.includes(opt.value);
+                  return (
+                    <TouchableOpacity
+                      key={idx}
+                      onPress={() => {
+                        let newVals = [...currentValues];
+                        if (isSelected) {
+                          newVals = newVals.filter((v: string) => v !== opt.value);
+                        } else {
+                          newVals.push(opt.value);
+                        }
+                        setFormData(setNestedValue({ ...formData }, field.name, newVals));
+                      }}
+                      className={`px-4 py-2 rounded-full border ${isSelected ? (isDark ? "bg-blue-500/20 border-blue-500" : "bg-blue-50 border-blue-500") : (isDark ? "bg-white/5 border-white/10" : "bg-gray-100 border-gray-200")}`}
+                    >
+                      <AutoText className={`${isSelected ? (isDark ? "text-blue-400" : "text-blue-600") : (isDark ? "text-gray-300" : "text-gray-600")}`}>
+                        {opt.title}
+                      </AutoText>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             ) : field.type === 'array-string' ? (
               <View>
                 {(Array.isArray(getNestedValue(formData, field.name)) 
@@ -618,6 +744,85 @@ export default function AdminFormScreen() {
                   <Ionicons name="add-circle-outline" size={20} color={isDark ? "#aaa" : "#666"} className="mr-2" />
                   <AutoText className={isDark ? "text-gray-400" : "text-gray-500"}>Lägg till rad</AutoText>
                 </TouchableOpacity>
+              </View>
+            ) : field.type === 'color-picker' ? (
+              <View className="flex-row flex-wrap" style={{ gap: 16 }}>
+                {field.options.map((color: string, idx: number) => {
+                  const currentHex = getNestedValue(formData, "color.hex");
+                  const isSelected = currentHex === color;
+                  return (
+                    <TouchableOpacity
+                      key={idx}
+                      onPress={() => setFormData(setNestedValue({ ...formData }, "color.hex", color))}
+                      className="w-12 h-12 rounded-full border-4 items-center justify-center shadow-sm"
+                      style={{ 
+                        backgroundColor: color, 
+                        borderColor: isSelected ? (isDark ? "#FFF" : "#000") : "transparent",
+                      }}
+                    >
+                      {isSelected && <Ionicons name="checkmark" size={24} color="#FFF" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 4 }} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ) : field.type === 'media' ? (
+              <View>
+                {(getNestedValue(formData, "media.image") || getNestedValue(formData, "media.video")) ? (
+                  <View className={`mb-3 p-5 rounded-[24px] flex-row items-center justify-between ${isDark ? "bg-dark-card border border-white/5" : "bg-white border border-gray-100"}`}>
+                    <View className="flex-row items-center flex-1">
+                      <Ionicons name={getNestedValue(formData, "media.type") === 'image' ? "image" : "videocam"} size={24} color={isDark ? "#3b82f6" : "#2563eb"} className="mr-3" />
+                      <AutoText className={`text-base font-bold flex-1 truncate ${isDark ? "text-white" : "text-gray-900"}`}>
+                        {getNestedValue(formData, "media.type") === 'image' ? "Bild uppladdad" : "Video uppladdad"}
+                      </AutoText>
+                    </View>
+                    <TouchableOpacity 
+                      onPress={() => {
+                        let newForm = setNestedValue({ ...formData }, "media.image", null);
+                        newForm = setNestedValue(newForm, "media.video", null);
+                        newForm = setNestedValue(newForm, "media.type", null);
+                        setFormData(newForm);
+                      }}
+                      className={`w-10 h-10 rounded-full items-center justify-center ${isDark ? "bg-red-500/10" : "bg-red-50"}`}
+                    >
+                      <Ionicons name="trash-outline" size={20} color="#f43f5e" />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    onPress={() => pickMedia(field.name, 'All')}
+                    disabled={saving}
+                    className={`p-6 rounded-[24px] border-2 border-dashed flex-row items-center justify-center ${isDark ? "border-white/10 bg-white/5" : "border-gray-200 bg-gray-50"}`}
+                  >
+                    <Ionicons name="cloud-upload-outline" size={24} color={isDark ? "#3b82f6" : "#2563eb"} className="mr-3" />
+                    <AutoText className={`text-base font-bold ${isDark ? "text-gray-300" : "text-gray-600"}`}>
+                      {saving ? "Laddar upp..." : "Ladda upp Bild eller Video"}
+                    </AutoText>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : field.type === 'image' || field.type === 'video' ? (
+              <View>
+                {getNestedValue(formData, field.name) ? (
+                  <View className={`mb-3 p-4 rounded-2xl flex-row items-center justify-between ${isDark ? "bg-white/5" : "bg-gray-100"}`}>
+                    <AutoText className={`truncate flex-1 mr-4 ${isDark ? "text-white" : "text-gray-900"}`}>
+                      {field.type === 'image' ? "Bild vald" : "Video vald"}
+                    </AutoText>
+                    <TouchableOpacity onPress={() => setFormData(setNestedValue({ ...formData }, field.name, undefined))}>
+                      <Ionicons name="trash" size={20} color="#f43f5e" />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    onPress={() => pickMedia(field.name, field.type === 'image' ? 'Images' : 'Videos')}
+                    disabled={saving}
+                    className={`p-4 rounded-2xl border-2 border-dashed flex-row items-center justify-center ${isDark ? "border-white/10" : "border-gray-200"}`}
+                  >
+                    <Ionicons name={field.type === 'image' ? "image-outline" : "videocam-outline"} size={20} color={isDark ? "#aaa" : "#666"} className="mr-2" />
+                    <AutoText className={isDark ? "text-gray-400" : "text-gray-500"}>
+                      {saving ? "Laddar upp..." : `Ladda upp ${field.type === 'image' ? 'Bild' : 'Video'}`}
+                    </AutoText>
+                  </TouchableOpacity>
+                )}
               </View>
             ) : field.type === 'array-object' ? (
               <View>
@@ -696,7 +901,7 @@ export default function AdminFormScreen() {
               />
             )}
           </View>
-        ))}
+        )})}
 
         <TouchableOpacity
           onPress={handleSave}
@@ -720,7 +925,7 @@ export default function AdminFormScreen() {
         </TouchableOpacity>
 
 
-        <View className="h-10" />
+        <View className="h-32" />
       </ScrollView>
 
       {showPicker && (

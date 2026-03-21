@@ -295,7 +295,10 @@ const Profile = () => {
   const userAvatar = imageUrl || userProfile?.imageUrl;
 
   return (
-    <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
+    <SafeAreaView 
+      edges={["top", "left", "right"]} 
+      className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}
+    >
       <SignedIn>
         {/* Header */}
 
@@ -329,7 +332,10 @@ const Profile = () => {
             aktivitet.
           </AutoText>
         </View>
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 120 }}
+        >
           {/* User Info Card */}
           <View className="px-6 mt-4">
             <LinearGradient
@@ -722,7 +728,7 @@ const Profile = () => {
           <View className="px-6 mt-6 mb-3">
             <SignOutButton />
           </View>
-          <View className=" items-center justify-center mb-20">
+          <View className=" items-center justify-center ">
             <AutoText
               className={`mb-2 ${isDark ? "text-zinc-700" : "text-gray-300"}`}
             >

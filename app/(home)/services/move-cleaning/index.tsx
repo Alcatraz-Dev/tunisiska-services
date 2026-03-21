@@ -510,6 +510,7 @@ export default function MoveCleaning() {
             value={date}
             mode="date"
             display={Platform.OS === "ios" ? "spinner" : "default"}
+            themeVariant={isDark ? "dark" : "light"}
             textColor={isDark ? "white" : "black"}
             minimumDate={new Date()}
             onChange={(_, selectedDate) => {
@@ -540,6 +541,7 @@ export default function MoveCleaning() {
             value={time}
             mode="time"
             display={Platform.OS === "ios" ? "spinner" : "default"}
+            themeVariant={isDark ? "dark" : "light"}
             textColor={isDark ? "white" : "black"}
             onChange={(_, selectedTime) => {
               setShowTimePicker(false);

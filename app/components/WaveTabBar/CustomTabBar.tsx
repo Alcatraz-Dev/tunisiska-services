@@ -2,6 +2,7 @@ import React from "react";
 import { View, TouchableOpacity, Text, Image, StyleSheet } from "react-native";
 import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { useTheme } from "@/app/context/ThemeContext";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   useAnimatedStyle,
   withSpring,
@@ -16,6 +17,7 @@ export function CustomTabBar({
 }: BottomTabBarProps) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
+  const insets = useSafeAreaInsets();
 
   const ACTIVE_COLOR = isDark ? "#F3F4F6" : "#2c2c2e";
   const INACTIVE_COLOR = "#9CA3AF";
@@ -28,6 +30,8 @@ export function CustomTabBar({
         {
           backgroundColor: BAR_COLOR,
           borderTopColor: isDark ? "#3f3f46" : "#e5e7eb",
+          height: 65 + (insets.bottom > 0 ? insets.bottom - 12 : 0),
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
         },
       ]}
     >
@@ -115,9 +119,7 @@ export function CustomTabBar({
 const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
-    height: 65,
     borderTopWidth: 1,
-    paddingBottom: 12,
     paddingTop: 12,
     elevation: 8,
     shadowColor: "#000",
