@@ -14,16 +14,17 @@ import { nativeNotifyAPI } from "../services/nativeNotifyApi";
 type Props = {
   setUserProfile: (data: any) => void;
   autoText?: any;
+  forceDark?: boolean;
 };
 
-export default function GoogleSignInButton({ setUserProfile }: Props) {
+export default function GoogleSignInButton({ setUserProfile, forceDark }: Props) {
   useWarmUpBrowser();
   const { user, isLoaded } = useUser();
   const { startOAuthFlow } = useOAuth({ strategy: "oauth_google" });
   const [loading, setLoading] = React.useState(false);
 
   const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === "dark";
+  const isDark = forceDark !== undefined ? forceDark : resolvedTheme === "dark";
 
   const updateUserMetadata = async (
     userId: string,

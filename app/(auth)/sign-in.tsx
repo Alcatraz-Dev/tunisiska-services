@@ -8,8 +8,6 @@ import { useState } from "react";
 import { StatusBar } from "expo-status-bar";
 import { AutoText } from "../components/ui/AutoText";
 import Input from "../components/ui/Input";
-import { LinearGradient } from "expo-linear-gradient";
-import { getPremiumGradient } from "../utils/getPremiumGradient";
 import { showAlert } from "../utils/showAlert";
 import GoogleSignInButton from "../components/GoogleSignInButton";
 
@@ -58,30 +56,20 @@ export default function SignInScreen() {
     }
   };
 
-  const inputStyle = `w-full p-4 rounded-xl border mb-4 ${isDark
-    ? "border-gray-700 bg-dark-card text-white"
-    : "border-gray-300 bg-white text-gray-900"
-    }`;
+  const inputStyle = `w-full p-4 rounded-xl border mb-4 border-gray-700 bg-dark-card text-white`;
 
-  const buttonStyle = `w-full p-4 rounded-xl items-center ${isDark ? "bg-blue-600" : "bg-blue-500"
-    }`;
+  const buttonStyle = `w-full p-4 rounded-xl items-center bg-blue-600`;
 
   const buttonTextStyle = "text-white font-semibold";
 
   return (
-    <LinearGradient
-      colors={getPremiumGradient() as [string, string]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={{ flex: 1 }}
-    >
+    <View className="flex-1 bg-dark">
       <ScrollView
         className="flex-1 px-6 pt-12"
         contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
       >
         <AutoText
-          className={`text-3xl font-bold mb-6 text-center ${isDark ? "text-white" : "text-gray-900"
-            }`}
+          className="text-3xl font-bold mb-6 text-center text-white"
         >
           Logga in
         </AutoText>
@@ -90,19 +78,21 @@ export default function SignInScreen() {
           value={emailAddress}
           onChangeText={setEmailAddress}
           placeholder="Ange e-postadress"
-          placeholderTextColor={isDark ? "gray" : "gray"}
+          placeholderTextColor="#9CA3AF"
           autoCorrect={false}
           autoCapitalize="none"
           className={inputStyle}
+          style={{ color: "#FFFFFF" }}
         />
 
         <Input
           value={password}
           onChangeText={setPassword}
           placeholder="Ange lösenord"
-          placeholderTextColor={isDark ? "gray" : "gray"}
+          placeholderTextColor="#9CA3AF"
           isPassword={true}
           className={inputStyle}
+          style={{ color: "#FFFFFF" }}
         />
 
         <TouchableOpacity
@@ -118,14 +108,14 @@ export default function SignInScreen() {
         </TouchableOpacity>
 
         <View
-          className={`flex-row justify-center my-4 border ${isDark ? "border-zinc-600" : "border-zinc-300"
-            }`}
+          className="flex-row justify-center my-4 border border-zinc-600"
         />
 
         {!userProfile ? (
           <GoogleSignInButton
             setUserProfile={setUserProfile}
             autoText={AutoText}
+            forceDark={false}
           />
         ) : (
           <View className="items-center">
@@ -144,7 +134,7 @@ export default function SignInScreen() {
         )}
 
         <View className="flex-row justify-center mt-4 gap-2">
-          <AutoText className={`${isDark ? "text-gray-400" : "text-gray-600"}`}>
+          <AutoText className="text-gray-400">
             Har du inget konto ?
           </AutoText>
           <Link href="/sign-up">
@@ -153,8 +143,8 @@ export default function SignInScreen() {
             </AutoText>
           </Link>
         </View>
-        <StatusBar style={isDark ? "light" : "dark"} />
+        <StatusBar style="light" />
       </ScrollView>
-    </LinearGradient>
+    </View>
   );
 }

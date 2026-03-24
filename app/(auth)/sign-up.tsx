@@ -8,8 +8,6 @@ import { StatusBar } from "expo-status-bar";
 import { OtpInput } from "react-native-otp-entry";
 import { AutoText } from "../components/ui/AutoText";
 import Input from "../components/ui/Input";
-import { LinearGradient } from "expo-linear-gradient";
-import { getPremiumGradient } from "../utils/getPremiumGradient";
 import { showAlert } from "../utils/showAlert";
 import GoogleSignInButton from "../components/GoogleSignInButton";
 import { nativeNotifyAPI } from "../services/nativeNotifyApi";
@@ -102,31 +100,25 @@ export default function SignUpScreen() {
     }
   };
 
-  const inputStyle = `w-full p-4 rounded-xl border mb-4 ${isDark
-    ? "border-gray-700 bg-dark-card text-white"
-    : "border-gray-300 bg-white text-gray-900"
-    }`;
+  const inputStyle = `w-full p-4 rounded-xl border mb-4 border-gray-700 bg-dark-card text-white`;
 
-  const buttonStyle = `w-full p-4 rounded-xl items-center ${isDark ? "bg-blue-600" : "bg-blue-500"
-    }`;
+  const buttonStyle = `w-full p-4 rounded-xl items-center bg-blue-600`;
 
   const buttonTextStyle = "text-white font-semibold";
 
   if (pendingVerification) {
     return (
       <View
-        className={`flex-1 justify-center px-6 ${isDark ? "bg-dark" : "bg-light"
-          }`}
+        className="flex-1 justify-center px-6 bg-dark"
       >
         {/* Header */}
         <AutoText
-          className={`text-2xl font-bold mb-4 ${isDark ? "text-white" : "text-gray-900"
-            }`}
+          className="text-2xl font-bold mb-4 text-white"
         >
           Verifiera din e-post
         </AutoText>
         <AutoText
-          className={`mb-6 ${isDark ? "text-gray-400" : "text-gray-600"}`}
+          className="mb-6 text-gray-400"
         >
           Ange koden som skickades till din e-post
         </AutoText>
@@ -135,16 +127,16 @@ export default function SignUpScreen() {
         <OtpInput
           numberOfDigits={6}
           onTextChange={setCode}
-          focusColor={isDark ? "#60A5FA" : "#3B82F6"}
+          focusColor="#60A5FA"
           theme={{
             pinCodeContainerStyle: {
-              borderColor: isDark ? "#374151" : "#D1D5DB",
-              backgroundColor: isDark ? "#1F2937" : "#F9FAFB",
+              borderColor: "#374151",
+              backgroundColor: "#1F2937",
               borderRadius: 12,
             },
             pinCodeTextStyle: {
               fontSize: 18,
-              color: isDark ? "#F9FAFB" : "#111827",
+              color: "#F9FAFB",
             },
           }}
         />
@@ -161,24 +153,19 @@ export default function SignUpScreen() {
             <AutoText className={buttonTextStyle}>Verifiera</AutoText>
           )}
         </TouchableOpacity>
+        <StatusBar style="light" />
       </View>
     );
   }
 
   return (
-    <LinearGradient
-      colors={getPremiumGradient() as [string, string]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={{ flex: 1 }}
-    >
+    <View className="flex-1 bg-dark">
       <ScrollView
         className={`flex-1 px-6 pt-12 `}
         contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
       >
         <AutoText
-          className={`text-3xl font-bold mb-6 text-center ${isDark ? "text-white" : "text-gray-900"
-            }`}
+          className="text-3xl font-bold mb-6 text-center text-white"
         >
           Skapa konto
         </AutoText>
@@ -187,18 +174,20 @@ export default function SignUpScreen() {
           value={emailAddress}
           onChangeText={setEmailAddress}
           placeholder="Ange e-postadress"
-          placeholderTextColor={isDark ? "gray" : "gray"}
+          placeholderTextColor="#9CA3AF"
           autoCapitalize="none"
           className={inputStyle}
+          style={{ color: "#FFFFFF" }}
         />
 
         <Input
           value={password}
           onChangeText={setPassword}
           placeholder="Ange lösenord"
-          placeholderTextColor={isDark ? "gray" : "gray"}
+          placeholderTextColor="#9CA3AF"
           isPassword={true}
           className={inputStyle}
+          style={{ color: "#FFFFFF" }}
         />
 
         <TouchableOpacity
@@ -213,13 +202,12 @@ export default function SignUpScreen() {
           )}
         </TouchableOpacity>
         <View
-          className={`flex-row justify-center my-4 border ${isDark ? "border-zinc-600" : "border-zinc-300"
-            }`}
+          className="flex-row justify-center my-4 border border-zinc-600"
         ></View>
         {!userProfile ? (
           <GoogleSignInButton
             setUserProfile={setUserProfile}
-          // autoText={AutoText}
+            forceDark={false}
           />
         ) : (
           <View className="items-center">
@@ -238,7 +226,7 @@ export default function SignUpScreen() {
         )}
 
         <View className="flex-row justify-center mt-4 gap-2">
-          <AutoText className={`${isDark ? "text-gray-400" : "text-gray-600"}`}>
+          <AutoText className="text-gray-400">
             Har du redan ett konto ?
           </AutoText>
           <Link href="/sign-in">
@@ -247,8 +235,8 @@ export default function SignUpScreen() {
             </AutoText>
           </Link>
         </View>
-        <StatusBar style={isDark ? "light" : "dark"} />
+        <StatusBar style="light" />
       </ScrollView>
-    </LinearGradient>
+    </View>
   );
 }

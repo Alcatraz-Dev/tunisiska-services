@@ -58,7 +58,7 @@ const HeadText = ({ text, side, image }: HeadTextProps) => {
   const getResponsiveFontSize = (
     text: string,
     maxWidth: number,
-    options = { baseFont: 20, minFont: 10, maxFont: 40 }
+    options = { baseFont: 20, minFont: 10, maxFont: 40 },
   ) => {
     if (!text) return options.baseFont;
     const charWidthRatio = 0.1;
@@ -66,7 +66,7 @@ const HeadText = ({ text, side, image }: HeadTextProps) => {
     const scaleFactor = maxWidth / estimatedTextWidth;
     return Math.max(
       options.minFont,
-      Math.min(options.maxFont, options.baseFont * scaleFactor)
+      Math.min(options.maxFont, options.baseFont * scaleFactor),
     );
   };
 
@@ -115,10 +115,8 @@ const HeadText = ({ text, side, image }: HeadTextProps) => {
             {text}
           </AutoText>
         </Animated.View>
-        
       )}
       {Boolean(text) && side === "center" && (
-        
         <Animated.View
           layout={Transition}
           onLayout={(event) => setTextWidth(event.nativeEvent.layout.width)}
@@ -219,22 +217,22 @@ export default function () {
         <HeadText
           text="Snabb"
           side="left"
-          image={require("../assets/images/one.jpg")}
+          image={require("../assets/images/welcome_fast_v2.png")}
         />
         <HeadText
           text="Trygg"
           side="right"
-          image={require("../assets/images/two.jpg")}
+          image={require("../assets/images/welcome_safe_v2.png")}
         />
         <HeadText
           text="Smart"
           side="left"
-          image={require("../assets/images/three.jpg")}
+          image={require("../assets/images/welcome_smart.png")}
         />
         <HeadText
           text="Stark"
           side="center"
-          image={require("../assets/images/four.jpg")}
+          image={require("../assets/images/welcome_strong.png")}
         />
 
         {/* Button */}

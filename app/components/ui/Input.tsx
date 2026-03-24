@@ -33,16 +33,16 @@ export default function Input(props: InputProps) {
       <TextInput
         {...props}
         placeholder={placeholder}
-        placeholderTextColor={isDark ? "#9CA3AF" : "#6B7280"}
+        placeholderTextColor={props.placeholderTextColor || (isDark ? "#9CA3AF" : "#6B7280")}
         secureTextEntry={shouldBeSecure}
         style={[
-          props.style,
           {
             textAlign: isRTL ? "right" : "left",
             paddingRight: isPasswordField ? 45 : undefined,
             marginBottom: 0,
-            color: isDark ? "#FFFFFF" : "#000000",
-          }
+            color: isDark ? "#FFFFFF" : "#111827",
+          },
+          props.style,
         ]}
         className={inputClasses}
       />
