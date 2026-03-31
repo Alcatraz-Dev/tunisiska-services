@@ -3,8 +3,6 @@ const { withNativeWind } = require('nativewind/metro');
 
 const config = getDefaultConfig(__dirname);
 
-// Fix for module resolution issues
-config.resolver.unstable_enableSymlinks = true;
-config.resolver.unstable_enablePackageExports = true;
+// Removed unstable settings as per expo-doctor advice
 
 module.exports = withNativeWind(config, { input: './app/global.css' });

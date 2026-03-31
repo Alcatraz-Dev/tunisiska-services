@@ -163,11 +163,13 @@ module.exports = {
             "Allow $(PRODUCT_NAME) to use your location.",
         },
       ],
+      "@react-native-google-signin/google-signin",
       "./plugins/withKlarnaRepo",
     ],
 
     experiments: {
       typedRoutes: true,
+      newArch: true,
     },
     extra: {
       router: {},

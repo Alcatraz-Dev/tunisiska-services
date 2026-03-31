@@ -217,22 +217,22 @@ export default function () {
         <HeadText
           text="Snabb"
           side="left"
-          image={require("../assets/images/welcome_fast_v2.png")}
+          image={require("../assets/images/welcome_fast_v2.jpg")}
         />
         <HeadText
           text="Trygg"
           side="right"
-          image={require("../assets/images/welcome_safe_v2.png")}
+          image={require("../assets/images/welcome_safe_v2.jpg")}
         />
         <HeadText
           text="Smart"
           side="left"
-          image={require("../assets/images/welcome_smart.png")}
+          image={require("../assets/images/welcome_smart.jpg")}
         />
         <HeadText
           text="Stark"
           side="center"
-          image={require("../assets/images/welcome_strong.png")}
+          image={require("../assets/images/welcome_strong.jpg")}
         />
 
         {/* Button */}
