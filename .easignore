@@ -25,5 +25,3 @@ expo-env.d.ts
 # @end expo-cli
 .vercel
 
-# Google Play service account key (sensitive - never commit)
-google-service-account.json
