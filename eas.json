@@ -22,7 +22,15 @@
       "channel": "production",
       "distribution": "store",
       "env": {
-        "APP_VARIANT": "production"
+        "APP_VARIANT": "production",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_ZXhhY3QtZG9lLTYuY2xlcmsuYWNjb3VudHMuZGV2JA",
+        "EXPO_PUBLIC_SANITY_PROJECT_ID": "ci4uj541",
+        "EXPO_PUBLIC_SANITY_DATASET": "production",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_live_51RBxpfC4Cy0OOwANyH44YXC4575IBb61dzwArC9MdhDmynSQTJ1gsLmfk8Az4SyhYiVjmyNZ3YOwHE1agKLGvajy00Py46dvKO",
+        "EXPO_PUBLIC_SERVER_URL": "https://tunisiska-services.vercel.app",
+        "EXPO_PUBLIC_SUPPORT_WHATSAPP": "+46737778737",
+        "EXPO_PUBLIC_SUPPORT_EMAIL": "tunisiska.fastfood@gmail.com",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyD15X03HjphQz3p4GLrooYrIKsBxcxW4s0"
       },
       "android": {
         "buildType": "app-bundle"
