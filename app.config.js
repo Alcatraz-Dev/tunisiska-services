@@ -60,6 +60,11 @@ module.exports = {
           },
         ],
       },
+      config: {
+        googleMaps: {
+          apiKey: "AIzaSyD15X03HjphQz3p4GLrooYrIKsBxcxW4s0",
+        },
+      },
     },
     android: {
       adaptiveIcon: {
