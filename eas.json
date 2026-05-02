@@ -49,6 +49,11 @@
         "track": "production",
         "releaseStatus": "completed",
         "changesNotSentForReview": false
+      },
+      "ios": {
+        "appleId": "dourrdourr7@gmail.com",
+        "ascAppId": "6765942795",
+        "appleTeamId": "8436MWNDM3"
       }
     },
     "preview": {
