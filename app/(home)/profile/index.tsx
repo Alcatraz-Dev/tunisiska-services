@@ -273,41 +273,49 @@ const Profile = () => {
     showAlert("Kopierad", "Referenskoden har kopierats till urklipp!");
   };
 
-  const handleDeleteAccount = async () => {
+  const handleDeleteAccount = () => {
     if (!user) return;
 
-    const confirmDelete = await showAlert(
+    showAlert(
       "Radera konto",
       "Är du säker på att du vill radera ditt konto permanent? Detta kommer att radera alla dina personuppgifter, bokningar och data. Denna åtgärd kan inte ångras.",
-      "Radera",
-      "Avbryt",
-      "destructive"
+      [
+        {
+          text: "Avbryt",
+          style: "cancel" as const,
+        },
+        {
+          text: "Radera",
+          style: "destructive" as const,
+          onPress: async () => {
+            setLoading(true);
+            try {
+              // Delete user data from Sanity first
+              const { client } = await import("@/sanityClient");
+              await client.delete(user.id);
+
+              // Delete user from Clerk
+              await user.delete();
+
+              // Sign out the user
+              await signOut();
+
+              // Navigate to the first screen (welcome/onboarding)
+              setTimeout(() => {
+                router.replace("/welcome");
+              }, 500);
+            } catch (error) {
+              console.error("Error deleting account:", error);
+              showAlert(
+                "Fel",
+                "Kunde inte radera kontot. Vänligen försök igen.",
+              );
+              setLoading(false);
+            }
+          },
+        },
+      ],
     );
-
-    if (!confirmDelete) return;
-
-    setLoading(true);
-    try {
-      // Delete user data from Sanity first
-      const { client } = await import("@/sanityClient");
-      await client.delete(user.id);
-      
-      // Delete user from Clerk
-      await user.delete();
-      
-      // Sign out the user
-      await signOut();
-      
-      // Navigate to home/onboarding
-      router.replace("/welcome");
-      
-      showAlert("Konto raderat", "Ditt konto har raderats permanent.");
-    } catch (error) {
-      console.error("Error deleting account:", error);
-      showAlert("Fel", "Kunde inte radera kontot. Vänligen försök igen.");
-    } finally {
-      setLoading(false);
-    }
   };
 
   // Show loading state while user data is being fetched
@@ -333,8 +341,8 @@ const Profile = () => {
   const userAvatar = imageUrl || userProfile?.imageUrl;
 
   return (
-    <SafeAreaView 
-      edges={["top", "left", "right"]} 
+    <SafeAreaView
+      edges={["top", "left", "right"]}
       className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}
     >
       <SignedIn>
@@ -370,7 +378,7 @@ const Profile = () => {
             aktivitet.
           </AutoText>
         </View>
-        <ScrollView 
+        <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 120 }}
         >
@@ -620,38 +628,54 @@ const Profile = () => {
                   text: "Referera vänner",
                   href: "/profile/referral-users",
                 },
-                  {
-                    icon: icons.sheare,
-                    text: "Dela appen",
-                    href: "/profile/sheare-app",
+                {
+                  icon: icons.sheare,
+                  text: "Dela appen",
+                  href: "/profile/sheare-app",
+                },
+                {
+                  icon: icons.shield,
+                  text: "Radera konto",
+                  onPress: handleDeleteAccount,
+                  style: {
+                    borderTopWidth: 1,
+                    borderTopColor: isDark ? "#374151" : "#e5e7eb",
                   },
-                  {
-                    icon: icons.shield,
-                    text: "Radera konto",
-                    onPress: handleDeleteAccount,
-                    style: { borderTopWidth: 1, borderTopColor: isDark ? "#374151" : "#e5e7eb" },
-                    textStyle: isDark ? "text-red-400" : "text-red-600",
-                  },
-                ].map((item, index) => (
+                  textStyle: isDark ? "text-red-400" : "text-red-600",
+                  iconType: "trash",
+                },
+              ].map((item, index) => (
                 <TouchableOpacity
-                  onPress={() =>
-                    router.push({
-                      pathname: item?.href as any,
-                      params: { theme: resolvedTheme },
-                    })
-                  }
+                  onPress={() => {
+                    if (item.onPress) {
+                      item.onPress();
+                    } else if (item.href) {
+                      router.push({
+                        pathname: item.href as any,
+                        params: { theme: resolvedTheme },
+                      });
+                    }
+                  }}
                   key={index}
-                  className={`flex-row items-center p-4`}
+                  className={`flex-row items-center p-4 ${item.style}`}
                 >
-                  <Image
-                    source={item.icon}
-                    className="w-5 h-5 mr-3"
-                    style={{ tintColor: isDark ? "#94a3b8" : "#64748b" }}
-                  />
+                  {item.iconType === "trash" ? (
+                    <Ionicons
+                      name="trash-outline"
+                      size={16}
+                      color={isDark ? "#ef4444" : "#dc2626"}
+                    />
+                  ) : (
+                    <Image
+                      source={item.icon}
+                      className="w-5 h-5 mr-3"
+                      style={{ tintColor: isDark ? "#94a3b8" : "#64748b" }}
+                    />
+                  )}
                   <AutoText
-                    className={`flex-1 ${
+                    className={`flex-1 ml-2 ${
                       isDark ? "text-white" : "text-gray-900"
-                    }`}
+                    } ${item.textStyle || ""}`}
                   >
                     {item.text}
                   </AutoText>
