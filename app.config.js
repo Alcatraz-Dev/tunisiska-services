@@ -34,7 +34,12 @@ module.exports = {
           : IS_PREVIEW
             ? "Tunisiska Mega Preview"
             : "Tunis Mega",
-        UIBackgroundModes: ["remote-notification"],
+         UIBackgroundModes: ["remote-notification"],
+         // Photo library permission for media uploads
+         NSPhotoLibraryUsageDescription:
+           "This app needs access to your photo library so you can upload photos of your shipments, damaged packages, or other items related to your service bookings. For example, you may need to attach a photo to prove the condition of a package during a shipping dispute.",
+         // Sign in with Apple for privacy-focused authentication
+         ASAuthorizationAppleIDProvider: true,
         UNUserNotificationCenter: {
           UNAuthorizationStatusAuthorized: true,
         },
@@ -123,7 +128,7 @@ module.exports = {
       [
         "expo-video",
         {
-          supportsBackgroundPlayback: true,
+          supportsBackgroundPlayback: false,
           supportsPictureInPicture: true,
         },
       ],
@@ -146,7 +151,6 @@ module.exports = {
           icon: "./app/assets/expo-icons/icon.png",
           color: "#ffffff",
           defaultChannel: "default",
-          sounds: ["./app/assets/sounds/notification.wav"],
           enableBackgroundRemoteNotifications: true,
           iosDisplayInForeground: true,
           mode: IS_DEV ? "development" : "production",
@@ -170,6 +174,7 @@ module.exports = {
       ],
       "@react-native-google-signin/google-signin",
       "./plugins/withKlarnaRepo",
+      "./plugins/withAudioBackgroundFix",
     ],
 
     experiments: {

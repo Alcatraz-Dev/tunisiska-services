@@ -10,6 +10,7 @@ import { AutoText } from "../components/ui/AutoText";
 import Input from "../components/ui/Input";
 import { showAlert } from "../utils/showAlert";
 import GoogleSignInButton from "../components/GoogleSignInButton";
+import AppleSignInButton from "../components/AppleSignInButton";
 
 export default function SignInScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
@@ -112,11 +113,18 @@ export default function SignInScreen() {
         />
 
         {!userProfile ? (
-          <GoogleSignInButton
-            setUserProfile={setUserProfile}
-            autoText={AutoText}
-            forceDark={false}
-          />
+          <>
+            <GoogleSignInButton
+              setUserProfile={setUserProfile}
+              autoText={AutoText}
+              forceDark={false}
+            />
+            <View className="h-3" />
+            <AppleSignInButton
+              setUserProfile={setUserProfile}
+              forceDark={false}
+            />
+          </>
         ) : (
           <View className="items-center">
             <Image

@@ -10,6 +10,7 @@ import { AutoText } from "../components/ui/AutoText";
 import Input from "../components/ui/Input";
 import { showAlert } from "../utils/showAlert";
 import GoogleSignInButton from "../components/GoogleSignInButton";
+import AppleSignInButton from "../components/AppleSignInButton";
 import { nativeNotifyAPI } from "../services/nativeNotifyApi";
 import { useUser } from "@clerk/clerk-expo";
 
@@ -205,10 +206,17 @@ export default function SignUpScreen() {
           className="flex-row justify-center my-4 border border-zinc-600"
         ></View>
         {!userProfile ? (
-          <GoogleSignInButton
-            setUserProfile={setUserProfile}
-            forceDark={false}
-          />
+          <>
+            <GoogleSignInButton
+              setUserProfile={setUserProfile}
+              forceDark={false}
+            />
+            <View className="h-3" />
+            <AppleSignInButton
+              setUserProfile={setUserProfile}
+              forceDark={false}
+            />
+          </>
         ) : (
           <View className="items-center">
             <Image
