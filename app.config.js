@@ -29,12 +29,11 @@ module.exports = {
           ? "com.alcatrazdev.tunisiskaservices.preview"
           : "com.alcatrazdev.tunisiskaservices",
       infoPlist: {
-        CFBundleDisplayName: IS_DEV
-          ? "Tunisiska Mega Dev"
-          : IS_PREVIEW
-            ? "Tunisiska Mega Preview"
-            : "Tunis Mega",
-         UIBackgroundModes: ["remote-notification"],
+         CFBundleDisplayName: IS_DEV
+           ? "Tunisiska Mega Dev"
+           : IS_PREVIEW
+             ? "Tunisiska Mega Preview"
+             : "Tunis Mega",
          // Photo library permission for media uploads
          NSPhotoLibraryUsageDescription:
            "This app needs access to your photo library so you can upload photos of your shipments, damaged packages, or other items related to your service bookings. For example, you may need to attach a photo to prove the condition of a package during a shipping dispute.",
@@ -174,7 +173,6 @@ module.exports = {
       ],
       "@react-native-google-signin/google-signin",
       "./plugins/withKlarnaRepo",
-      "./plugins/withAudioBackgroundFix",
     ],
 
     experiments: {

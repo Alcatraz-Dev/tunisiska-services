@@ -5,7 +5,7 @@ import { AutoText } from "@/app/components/ui/AutoText";
 import icons from "@/app/constants/icons";
 import { getPremiumGradient } from "@/app/utils/getPremiumGradient";
 import { showAlert } from "@/app/utils/showAlert";
-import { SignedIn, useUser } from "@clerk/clerk-expo";
+import { SignedIn, useUser, useAuth } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import * as Application from "expo-application";
 import { LinearGradient } from "expo-linear-gradient";
@@ -66,6 +66,7 @@ interface UserProfileData {
 
 const Profile = () => {
   const { isLoaded, user } = useUser();
+  const { signOut } = useAuth();
   const { resolvedTheme } = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [referralCode, setReferralCode] = useState("");
@@ -270,6 +271,43 @@ const Profile = () => {
 
   const copyToClipboard = () => {
     showAlert("Kopierad", "Referenskoden har kopierats till urklipp!");
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!user) return;
+
+    const confirmDelete = await showAlert(
+      "Radera konto",
+      "Är du säker på att du vill radera ditt konto permanent? Detta kommer att radera alla dina personuppgifter, bokningar och data. Denna åtgärd kan inte ångras.",
+      "Radera",
+      "Avbryt",
+      "destructive"
+    );
+
+    if (!confirmDelete) return;
+
+    setLoading(true);
+    try {
+      // Delete user data from Sanity first
+      const { client } = await import("@/sanityClient");
+      await client.delete(user.id);
+      
+      // Delete user from Clerk
+      await user.delete();
+      
+      // Sign out the user
+      await signOut();
+      
+      // Navigate to home/onboarding
+      router.replace("/welcome");
+      
+      showAlert("Konto raderat", "Ditt konto har raderats permanent.");
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      showAlert("Fel", "Kunde inte radera kontot. Vänligen försök igen.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Show loading state while user data is being fetched
@@ -582,12 +620,19 @@ const Profile = () => {
                   text: "Referera vänner",
                   href: "/profile/referral-users",
                 },
-                {
-                  icon: icons.sheare,
-                  text: "Dela appen",
-                  href: "/profile/sheare-app",
-                },
-              ].map((item, index) => (
+                  {
+                    icon: icons.sheare,
+                    text: "Dela appen",
+                    href: "/profile/sheare-app",
+                  },
+                  {
+                    icon: icons.shield,
+                    text: "Radera konto",
+                    onPress: handleDeleteAccount,
+                    style: { borderTopWidth: 1, borderTopColor: isDark ? "#374151" : "#e5e7eb" },
+                    textStyle: isDark ? "text-red-400" : "text-red-600",
+                  },
+                ].map((item, index) => (
                 <TouchableOpacity
                   onPress={() =>
                     router.push({
