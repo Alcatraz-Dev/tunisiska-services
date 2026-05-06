@@ -73,8 +73,8 @@
     "node-fetch": "^3.3.2",
     "pako": "^2.1.0",
     "prettier-plugin-tailwindcss": "^0.5.14",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
     "react-i18next": "^15.7.3",
     "react-native": "0.81.5",
     "react-native-autoscroll-flatlist": "^1.11.2",
@@ -109,8 +109,9 @@
     "typescript": "~5.9.2"
   },
   "overrides": {
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
+    "@clerk/shared": "3.47.5",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-autoscroll-flatlist": {
       "react": "$react",
