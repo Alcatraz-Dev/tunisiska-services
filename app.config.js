@@ -23,6 +23,7 @@ module.exports = {
     },
     ios: {
       supportsTablet: true,
+      requireFullScreen: true,
       bundleIdentifier: IS_DEV
         ? "com.alcatrazdev.tunisiskaservices.dev"
         : IS_PREVIEW
