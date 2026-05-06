@@ -8,6 +8,7 @@ module.exports = function (api) {
     ],
     plugins: [
       require.resolve("react-native-worklets/plugin"),
+      "react-native-reanimated/plugin",
     ],
   };
 };
