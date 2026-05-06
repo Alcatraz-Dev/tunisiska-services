@@ -10,6 +10,11 @@ function removeAudioBackgroundMode(config) {
         config.modResults.Plist.UIBackgroundModes.filter(
           mode => mode !== "audio" && mode !== "Audio"
         );
+      
+      // Remove UIBackgroundModes entirely if the array is empty
+      if (config.modResults.Plist.UIBackgroundModes.length === 0) {
+        delete config.modResults.Plist.UIBackgroundModes;
+      }
     }
     return config;
   });
