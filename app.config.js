@@ -128,7 +128,7 @@ module.exports = {
         "expo-video",
         {
           supportsBackgroundPlayback: false,
-          supportsPictureInPicture: true,
+          supportsPictureInPicture: false,
         },
       ],
       [
@@ -150,7 +150,7 @@ module.exports = {
           icon: "./app/assets/expo-icons/icon.png",
           color: "#ffffff",
           defaultChannel: "default",
-          enableBackgroundRemoteNotifications: true,
+          enableBackgroundRemoteNotifications: false,
           iosDisplayInForeground: true,
           mode: IS_DEV ? "development" : "production",
           ios: {
