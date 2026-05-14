@@ -12,7 +12,7 @@ module.exports = {
     display: "standalone",
     description:
       "Tunisiska Mega Service is a mobile app for booking and managing services.",
-    version: "1.0.0",
+    version: "1.0.1",
     orientation: "portrait",
     icon: "./app/assets/expo-icons/icon.png",
     userInterfaceStyle: "automatic",
