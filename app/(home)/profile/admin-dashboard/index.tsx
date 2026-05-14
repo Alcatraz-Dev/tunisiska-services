@@ -167,10 +167,7 @@ export default function AdminDashboard() {
           containers,
           moves,
           announcements,
-          totalRevenueShipping,
-          totalRevenueTaxi,
-          totalRevenueContainer,
-          totalRevenueMove,
+          totalRevenue,
           recent,
           pending,
           pendingFriends,
@@ -183,12 +180,7 @@ export default function AdminDashboard() {
             `count(*[_type == "moveOrder" || _type == "moveCleaningOrder"])`,
           ),
           client.fetch(`count(*[_type == "announcement"])`),
-          client.fetch(`math::sum(*[_type == "shippingOrder"].totalPrice)`),
-          client.fetch(`math::sum(*[_type == "taxiOrder"].totalPrice)`),
-          client.fetch(
-            `math::sum(*[_type == "containerShippingOrder"].totalPrice)`,
-          ),
-          client.fetch(`math::sum(*[_type == "moveOrder"].totalPrice)`),
+          client.fetch(`coalesce(math::sum(*[_type in ["shippingOrder", "taxiOrder", "containerShippingOrder", "moveOrder", "moveCleaningOrder"] && status == "completed"].totalPrice), 0)`),
           client.fetch(`*[_type == "shippingOrder"] | order(_createdAt desc)[0...5] {
             _id,
             "customerName": customerInfo.name,
@@ -197,7 +189,7 @@ export default function AdminDashboard() {
             _createdAt
           }`),
           client.fetch(
-            `count(*[_type in ["shippingOrder", "taxiOrder", "containerShippingOrder", "moveOrder"] && status == "PENDING"])`,
+            `count(*[_type in ["shippingOrder", "taxiOrder", "containerShippingOrder", "moveOrder", "moveCleaningOrder"] && status == "pending"])`,
           ),
           client.fetch(
             `count(*[_type == "friendRequest" && status == "pending"])`,
@@ -212,11 +204,7 @@ export default function AdminDashboard() {
           moves: moves || 0,
           announcements: announcements || 0,
           friendRequests: pendingFriends || 0,
-          revenue:
-            (totalRevenueShipping || 0) +
-            (totalRevenueTaxi || 0) +
-            (totalRevenueContainer || 0) +
-            (totalRevenueMove || 0),
+          revenue: totalRevenue || 0,
         });
         setRecentOrders(recent || []);
         setPendingCount(pending || 0);
@@ -235,106 +223,106 @@ export default function AdminDashboard() {
       title: "Användare",
       description: "Hantering & Roller",
       icon: "people",
-      href: "/profile/admin-manage/users",
+      href: "/profile/admin-manage?type=users",
       color: "#3b82f6",
     },
     {
       title: "Sändningar",
       description: "Logistik & Frakt",
       icon: "cube",
-      href: "/profile/admin-manage/shipping-orders",
+      href: "/profile/admin-manage?type=shipping-orders",
       color: "#8b5cf6",
     },
     {
       title: "Containers",
       description: "Frakt & Logistik",
       icon: "boat",
-      href: "/profile/admin-manage/container-shipping-orders",
+      href: "/profile/admin-manage?type=container-shipping-orders",
       color: "#0ea5e9",
     },
     {
       title: "Sändningsschema",
       description: "Schema & Planering",
       icon: "calendar",
-      href: "/profile/admin-manage/shipping-schedules",
+      href: "/profile/admin-manage?type=shipping-schedules",
       color: "#ec4899",
     },
     {
-      title: "Containerschema",
-      description: "Schema & Rutter",
+      title: "Container Schema",
+      description: "Båtrutter & Tider",
       icon: "time",
-      href: "/profile/admin-manage/container-shipping-schedules",
+      href: "/profile/admin-manage?type=container-shipping-schedules",
       color: "#6366f1",
     },
     {
       title: "Taxibokningar",
       description: "Resor & Drift",
       icon: "car",
-      href: "/profile/admin-manage/taxi-orders",
+      href: "/profile/admin-manage?type=taxi-orders",
       color: "#f59e0b",
-    },
-    {
-      title: "Annonser",
-      description: "Push & Kampanjer",
-      icon: "megaphone",
-      href: "/profile/admin-manage/announcements",
-      color: "#f43f5e",
-    },
-    {
-      title: "Notifikations Historik",
-      description: "Tidigare skickade",
-      icon: "notifications",
-      href: "/profile/admin-history",
-      color: "#8b5cf6",
     },
     {
       title: "Flyttordrar",
       description: "Flyttuppdrag",
       icon: "bus",
-      href: "/profile/admin-manage/move-orders",
+      href: "/profile/admin-manage?type=move-orders",
       color: "#10b981",
     },
     {
       title: "Flytt & Städ",
       description: "Kombinerade jobb",
       icon: "home",
-      href: "/profile/admin-manage/move-clean-orders",
+      href: "/profile/admin-manage?type=move-clean-orders",
       color: "#06b6d4",
+    },
+    {
+      title: "Annonser",
+      description: "Push & Kampanjer",
+      icon: "megaphone",
+      href: "/profile/admin-manage?type=announcements",
+      color: "#f43f5e",
     },
     {
       title: "Vänförfrågningar",
       description: "Poäng & Nätverk",
       icon: "person-add",
-      href: "/profile/admin-manage/friend-requests",
+      href: "/profile/admin-manage?type=friend-requests",
       color: "#6366f1",
     },
     {
-      title: "Livestatus",
+      title: "Live Status",
       description: "Systemets hälsa",
       icon: "pulse",
-      href: "/profile/admin-manage/live-status",
+      href: "/profile/admin-manage?type=live-status",
       color: "#84cc16",
     },
     {
       title: "Footer",
       description: "Design & Copy",
       icon: "reorder-four",
-      href: "/profile/admin-manage/footer",
+      href: "/profile/admin-manage?type=footer",
       color: "#64748b",
     },
     {
       title: "Användarvillkor",
       description: "Regler & Krav",
       icon: "document-text",
-      href: "/profile/admin-manage/terms",
+      href: "/profile/admin-manage?type=terms",
       color: "#94a3b8",
     },
     {
-      title: "Policy",
+      title: "Integritetspolicy",
       description: "GDPR & Data",
       icon: "shield-checkmark",
-      href: "/profile/admin-manage/privacy",
+      href: "/profile/admin-manage?type=privacy",
       color: "#475569",
+    },
+    {
+      title: "Notifikationer",
+      description: "Notifikationshistorik",
+      icon: "notifications",
+      href: "/profile/admin-manage?type=notification-history",
+      color: "#8b5cf6",
     },
   ];
 
@@ -425,7 +413,7 @@ export default function AdminDashboard() {
                 <Ionicons name="stats-chart" size={240} color="white" />
               </View>
               <AutoText className="text-white/60 text-[10px] font-black uppercase tracking-[3px]">
-                Total Intäkt (30d)
+                Total Intäkt
               </AutoText>
               <View className="flex-row items-baseline mt-2">
                 <AutoText className="text-white text-5xl font-black">
@@ -433,17 +421,6 @@ export default function AdminDashboard() {
                 </AutoText>
                 <AutoText className="text-white/80 text-xl font-bold ml-2">
                   SEK
-                </AutoText>
-              </View>
-
-              <View className="flex-row items-center mt-6 bg-white/10 self-start px-3 py-1.5 rounded-2xl border border-white/20">
-                <Ionicons name="trending-up" size={14} color="#4ade80" />
-                <AutoText className="text-green-400 text-xs font-black ml-1">
-                  +12.5%
-                </AutoText>
-                <View className="w-1 h-1 bg-white/40 rounded-full mx-2" />
-                <AutoText className="text-white/60 text-[10px] font-bold">
-                  ÖKNING
                 </AutoText>
               </View>
             </LinearGradient>

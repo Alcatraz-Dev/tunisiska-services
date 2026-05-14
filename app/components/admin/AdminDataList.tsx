@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   FlatList,
@@ -29,6 +29,7 @@ interface AdminDataListProps {
   onEdit?: (item: any) => void;
   onDelete?: (item: any) => void;
   searchField?: string;
+  refreshKey?: number;
 }
 
 export const AdminDataList = ({
@@ -40,6 +41,7 @@ export const AdminDataList = ({
   onEdit,
   onDelete,
   searchField,
+  refreshKey = 0,
 }: AdminDataListProps) => {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
@@ -48,14 +50,21 @@ export const AdminDataList = ({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   const fetchData = async () => {
     try {
       setLoading(true);
+      setError(null);
+      console.log(`[AdminDataList] Fetching: ${title}`);
+      console.log(`[AdminDataList] Query: ${query}`);
       const result = await client.fetch(query, params);
+      console.log(`[AdminDataList] Result length: ${result?.length || 0}`);
+      console.log(`[AdminDataList] First item:`, result?.[0] || 'none');
       setData(result || []);
-    } catch (error) {
-      console.error(`Error fetching admin data for ${title}:`, error);
+    } catch (error: any) {
+      console.error(`[AdminDataList] Error fetching ${title}:`, error);
+      setError(error.message || "Kunde inte hämta data");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -64,23 +73,20 @@ export const AdminDataList = ({
 
   useEffect(() => {
     fetchData();
-  }, [query]);
+  }, [query, JSON.stringify(params), refreshKey]);
 
   const onRefresh = () => {
     setRefreshing(true);
     fetchData();
   };
 
-  const filteredData =
-    searchTerm && searchField
-      ? data.filter((item) => {
-          const value = item[searchField];
-          return (
-            value &&
-            String(value).toLowerCase().includes(searchTerm.toLowerCase())
-          );
-        })
-      : data;
+  const filteredData = useMemo(() => {
+    if (!searchTerm || !searchField) return data;
+    return data.filter((item) => {
+      const value = item[searchField];
+      return value && String(value).toLowerCase().includes(searchTerm.toLowerCase());
+    });
+  }, [data, searchTerm, searchField]);
 
   const renderValue = (item: any, column: Column) => {
     const value = item[column.key];
@@ -166,14 +172,17 @@ export const AdminDataList = ({
   };
 
   const getItemTitle = (item: any) => {
-    const primaryKey = columns[0].key;
+    const primaryKey = columns[0]?.key;
     const value = item[primaryKey];
     
     if (value && typeof value === 'string') return value;
     if (value && typeof value === 'boolean') return String(value);
     
-    // Fallback search in item
-    return item.email || item.userName || item.name || item.title || item.clerkId || "Utan titel";
+    return item.email || item.userName || item.name || item.title || item.clerkId || item._id || "Utan titel";
+  };
+
+  const getItemId = (item: any, index: number): string => {
+    return item._id || item.id || `item-${index}-${Date.now()}`;
   };
 
   return (
@@ -201,11 +210,38 @@ export const AdminDataList = ({
       {loading && !refreshing ? (
         <View className="flex-1 justify-center items-center py-20">
           <ActivityIndicator color="#3b82f6" />
+          <AutoText className="text-gray-500 mt-4">Laddar {title.toLowerCase()}...</AutoText>
+        </View>
+      ) : error ? (
+        <View className="flex-1 justify-center items-center py-20 px-8">
+          <Ionicons name="warning-outline" size={48} color="#ef4444" />
+          <AutoText className="text-red-500 mt-4 text-center font-bold">Fel vid hämtning</AutoText>
+          <AutoText className="text-gray-500 mt-2 text-center text-xs">{error}</AutoText>
+          <TouchableOpacity 
+            onPress={onRefresh}
+            className="mt-4 px-6 py-3 bg-primary/10 rounded-2xl"
+          >
+            <AutoText className="text-primary font-bold">Försök igen</AutoText>
+          </TouchableOpacity>
+        </View>
+      ) : data.length === 0 ? (
+        <View className="flex-1 justify-center items-center py-20">
+          <Ionicons
+            name="folder-open-outline"
+            size={48}
+            color={isDark ? "#1e293b" : "#cbd5e1"}
+          />
+          <AutoText className="text-gray-500 mt-4 text-center">
+            Inga {title.toLowerCase()} hittades
+          </AutoText>
+          <AutoText className={`${isDark ? "text-gray-600" : "text-gray-400"} mt-2 text-xs text-center px-8`}>
+            Tryck på + för att lägga till ny {title.toLowerCase()}
+          </AutoText>
         </View>
       ) : (
         <FlatList
           data={filteredData}
-          keyExtractor={(item) => item._id}
+          keyExtractor={(item, index) => getItemId(item, index)}
           contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 150 }}
           refreshControl={
             <RefreshControl
@@ -215,7 +251,7 @@ export const AdminDataList = ({
             />
           }
           renderItem={({ item, index }) => (
-            <View key={item._id || index} className="relative">
+            <View key={getItemId(item, index)} className="relative">
               <TouchableOpacity
                 onPress={() => (onItemPress ? onItemPress(item) : null)}
                 className={`mb-3 p-5 rounded-[32px] shadow-sm ${isDark ? "bg-dark-card border border-white/5" : "bg-white border border-gray-100"}`}
@@ -274,18 +310,6 @@ export const AdminDataList = ({
               </TouchableOpacity>
             </View>
           )}
-          ListEmptyComponent={
-            <View className="py-20 items-center">
-              <Ionicons
-                name="folder-open-outline"
-                size={48}
-                color={isDark ? "#1e293b" : "#cbd5e1"}
-              />
-              <AutoText className="text-gray-500 mt-4 text-center">
-                Inga data hittades
-              </AutoText>
-            </View>
-          }
         />
       )}
     </View>

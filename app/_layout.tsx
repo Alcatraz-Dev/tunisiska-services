@@ -78,7 +78,9 @@ export default function RootLayout() {
             <SafeAreaProvider>
               <PushBootstrap />
               <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="(tabs)" />
                 <Stack.Screen name="(home)" />
+                <Stack.Screen name="(auth)" />
                 <Stack.Screen name="+not-found" />
               </Stack>
             </SafeAreaProvider>
