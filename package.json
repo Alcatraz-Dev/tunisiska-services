@@ -1,7 +1,7 @@
 {
   "name": "clerk-expo-quickstart",
   "main": "expo-router/entry",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "scripts": {
     "start": "concurrently \"npm run dev\" \"npm run server\"",
     "dev": "expo start",
