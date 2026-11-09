@@ -8,9 +8,22 @@ npm-debug.*
 # Native build folders (Managed workflow handles these via prebuild)
 /ios
 /android
+android_backup/
 
-# Assets not needed for build
-studio-tunisiska-services
+# Assets & non-app content not needed for build
+studio-tunisiska-services/
+video-production/
+.pandaos/
+.kombai/
+.agents/
+.claude/
+.codex/
+.upgrade-preflight/
+web/
+docs/
+workplans/
+*.md
+find_text.py
 *.jks
 *.p8
 *.p12
