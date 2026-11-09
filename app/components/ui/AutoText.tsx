@@ -1,9 +1,20 @@
 import React from "react";
-import { Text } from "react-native";
+import { Text, type StyleProp, type TextStyle } from "react-native";
 import { useTranslationText } from "../../hooks/useTranslation";
 import { useLanguage } from "../../hooks/useLanguage";
 
-const rtlLanguages = ["ar"];
+function getPlainText(children: React.ReactNode): string | null {
+  if (typeof children === "string" || typeof children === "number") {
+    return String(children);
+  }
+  if (children == null || typeof children === "boolean") return "";
+  if (Array.isArray(children)) {
+    const parts = children.map(getPlainText);
+    return parts.some((part) => part === null) ? null : parts.join("");
+  }
+  return null;
+}
+
 export function AutoText({
   children,
   className,
@@ -11,23 +22,23 @@ export function AutoText({
   numberOfLines,
   ellipsizeMode
 }: {
-  children: any;
+  children: React.ReactNode;
   className?: string;
-  style?: object;
+  style?: StyleProp<TextStyle>;
   numberOfLines?: number;
   ellipsizeMode?: any;
 }) {
   const { language } = useLanguage(); // must be updated
-  const translated = useTranslationText(children, language);
-  const isRTL = rtlLanguages.includes(language);
+  const plainText = getPlainText(children);
+  const translated = useTranslationText(plainText ?? "", language);
   return (
     <Text
       className={className}
-      style={[style]}
+      style={style}
       numberOfLines={numberOfLines}
       ellipsizeMode={ellipsizeMode}
     >
-      {translated || children}
+      {plainText !== null && plainText ? translated || plainText : children}
     </Text>
   );
 }

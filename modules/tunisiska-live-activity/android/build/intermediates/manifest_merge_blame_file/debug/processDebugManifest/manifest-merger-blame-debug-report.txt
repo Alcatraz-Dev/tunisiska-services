@@ -1,0 +1,79 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="expo.modules.tuniskaliveactivity" >
+4
+5    <uses-sdk android:minSdkVersion="24" />
+5-->INJECTED
+5-->INJECTED
+6
+7    <application>
+7-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:2:3-38:17
+8        <receiver
+8-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:3:5-13:16
+9            android:name="expo.modules.tuniskaliveactivity.TunisiskaSmallDepartureWidgetProvider"
+9-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:4:7-92
+10            android:exported="true"
+10-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:5:7-30
+11            android:label="@string/tunisiska_widget_small_name" >
+11-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:6:7-58
+12            <intent-filter>
+12-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:7:7-9:23
+13                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+13-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:8:9-76
+13-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:8:17-73
+14            </intent-filter>
+15
+16            <meta-data
+16-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:10:7-12:63
+17                android:name="android.appwidget.provider"
+17-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:11:9-50
+18                android:resource="@xml/tunisiska_widget_small_info" />
+18-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:12:9-60
+19        </receiver>
+20        <receiver
+20-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:15:5-25:16
+21            android:name="expo.modules.tuniskaliveactivity.TunisiskaMediumDepartureWidgetProvider"
+21-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:16:7-93
+22            android:exported="true"
+22-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:17:7-30
+23            android:label="@string/tunisiska_widget_medium_name" >
+23-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:18:7-59
+24            <intent-filter>
+24-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:7:7-9:23
+25                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+25-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:8:9-76
+25-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:8:17-73
+26            </intent-filter>
+27
+28            <meta-data
+28-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:10:7-12:63
+29                android:name="android.appwidget.provider"
+29-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:11:9-50
+30                android:resource="@xml/tunisiska_widget_medium_info" />
+30-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:12:9-60
+31        </receiver>
+32        <receiver
+32-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:27:5-37:16
+33            android:name="expo.modules.tuniskaliveactivity.TunisiskaLargeDepartureWidgetProvider"
+33-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:28:7-92
+34            android:exported="true"
+34-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:29:7-30
+35            android:label="@string/tunisiska_widget_large_name" >
+35-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:30:7-58
+36            <intent-filter>
+36-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:7:7-9:23
+37                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+37-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:8:9-76
+37-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:8:17-73
+38            </intent-filter>
+39
+40            <meta-data
+40-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:10:7-12:63
+41                android:name="android.appwidget.provider"
+41-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:11:9-50
+42                android:resource="@xml/tunisiska_widget_large_info" />
+42-->/Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:12:9-60
+43        </receiver>
+44    </application>
+45
+46</manifest>

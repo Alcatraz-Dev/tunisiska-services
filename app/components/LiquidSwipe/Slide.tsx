@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import AppIcon from "@/app/components/ui/AppIcon";
 import Color from "color";
 import React from "react";
 import { View, Text, Dimensions, Image } from "react-native";
@@ -54,7 +55,7 @@ const Slide = ({
         <View className={`items-center ${!showImage ? "top-[40%]" : "top-[10%]"}`}>
           {showIcon && icon && (
             <Animated.View entering={FadeInUp.delay(400)}>
-              <Ionicons
+              <AppIcon
                 name={icon as any}
                 size={25}
                 color="white"

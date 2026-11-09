@@ -1,18 +1,20 @@
-import React, { useState, useEffect, useMemo } from "react";
-import {
-  View,
-  FlatList,
-  TouchableOpacity,
-  ActivityIndicator,
-  RefreshControl,
-  TextInput,
-  Image,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { FlatList, RefreshControl, View } from "react-native";
 import { client } from "@/sanityClient";
-import { AutoText } from "../ui/AutoText";
-import { useTheme } from "@/app/context/ThemeContext";
+import AppIcon from "@/app/components/ui/AppIcon";
+import EmptyState from "@/app/components/ui/EmptyState";
+import Input from "@/app/components/ui/Input";
+import PressableScale from "@/app/components/ui/PressableScale";
+import ThemedText from "@/app/components/ui/ThemedText";
+import Badge from "@/app/components/ui/Badge";
+import Skeleton from "@/app/components/ui/Skeleton";
+import { useThemeColors } from "@/app/theme";
+import { spacing, radii, shadows } from "@/app/theme/spacing";
+import { currentDateLocale } from "@/app/lib/time";
+import { useLanguage } from "@/app/hooks/useLanguage";
+import { useTranslationText } from "@/app/hooks/useTranslation";
+
+const EMPTY_PARAMS: Record<string, any> = {};
 
 interface Column {
   key: string;
@@ -32,286 +34,183 @@ interface AdminDataListProps {
   refreshKey?: number;
 }
 
-export const AdminDataList = ({
+function statusTone(value: unknown): "success" | "warning" | "danger" | "info" | "neutral" {
+  const status = String(value ?? "").toLowerCase();
+  if (["true", "confirmed", "completed", "active", "accepted", "published"].includes(status)) return "success";
+  if (["pending", "draft"].includes(status)) return "warning";
+  if (["false", "cancelled", "rejected", "deleted"].includes(status)) return "danger";
+  if (["in transit", "in_transit", "departed"].includes(status)) return "info";
+  return "neutral";
+}
+
+function formatValue(value: any, type?: Column["type"]): string {
+  if (value === null || value === undefined || value === "") return "—";
+  if (type === "date") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString(currentDateLocale(), { day: "numeric", month: "short", year: "numeric" });
+  }
+  if (type === "currency") return `${Number(value || 0).toLocaleString(currentDateLocale())} SEK`;
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (Array.isArray(value)) return `${value.length} items`;
+  if (typeof value === "object") return value.email || value.userName || value.name || value.title || value.label || "Record";
+  return String(value);
+}
+
+export function AdminDataList({
   title,
   query,
-  params = {},
+  params = EMPTY_PARAMS,
   columns,
   onItemPress,
   onEdit,
   onDelete,
   searchField,
   refreshKey = 0,
-}: AdminDataListProps) => {
-  const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === "dark";
-  const router = useRouter();
+}: AdminDataListProps) {
+  const theme = useThemeColors();
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const { language } = useLanguage();
+  const openWord = useTranslationText("Open", language);
+  const deleteWord = useTranslationText("Delete", language);
+  const clearSearchLabel = useTranslationText("Clear search", language);
+  const searchPlaceholder = useTranslationText(searchPlaceholderForTitle(title), language);
+  function searchPlaceholderForTitle(listTitle: string) {
+    const key = listTitle.trim().toLowerCase();
+    if (key.includes("user")) return "Search users";
+    if (key.includes("shipping order")) return "Search shipping orders";
+    if (key.includes("taxi")) return "Search taxi bookings";
+    if (key.includes("announcement")) return "Search announcements";
+    return `Search ${key}`;
+  }
+  function emptyTitleForTitle(listTitle: string, searching: boolean) {
+    if (searching) return "No matching records";
+    const key = listTitle.trim().toLowerCase();
+    if (key.includes("user")) return "No users yet";
+    if (key.includes("shipping order")) return "No shipping orders yet";
+    if (key.includes("taxi")) return "No taxi bookings yet";
+    if (key.includes("announcement")) return "No announcements yet";
+    return `No ${key} yet`;
+  }
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      setError(null);
-      console.log(`[AdminDataList] Fetching: ${title}`);
-      console.log(`[AdminDataList] Query: ${query}`);
       const result = await client.fetch(query, params);
-      console.log(`[AdminDataList] Result length: ${result?.length || 0}`);
-      console.log(`[AdminDataList] First item:`, result?.[0] || 'none');
-      setData(result || []);
-    } catch (error: any) {
-      console.error(`[AdminDataList] Error fetching ${title}:`, error);
-      setError(error.message || "Kunde inte hämta data");
+      setData(Array.isArray(result) ? result : []);
+    } catch (cause: any) {
+      setError(cause?.message || "Could not load records. Check your connection and try again.");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [query, params]);
 
-  useEffect(() => {
-    fetchData();
-  }, [query, JSON.stringify(params), refreshKey]);
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchData();
-  };
+  useEffect(() => { void fetchData(); }, [fetchData, refreshKey]);
 
   const filteredData = useMemo(() => {
-    if (!searchTerm || !searchField) return data;
-    return data.filter((item) => {
-      const value = item[searchField];
-      return value && String(value).toLowerCase().includes(searchTerm.toLowerCase());
-    });
+    const term = searchTerm.trim().toLocaleLowerCase();
+    if (!term || !searchField) return data;
+    return data.filter((item) => String(item?.[searchField] ?? "").toLocaleLowerCase().includes(term));
   }, [data, searchTerm, searchField]);
+  const countUnit = useTranslationText(filteredData.length === 1 ? "record" : "records", language);
+  const emptyTitleText = useTranslationText(emptyTitleForTitle(title, Boolean(searchTerm)), language);
 
-  const renderValue = (item: any, column: Column) => {
-    const value = item[column.key];
+  const firstColumn = columns[0];
+  const remainingColumns = columns.slice(1, 4);
 
-    if (value === null || value === undefined) return "N/A";
+  const renderItem = ({ item }: { item: any }) => {
+    const titleValue = formatValue(item?.[firstColumn?.key], firstColumn?.type);
+    const recordTitle = titleValue === "—"
+      ? String(item?.email || item?.userName || item?.name || item?.title || item?.clerkId || item?._id || "Record")
+      : titleValue;
+    const metadata = remainingColumns.filter((column) => item?.[column.key] !== undefined && item?.[column.key] !== null);
 
-    if (column.type === "date") {
-      try {
-        const date = new Date(value);
-        return isNaN(date.getTime())
-          ? "Ogiltigt datum"
-          : date.toLocaleDateString();
-      } catch {
-        return "Ogiltigt datum";
-      }
-    }
-
-    if (column.type === "currency") {
-      return `${value || 0} SEK`;
-    }
-
-    if (column.type === "status") {
-      const getStatusColor = (s: any) => {
-        const val = String(s || "").toLowerCase();
-        switch (val) {
-          case "true":
-          case "confirmed":
-          case "completed":
-          case "active":
-          case "accepted":
-            return "bg-green-500/20 text-green-500";
-          case "pending":
-            return "bg-yellow-500/20 text-yellow-500";
-          case "false":
-          case "cancelled":
-          case "rejected":
-            return "bg-red-500/20 text-red-500";
-          default:
-            return isDark
-              ? "bg-blue-500/10 text-blue-400"
-              : "bg-blue-500/10 text-blue-600";
-        }
-      };
-
-      const statusStyle = getStatusColor(value);
-      const [bgClass, textClass] = statusStyle.split(" ");
-
-      return (
-        <View className={`${bgClass} px-2 py-0.5 rounded-full`}>
-          <AutoText className={`${textClass} text-[10px] font-black uppercase`}>
-            {String(value)}
-          </AutoText>
+    return (
+      <PressableScale
+        onPress={() => (onItemPress ?? onEdit)?.(item)}
+        accessibilityRole="button"
+        accessibilityLabel={`${openWord || "Open"} ${recordTitle}`}
+        haptic="light"
+        pressedScale={0.99}
+        style={{ marginBottom: spacing.sm }}
+      >
+        <View style={{ minHeight: 78, flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md, borderRadius: radii.lg, borderWidth: 1, borderColor: theme.borderSubtle, backgroundColor: theme.surface, ...shadows.sm }}>
+          <View style={{ width: 42, height: 42, borderRadius: 14, backgroundColor: theme.primarySoft, alignItems: "center", justifyContent: "center" }}>
+            <AppIcon name={firstColumn?.key === "email" ? "person-outline" : firstColumn?.key.toLowerCase().includes("date") ? "calendar-outline" : "document-text-outline"} size={19} color={theme.primary} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
+            <ThemedText variant="headline" numberOfLines={1} translate={firstColumn?.key !== "email"}>{recordTitle}</ThemedText>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: spacing.sm, rowGap: 4 }}>
+              {metadata.map((column) => {
+                const value = item?.[column.key];
+                if (column.type === "status") return <Badge key={column.key} label={formatValue(value)} tone={statusTone(value)} />;
+                return (
+                  <ThemedText key={column.key} variant="caption" tone="secondary" numberOfLines={1} translate={column.type !== "date" && column.type !== "currency" && column.key !== "email" && column.key !== "phone"}>
+                    {formatValue(value, column.type)}
+                  </ThemedText>
+                );
+              })}
+            </View>
+          </View>
+          {onDelete ? (
+            <PressableScale onPress={() => onDelete(item)} accessibilityRole="button" accessibilityLabel={`${deleteWord || "Delete"} ${recordTitle}`} haptic="light" style={{ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }}>
+              <AppIcon name="trash-outline" size={18} color={theme.textTertiary} />
+            </PressableScale>
+          ) : <AppIcon name="chevron-forward" size={17} color={theme.textQuaternary} />}
         </View>
-      );
-    }
-
-    if (column.type === "image" && value?.asset?._ref) {
-      return (
-        <View
-          className={`w-8 h-8 rounded-lg ${isDark ? "bg-white/5" : "bg-gray-200"}`}
-        />
-      );
-    }
-
-    if (Array.isArray(value)) {
-      return `${value.length} objekt`;
-    }
-
-    if (typeof value === "object") {
-      // Try common sub-fields for Sanity objects/references
-      return (
-        value.email ||
-        value.userName ||
-        value.name ||
-        value.title ||
-        value.label ||
-        value.copyrightText ||
-        "[Objekt]"
-      );
-    }
-
-    return String(value);
-  };
-
-  const getItemTitle = (item: any) => {
-    const primaryKey = columns[0]?.key;
-    const value = item[primaryKey];
-    
-    if (value && typeof value === 'string') return value;
-    if (value && typeof value === 'boolean') return String(value);
-    
-    return item.email || item.userName || item.name || item.title || item.clerkId || item._id || "Utan titel";
-  };
-
-  const getItemId = (item: any, index: number): string => {
-    return item._id || item.id || `item-${index}-${Date.now()}`;
+      </PressableScale>
+    );
   };
 
   return (
-    <View className="flex-1">
-      {/* Search Bar */}
-      {searchField && (
-        <View
-          className={`mx-6 mb-6 flex-row items-center px-5 h-14 rounded-[24px] ${isDark ? "bg-dark-card border border-white/5 shadow-sm" : "bg-white border border-gray-100 shadow-sm"}`}
-        >
-          <Ionicons
-            name="search-outline"
-            size={20}
-            color={isDark ? "#3b82f6" : "#2563eb"}
-          />
-          <TextInput
-            placeholder={`Sök efter ${title.toLowerCase()}...`}
-            placeholderTextColor={isDark ? "#4b5563" : "#94a3b8"}
-            value={searchTerm}
-            onChangeText={setSearchTerm}
-            className={`flex-1 ml-3 text-sm font-bold ${isDark ? "text-white" : "text-gray-900"}`}
-          />
+    <View style={{ flex: 1 }}>
+      <View style={{ paddingHorizontal: spacing.gutter, paddingBottom: spacing.md }}>
+        {searchField ? (
+          <View style={{ minHeight: 50, flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.md, borderRadius: radii.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.surface }}>
+            <AppIcon name="search-outline" size={18} color={theme.textTertiary} />
+            <Input placeholder={searchPlaceholder || `Search ${title.toLowerCase()}`} value={searchTerm} onChangeText={setSearchTerm} style={{ flex: 1, marginLeft: spacing.sm, fontSize: 14, color: theme.textPrimary }} />
+            {searchTerm ? <PressableScale onPress={() => setSearchTerm("")} accessibilityRole="button" accessibilityLabel={clearSearchLabel || "Clear search"} haptic="selection"><AppIcon name="close-circle" size={18} color={theme.textTertiary} /></PressableScale> : null}
+          </View>
+        ) : null}
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing.md }}>
+          <ThemedText variant="caption" tone="secondary" translate={false}>{loading ? "Loading records" : `${filteredData.length} ${countUnit || (filteredData.length === 1 ? "record" : "records")}`}</ThemedText>
+          {searchTerm ? <ThemedText variant="caption" tone="tertiary">Filtered</ThemedText> : null}
         </View>
-      )}
+      </View>
 
       {loading && !refreshing ? (
-        <View className="flex-1 justify-center items-center py-20">
-          <ActivityIndicator color="#3b82f6" />
-          <AutoText className="text-gray-500 mt-4">Laddar {title.toLowerCase()}...</AutoText>
+        <View style={{ paddingHorizontal: spacing.gutter, gap: spacing.sm }}>
+          {[0, 1, 2, 3].map((key) => <Skeleton key={key} height={78} radius={radii.lg} />)}
         </View>
       ) : error ? (
-        <View className="flex-1 justify-center items-center py-20 px-8">
-          <Ionicons name="warning-outline" size={48} color="#ef4444" />
-          <AutoText className="text-red-500 mt-4 text-center font-bold">Fel vid hämtning</AutoText>
-          <AutoText className="text-gray-500 mt-2 text-center text-xs">{error}</AutoText>
-          <TouchableOpacity 
-            onPress={onRefresh}
-            className="mt-4 px-6 py-3 bg-primary/10 rounded-2xl"
-          >
-            <AutoText className="text-primary font-bold">Försök igen</AutoText>
-          </TouchableOpacity>
+        <View style={{ paddingHorizontal: spacing.gutter, paddingTop: spacing.xxxl, alignItems: "center", gap: spacing.md }}>
+          <AppIcon name="cloud-offline-outline" size={32} color={theme.textTertiary} />
+          <ThemedText variant="title3">Records could not load</ThemedText>
+          <ThemedText variant="bodySm" tone="secondary" align="center">{error}</ThemedText>
+          <PressableScale onPress={() => void fetchData()} accessibilityRole="button" haptic="light" style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderRadius: radii.md, backgroundColor: theme.primary }}>
+            <ThemedText variant="button" style={{ color: theme.textOnAccent }}>Try again</ThemedText>
+          </PressableScale>
         </View>
-      ) : data.length === 0 ? (
-        <View className="flex-1 justify-center items-center py-20">
-          <Ionicons
-            name="folder-open-outline"
-            size={48}
-            color={isDark ? "#1e293b" : "#cbd5e1"}
-          />
-          <AutoText className="text-gray-500 mt-4 text-center">
-            Inga {title.toLowerCase()} hittades
-          </AutoText>
-          <AutoText className={`${isDark ? "text-gray-600" : "text-gray-400"} mt-2 text-xs text-center px-8`}>
-            Tryck på + för att lägga till ny {title.toLowerCase()}
-          </AutoText>
+      ) : filteredData.length === 0 ? (
+        <View style={{ flex: 1, paddingHorizontal: spacing.gutter, justifyContent: "center" }}>
+          <EmptyState icon="folder-open-outline" title={emptyTitleText} description={searchTerm ? "Try another name or search term." : "New records will appear here when they are added."} />
         </View>
       ) : (
         <FlatList
           data={filteredData}
-          keyExtractor={(item, index) => getItemId(item, index)}
-          contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 150 }}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor="#3b82f6"
-            />
-          }
-          renderItem={({ item, index }) => (
-            <View key={getItemId(item, index)} className="relative">
-              <TouchableOpacity
-                onPress={() => (onItemPress ? onItemPress(item) : null)}
-                className={`mb-3 p-5 rounded-[32px] shadow-sm ${isDark ? "bg-dark-card border border-white/5" : "bg-white border border-gray-100"}`}
-              >
-                <View className="flex-row items-start justify-between mb-2">
-                  <AutoText
-                    className={`text-base font-black flex-1 mr-4 ${isDark ? "text-white" : "text-gray-900"}`}
-                    numberOfLines={1}
-                  >
-                    {getItemTitle(item)}
-                  </AutoText>
-
-                  <View className="flex-row items-center">
-                    <TouchableOpacity
-                      onPress={() => (onDelete ? onDelete(item) : null)}
-                      className={`w-8 h-8 rounded-full items-center justify-center mr-2 ${isDark ? "bg-red-500/10" : "bg-red-50"}`}
-                    >
-                      <Ionicons name="trash-outline" size={16} color="#ef4444" />
-                    </TouchableOpacity>
-
-                    <View
-                      className={`w-8 h-8 rounded-full items-center justify-center ${isDark ? "bg-white/5" : "bg-gray-50"}`}
-                    >
-                      <Ionicons
-                        name="chevron-forward"
-                        size={16}
-                        color={isDark ? "#3b82f6" : "#2563eb"}
-                      />
-                    </View>
-                  </View>
-                </View>
-
-                <View className="flex-row flex-wrap">
-                  {columns.slice(1).map((col) => {
-                    const val = renderValue(item, col);
-                    const isJSX = typeof val !== "string";
-
-                    return (
-                      <View key={col.key} className="flex-row items-center mr-4 mt-1">
-                        {col.type !== "status" && col.type !== "image" && (
-                          <AutoText className={`${isDark ? "text-gray-400" : "text-gray-500"} text-[9px] uppercase font-black mr-1 tracking-tighter`}>
-                            {col.label}:
-                          </AutoText>
-                        )}
-                        {isJSX ? (
-                          val
-                        ) : (
-                          <AutoText className={`text-[10px] font-bold ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                            {val}
-                          </AutoText>
-                        )}
-                      </View>
-                    );
-                  })}
-                </View>
-              </TouchableOpacity>
-            </View>
-          )}
+          keyExtractor={(item, index) => String(item?._id || item?.id || `${title}-${index}`)}
+          renderItem={renderItem}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingHorizontal: spacing.gutter, paddingBottom: 120 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void fetchData(true)} tintColor={theme.primary} />}
         />
       )}
     </View>
   );
-};
+}

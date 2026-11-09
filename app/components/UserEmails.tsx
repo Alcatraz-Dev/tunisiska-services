@@ -9,6 +9,7 @@ import {
 import { useUser } from "@clerk/clerk-expo";
 import { useTheme } from "@/app/context/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
+import AppIcon from "@/app/components/ui/AppIcon";
 import { AutoText } from "./ui/AutoText";
 
 export default function UserEmails() {
@@ -60,7 +61,7 @@ export default function UserEmails() {
             {isActive && (
               <View className="flex-row items-center space-x-1 gap-3">
                 <AutoText className="text-sm text-green-500">Active</AutoText>
-                <Ionicons
+                <AppIcon
                   name="checkmark-circle"
                   size={18}
                   color={isDark ? "#34D399" : "#10B981"} // Tailwind green-400 / green-500

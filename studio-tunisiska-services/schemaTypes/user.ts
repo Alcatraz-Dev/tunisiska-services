@@ -86,6 +86,27 @@ export default defineType({
       type: 'boolean',
       initialValue: false,
     }),
+    // Written by the app when a phone registers for push.
+    defineField({
+      name: 'expoPushToken',
+      title: 'Expo Push Token',
+      type: 'string',
+      readOnly: true,
+      description: 'Set automatically by the app on a physical device.',
+    }),
+    defineField({
+      name: 'pushPlatform',
+      title: 'Push Platform',
+      type: 'string',
+      readOnly: true,
+      options: { list: ['ios', 'android'] },
+    }),
+    defineField({
+      name: 'pushUpdatedAt',
+      title: 'Push Token Updated',
+      type: 'datetime',
+      readOnly: true,
+    }),
   ],
   preview: {
     select: {

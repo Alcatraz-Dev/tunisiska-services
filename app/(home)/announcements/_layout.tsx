@@ -1,13 +1,5 @@
-import { ThemeProvider } from "@/app/context/ThemeContext";
 import { Slot } from "expo-router";
-import { SafeAreaProvider } from "react-native-safe-area-context";
 
 export default function AnnouncementLayout() {
-  return (
-    <ThemeProvider>
-      <SafeAreaProvider>
-        <Slot screenOptions={{ headerShown: false }} />
-      </SafeAreaProvider>
-    </ThemeProvider>
-  );
+  return <Slot screenOptions={{ headerShown: false }} />;
 }

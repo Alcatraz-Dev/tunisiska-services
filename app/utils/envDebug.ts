@@ -13,6 +13,24 @@ export const debugEnvironment = () => {
     APP_VARIANT: process.env.APP_VARIANT,
   };
 
+  /**
+   * Mask anything that looks like a credential before it reaches a console.
+   *
+   * `expoConfig.extra` previously carried the Sanity API token verbatim into
+   * device logs, which is how secrets end up in crash reports and screenshots.
+   */
+  const redact = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(redact);
+    if (!value || typeof value !== 'object') return value;
+
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([entryKey, entryValue]) => {
+        const isSecret = /token|secret|key|password|credential/i.test(entryKey);
+        return [entryKey, isSecret ? '🔒 redacted' : redact(entryValue)];
+      }),
+    );
+  };
+
   const debugInfo = {
     isDev,
     platform: Constants.platform,
@@ -22,7 +40,8 @@ export const debugEnvironment = () => {
     executionEnvironment: Constants.executionEnvironment,
     appOwnership: Constants.appOwnership,
     envVars,
-    expoConfigExtra: expoConfig?.extra,
+    // `extra` is only present on the ExpoConfig branch of the union.
+    expoConfigExtra: redact((expoConfig as any)?.extra),
   };
 
   console.log('🔍 Environment Debug Info:', JSON.stringify(debugInfo, null, 2));

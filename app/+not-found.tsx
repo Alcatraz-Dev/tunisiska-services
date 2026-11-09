@@ -1,6 +1,7 @@
 import { Link, Stack, useRouter } from "expo-router";
 import { View, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import AppIcon from "@/app/components/ui/AppIcon";
 import { LinearGradient } from "expo-linear-gradient";
 import { AutoText } from "./components/ui/AutoText";
 import { useTheme } from "./context/ThemeContext";
@@ -19,7 +20,7 @@ export default function NotFoundScreen() {
       >
         <View style={styles.content}>
           <View style={[styles.iconContainer, isDark ? styles.darkIcon : styles.lightIcon]}>
-            <Ionicons 
+            <AppIcon
               name="navigate-circle-outline" 
               size={120} 
               color={isDark ? "#3b82f6" : "#2563eb"} 
@@ -41,7 +42,7 @@ export default function NotFoundScreen() {
                 end={{ x: 1, y: 0 }}
                 style={styles.buttonGradient}
               >
-                <Ionicons name="home" size={20} color="#fff" style={styles.buttonIcon} />
+                <AppIcon name="home" size={20} color="#fff" style={styles.buttonIcon} />
                 <AutoText style={styles.buttonText}>Tillbaka till hem</AutoText>
               </LinearGradient>
             </TouchableOpacity>

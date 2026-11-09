@@ -11,6 +11,8 @@ import {
 import { WebView } from "react-native-webview";
 import { AutoText } from "./ui/AutoText";
 import { showAlert } from "../utils/showAlert";
+import { useLanguage } from "../hooks/useLanguage";
+import { translateNow } from "../hooks/useTranslation";
 
 interface PaymentStripeJSProps {
   amount: number;
@@ -49,6 +51,9 @@ export default function PaymentStripeJS({
     externalDisableAll !== undefined ? externalDisableAll : internalDisableAll;
   const setDisableAll = externalSetDisableAll || setInternalDisableAll;
   const formattedAmount = amount.toFixed(2);
+
+  const { language } = useLanguage();
+  const t = (text: string) => translateNow(text, language);
 
   const createCheckoutSession = async () => {
     try {
@@ -101,8 +106,8 @@ export default function PaymentStripeJS({
           Linking.openURL(data.url);
           // Since we can't detect completion, show a message
           showAlert(
-            "Betalning initierad",
-            "Betalningssidan öppnas i din webbläsare. Kom tillbaka efter betalning."
+            t("Payment initiated"),
+            t("The payment page opens in your browser. Come back after paying.")
           );
         } else {
           throw new Error("No checkout URL received");
@@ -123,7 +128,10 @@ export default function PaymentStripeJS({
       const errorStack = error instanceof Error ? error.stack : undefined;
       console.error("❌ [PAYMENT] Error message:", errorMessage);
       if (errorStack) console.error("❌ [PAYMENT] Error stack:", errorStack);
-      showAlert("Fel", `Kunde inte skapa betalningssession: ${errorMessage}`);
+      showAlert(
+        t("Failed"),
+        `${t("Could not create payment session: ")}${errorMessage}`
+      );
     } finally {
       setLoading(false);
     }
@@ -145,13 +153,13 @@ export default function PaymentStripeJS({
         setShowModal(false);
         setCheckoutUrl("");
         showAlert(
-          "Betalning genomförd! 🎉",
-          `Din betalning på ${amount} SEK är bekräftad !`
+          t("Payment completed! 🎉"),
+          `${t("Your payment of")} ${amount} SEK ${t("is confirmed!")}`
         );
       } else if (data.type === "PAYMENT_CANCELLED") {
         setShowModal(false);
         setCheckoutUrl("");
-        showAlert("Avbruten", "Betalningen avbröts");
+        showAlert(t("Cancelled"), t("Payment was cancelled."));
       }
     } catch (error) {
       console.error("Error parsing webview message:", error);
@@ -183,13 +191,13 @@ export default function PaymentStripeJS({
                 setShowModal(false);
                 setCheckoutUrl("");
                 showAlert(
-                  "Betalning genomförd! 🎉",
-                  `Din betalning på ${amount} SEK är bekräftad!\n\n🎁 Du fick ${earnedPoints} poäng!`
+                  t("Payment completed! 🎉"),
+                  `${t("Your payment of")} ${amount} SEK ${t("is confirmed!")}\n\n🎁 ${t("You earned")} ${earnedPoints} ${t("points")}!`
                 );
               } else if (url.includes('/payment-cancel')) {
                 setShowModal(false);
                 setCheckoutUrl("");
-                showAlert("Avbruten", "Betalningen avbröts.");
+                showAlert(t("Cancelled"), t("Payment was cancelled."));
               }
             }}
             javaScriptEnabled={true}
@@ -230,7 +238,7 @@ export default function PaymentStripeJS({
           <View
             className={`w-full rounded-2xl  ${
               !isWallet
-                ? "bg-blue-500"
+                ? "bg-navy-700"
                 : isDark
                 ? "bg-dark-card"
                 : "bg-light-card"
@@ -247,7 +255,7 @@ export default function PaymentStripeJS({
           >
             <ActivityIndicator
               size="small"
-              color={!isWallet ? "#fff" : isDark ? "#fff" : "#0ea5e9"}
+              color={!isWallet ? "#fff" : isDark ? "#fff" : "#132B55"}
             />
             <AutoText
               className={`text-xs font-medium text-center mt-2 ${
@@ -255,14 +263,14 @@ export default function PaymentStripeJS({
               }`}
               style={{ letterSpacing: 0.5 }}
             >
-              Skapar betalning...
+              Creating payment...
             </AutoText>
           </View>
         ) : (
           <View
             className={`w-full rounded-2xl ${
               !isWallet
-                ? "bg-blue-500"
+                ? "bg-navy-700"
                 : isDark
                 ? "bg-dark-card"
                 : "bg-light-card"
@@ -302,7 +310,7 @@ export default function PaymentStripeJS({
                   }`}
                   style={{ letterSpacing: 0.5 }}
                 >
-                  {points ? points : amount * 10} poäng
+                  {points ? points : amount * 10} {translateNow("points", language)}
                 </AutoText>
               </>
             )}

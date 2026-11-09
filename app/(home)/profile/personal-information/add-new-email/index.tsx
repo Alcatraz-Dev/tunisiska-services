@@ -7,15 +7,22 @@ import {
 } from "react-native";
 import { useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
+import AppIcon from "@/app/components/ui/AppIcon";
+import PrimaryButton from "@/app/components/ui/PrimaryButton";
+import ScreenHeader from "@/app/components/ui/ScreenHeader";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/app/context/ThemeContext";
 import { SafeAreaView } from "react-native-safe-area-context";
 import UserEmails from "@/app/components/UserEmails";
 import { AutoText } from "@/app/components/ui/AutoText";
 import Input from "@/app/components/ui/Input";
+import { useLanguage } from "@/app/hooks/useLanguage";
+import { useTranslationText } from "@/app/hooks/useTranslation";
 import { showAlert } from "@/app/utils/showAlert";
 
 export default function AddNewEmail() {
+  const { language } = useLanguage();
+  const emailHint = useTranslationText("Ange ny e-postadress", language);
   const { user, isLoaded } = useUser();
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
@@ -58,36 +65,7 @@ const handleAddEmail = async () => {
 
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
-      {/* Header */}
-      <View className={`pb-4 px-6 ${isDark ? "bg-dark" : "bg-light"}`}>
-        <View className="flex-row items-center justify-center mb-4 mt-5 relative">
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="absolute left-0 p-2"
-          >
-            <Ionicons
-              name="arrow-back"
-              size={24}
-              color={isDark ? "#fff" : "#000"}
-            />
-          </TouchableOpacity>
-          <AutoText
-            className={`text-xl font-extrabold text-center tracking-tighter ${
-              isDark ? "text-white" : "text-gray-900"
-            }`}
-          >
-            Ny e-post
-          </AutoText>
-        </View>
-
-        <AutoText
-          className={`text-sm text-center my-4 ${
-            isDark ? "text-gray-300" : "text-gray-600"
-          }`}
-        >
-          Här kan du lägga till en ny e-postadress.
-        </AutoText>
-      </View>
+      <ScreenHeader title="Add email" subtitle="Add a new email address to your account" showBack />
 
       <ScrollView className="flex-1 p-6">
         {/* New Email */}
@@ -104,7 +82,7 @@ const handleAddEmail = async () => {
             <Input
               value={newEmail}
               onChangeText={setNewEmail}
-              placeholder="Ange ny e-postadress"
+              placeholder={emailHint}
               placeholderTextColor={isDark ? "#9CA3AF" : "#6B7280"}
               keyboardType="email-address"
               autoCapitalize="none"
@@ -118,18 +96,7 @@ const handleAddEmail = async () => {
         </View>
 
         {/* add new email Button */}
-        <TouchableOpacity
-          onPress={handleAddEmail}
-          activeOpacity={0.7}
-          disabled={loading}
-          className={`bg-blue-500 p-4 rounded-xl items-center mb-4 ${
-            loading ? "opacity-50" : ""
-          }`}
-        >
-          <AutoText className="text-white font-semibold text-base">
-            {loading ? "Lägger till..." : "Lägg till E-post"}
-          </AutoText>
-        </TouchableOpacity>
+        <PrimaryButton label={loading ? "Lägger till..." : "Lägg till E-post"} onPress={handleAddEmail} loading={loading} style={{ marginBottom: 16 }} />
       </ScrollView>
     </SafeAreaView>
   );

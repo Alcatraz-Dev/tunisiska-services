@@ -1,6 +1,9 @@
+import { currentDateLocale } from "@/app/lib/time";
 import React, { useState, useEffect, useCallback } from "react";
 import { View, FlatList, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import AppIcon from "@/app/components/ui/AppIcon";
+import ScreenHeader from "@/app/components/ui/ScreenHeader";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/app/context/ThemeContext";
 import Animated, { FadeInUp, FadeOutDown } from "react-native-reanimated";
@@ -11,9 +14,11 @@ import { MoveOrderService } from "@/app/services/moveOrderService";
 import { ShippingOrderService } from "@/app/services/shippingOrderService";
 import { ContainerShippingOrderService } from "@/app/services/containerShippingOrderService";
 import { useAuth } from "@clerk/clerk-expo";
+import { useThemeColors } from "@/app/theme";
 
 export default function BookingHistoryScreen() {
   const { resolvedTheme } = useTheme();
+  const theme = useThemeColors();
   const isDark = resolvedTheme === "dark";
   const router = useRouter();
   const { userId } = useAuth();
@@ -225,14 +230,16 @@ export default function BookingHistoryScreen() {
       >
         <View
           style={{
-            backgroundColor: isDark ? "#2c2c2e" : "#ffffff",
+            backgroundColor: theme.surface,
             padding: 20,
-            borderRadius: 16,
-            shadowColor: "#000",
-            shadowOpacity: 0.15,
-            shadowRadius: 6,
-            shadowOffset: { width: 0, height: 3 },
-            elevation: 5,
+            borderRadius: 20,
+            borderWidth: 1,
+            borderColor: theme.border,
+            shadowColor: theme.textPrimary,
+            shadowOpacity: isDark ? 0.18 : 0.06,
+            shadowRadius: 16,
+            shadowOffset: { width: 0, height: 6 },
+            elevation: 2,
           }}
         >
           <View className="flex-row justify-between items-center mb-3">
@@ -257,7 +264,7 @@ export default function BookingHistoryScreen() {
             >
               Datum:{" "}
               {item.dateObj
-                ? item.dateObj.toLocaleDateString("sv-SE")
+                ? item.dateObj.toLocaleDateString(currentDateLocale())
                 : "Datum saknas"}
             </AutoText>
             <AutoText
@@ -303,7 +310,7 @@ export default function BookingHistoryScreen() {
             activeOpacity={0.8}
             onPress={() => router.push(`/profile/booking/${item.slug}`)}
             style={{
-              backgroundColor: isDark ? "#ffffff" : "#111111",
+              backgroundColor: theme.primary,
               shadowColor: "#000",
               shadowOpacity: 0.15,
               shadowRadius: 4,
@@ -324,7 +331,7 @@ export default function BookingHistoryScreen() {
         </View>
       </Animated.View>
     ),
-    [isDark],
+    [isDark, theme],
   );
 
   return (
@@ -332,31 +339,7 @@ export default function BookingHistoryScreen() {
       edges={["top", "left", "right"]} 
       className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}
     >
-      {/* Header */}
-      <View className={`px-6 pt-6 pb-3 ${isDark ? "bg-dark" : "bg-light"}`}>
-        <View className="flex-row items-center justify-center relative mb-2">
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="absolute left-0 p-2"
-          >
-            <Ionicons
-              name="arrow-back"
-              size={24}
-              color={isDark ? "#fff" : "#000"}
-            />
-          </TouchableOpacity>
-          <AutoText
-            className={`text-2xl font-extrabold text-center ${isDark ? "text-white" : "text-gray-900"}`}
-          >
-            Mina bokningar
-          </AutoText>
-        </View>
-        <AutoText
-          className={`text-sm text-center ${isDark ? "text-gray-400" : "text-gray-600"}`}
-        >
-          Se din historik av bokade tjänster
-        </AutoText>
-      </View>
+      <ScreenHeader title="My bookings" subtitle="Your service booking history" showBack />
 
       {/* Content */}
       {loading && !initialLoadComplete ? (
@@ -369,7 +352,7 @@ export default function BookingHistoryScreen() {
         </View>
       ) : bookings.length === 0 && initialLoadComplete ? (
         <View className="flex-1 justify-center items-center">
-          <Ionicons
+          <AppIcon
             name="document-text-outline"
             size={60}
             color={isDark ? "#6B7280" : "#9CA3AF"}

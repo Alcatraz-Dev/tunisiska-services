@@ -1,3 +1,4 @@
+import { currentDateLocale } from "@/app/lib/time";
 import { Platform } from 'react-native';
 import { AutoText } from "@/app/components/ui/AutoText";
 import icons from "@/app/constants/icons";
@@ -9,6 +10,9 @@ import { showAlert } from "@/app/utils/showAlert";
 
 import { useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
+import AppIcon from "@/app/components/ui/AppIcon";
+import PrimaryButton from "@/app/components/ui/PrimaryButton";
+import ScreenHeader from "@/app/components/ui/ScreenHeader";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
@@ -34,6 +38,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import PaymentStripeJS from "@/app/components/PaymentStripeJS";
+import RedirectIfSignedOut from "@/app/components/RedirectIfSignedOut";
 
 interface Referral {
   id: string;
@@ -305,6 +310,7 @@ export default function Wallet() {
         className={`flex-1 ${isDark ? "bg-dark" : "bg-light"
           } justify-center items-center`}
       >
+        <RedirectIfSignedOut />
         <ActivityIndicator size="large" color={isDark ? "#fff" : "#000"} />
         <AutoText className={`mt-4 ${isDark ? "text-white" : "text-gray-900"}`}>
           Laddar wallet...
@@ -321,33 +327,7 @@ export default function Wallet() {
       edges={["top", "left", "right"]} 
       className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}
     >
-      {/* Header */}
-      <View className={`px-6 pt-6 pb-4 ${isDark ? "bg-dark" : "bg-light"}`}>
-        <View className="flex-row items-center justify-center relative mb-4">
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="absolute left-0 p-2"
-          >
-            <Ionicons
-              name="arrow-back"
-              size={24}
-              color={isDark ? "#fff" : "#000"}
-            />
-          </TouchableOpacity>
-          <AutoText
-            className={`text-2xl font-extrabold text-center ${isDark ? "text-white" : "text-gray-900"
-              }`}
-          >
-            Din Wallet
-          </AutoText>
-        </View>
-        <AutoText
-          className={`text-sm text-center mt-3 ${isDark ? "text-gray-400" : "text-gray-600"
-            }`}
-        >
-          Se din senaste aktivitet och transaktioner
-        </AutoText>
-      </View>
+      <ScreenHeader title="Your wallet" subtitle="Recent activity and transactions" showBack />
 
       <ScrollView
         className=" mt-4 px-6 "
@@ -429,17 +409,17 @@ export default function Wallet() {
                   }}
                 >
                   {isClaimed ? (
-                    <Ionicons
+                    <AppIcon
                       name="checkmark-circle"
                       size={20}
                       color="#22c55e"
                     />
                   ) : isToday ? (
                     <Animated.View style={animatedStyle}>
-                      <Ionicons name="gift" size={20} color="#facc15" />
+                      <AppIcon name="gift" size={20} color="#facc15" />
                     </Animated.View>
                   ) : (
-                    <Ionicons
+                    <AppIcon
                       name="lock-closed"
                       size={20}
                       color={isDark ? "#6b7280" : "#9ca3af"}
@@ -458,26 +438,9 @@ export default function Wallet() {
         </Animated.View>
 
         {/* Action Buttons */}
-        <View className="flex-row mt-6  gap-4 items-center justify-center">
-          <TouchableOpacity
-            onPress={() => router.push("/profile/referral-users")}
-            className={`flex-1  py-4 px-3 rounded-xl items-center justify-center ${isDark ? " bg-blue-400" : "bg-blue-500"
-              }`}
-          >
-            <AutoText className="text-black font-bold">Tjäna poäng</AutoText>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => router.push("/(home)/profile/transfer-points")}
-            className={`flex-1 bg-green-500 py-4 px-3 rounded-xl items-center justify-center ${isDark ? " bg-yellow-400" : "bg-yellow-500"
-              }`}
-          >
-            <AutoText
-              className={`font-bold ${isDark ? "text-dark" : " text-dark"}`}
-            >
-              Överför poäng
-            </AutoText>
-          </TouchableOpacity>
+        <View style={{ flexDirection: "row", marginTop: 24, gap: 12 }}>
+          <PrimaryButton label="Tjäna poäng" variant="secondary" onPress={() => router.push("/profile/referral-users")} style={{ flex: 1 }} />
+          <PrimaryButton label="Överför poäng" onPress={() => router.push("/(home)/profile/transfer-points")} style={{ flex: 1 }} />
         </View>
         {/* Premium Payment Cards - Smaller Enhanced Design */}
         <View className="flex-row items-center justify-between mb-2 mt-2">
@@ -566,7 +529,7 @@ export default function Wallet() {
                   elevation: 5, // only works on Android
                 }}
               >
-                <Ionicons
+                <AppIcon
                   name={
                     tx.description.includes("Dag") || tx.description.includes("belöning")
                       ? "gift"
@@ -587,7 +550,7 @@ export default function Wallet() {
                     tx.description.includes("Dag") || tx.description.includes("belöning")
                       ? "#f59e0b" // Yellow for daily rewards
                       : tx.description.includes("Köp") || tx.description.includes("poäng för")
-                        ? "#3b82f6" // Blue for purchases
+                        ? "#132B55" // Blue for purchases
                         : tx.description.includes("Överfört") || tx.description.includes("till mottagare")
                           ? "#ef4444" // Red for sent transfers
                           : tx.description.includes("Mottagit") || tx.description.includes("från")
@@ -611,7 +574,7 @@ export default function Wallet() {
                     className={`${isDark ? "text-gray-400" : "text-gray-500"
                       } text-[9px]`}
                   >
-                    {new Date(tx.date).toLocaleDateString("sv-SE")}
+                    {new Date(tx.date).toLocaleDateString(currentDateLocale())}
                   </AutoText>
                 </View>
                 <AutoText

@@ -75,7 +75,7 @@ class SanityApi {
         timestamp: result.timestamp
       });
 
-      return result.data;
+      return result.data as T;
     } catch (error: any) {
       console.error('❌ Sanity API fetch error:', error);
       throw new Error(`Failed to fetch from Sanity API: ${error.message}`);
@@ -110,7 +110,7 @@ class SanityApi {
       }
 
       console.log('✅ Sanity API mutation successful:', result.timestamp);
-      return result.data;
+      return result.data as T;
     } catch (error: any) {
       console.error('❌ Sanity API mutate error:', error);
       throw new Error(`Failed to mutate Sanity data: ${error.message}`);

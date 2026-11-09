@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { View, TouchableOpacity, ScrollView, Alert, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import AppIcon from "@/app/components/ui/AppIcon";
+import ScreenHeader from "@/app/components/ui/ScreenHeader";
 import { useTheme } from "../../../context/ThemeContext";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -509,35 +511,7 @@ export default function AddFriendScreen() {
 
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
-      {/* Header */}
-      <View className="p-6">
-        <View className="flex-row items-center justify-center mb-6 relative">
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="absolute left-0 p-2"
-          >
-            <Ionicons
-              name="arrow-back"
-              size={24}
-              color={isDark ? "#fff" : "#000"}
-            />
-          </TouchableOpacity>
-          <AutoText
-            className={`text-2xl font-extrabold ${
-              isDark ? "text-white" : "text-gray-900"
-            }`}
-          >
-            Vänner
-          </AutoText>
-        </View>
-        <AutoText
-          className={`text-sm text-center ${
-            isDark ? "text-gray-400" : "text-gray-600"
-          }`}
-        >
-          Lägg till vänner för att kunna överföra poäng
-        </AutoText>
-      </View>
+      <ScreenHeader title="Add a friend" subtitle="Connect to transfer points" showBack />
 
       <ScrollView
         className=" mt-4 px-6 "
@@ -629,7 +603,7 @@ export default function AddFriendScreen() {
                   <View
                     className={`p-3 rounded-xl ${isDark ? "bg-white/20" : "bg-black/20"}`}
                   >
-                    <Ionicons
+                    <AppIcon
                       name="people"
                       size={28}
                       color={isDark ? "#fff" : "#000"}
@@ -703,7 +677,7 @@ export default function AddFriendScreen() {
                   }}
                 >
                   <View className="flex-row items-center">
-                    <Ionicons
+                    <AppIcon
                       name={
                         isLoading ? "hourglass-outline" : "person-add-outline"
                       }
@@ -844,7 +818,7 @@ export default function AddFriendScreen() {
                                 }}
                                 className="p-2 rounded-full bg-red-500/10 "
                               >
-                                <Ionicons
+                                <AppIcon
                                   name="trash-outline"
                                   size={16}
                                   color="#ef4444"
@@ -873,7 +847,7 @@ export default function AddFriendScreen() {
                     isDark ? "bg-dark-card" : "bg-light-card"
                   }`}
                 >
-                  <Ionicons
+                  <AppIcon
                     name="people-outline"
                     size={48}
                     color={isDark ? "#9ca3af" : "#6b7280"}
@@ -1072,7 +1046,7 @@ export default function AddFriendScreen() {
                     isDark ? "bg-dark-card" : "bg-light-card"
                   }`}
                 >
-                  <Ionicons
+                  <AppIcon
                     name="person-add-outline"
                     size={48}
                     color={isDark ? "#9ca3af" : "#6b7280"}

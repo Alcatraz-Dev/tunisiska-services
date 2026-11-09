@@ -10,30 +10,27 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import AppIcon from "@/app/components/ui/AppIcon";
+import PrimaryButton from "@/app/components/ui/PrimaryButton";
 import { useTheme } from "@/app/context/ThemeContext";
 import { StatusBar } from "expo-status-bar";
 import Animated, { FadeInUp, FadeOutDown } from "react-native-reanimated";
 import VideoPlayer from "@/app/components/VideoPlayer";
 import { AutoText } from "@/app/components/ui/AutoText";
-import { client } from "@/sanityClient";
-import { singleAnnouncementQuery } from "@/app/hooks/useQuery";
+import {
+  getAnnouncement,
+  type Announcement as AnnouncementRecord,
+} from "@/app/services/announcementService";
 import icons from "@/app/constants/icons";
 import { TranslatableDateText } from "@/app/utils/dateFormat";
 
-type AnnouncementMedia =
-  | { type: "image"; imageUrl: string }
-  | { type: "video"; videoUrl: string };
-
-type Announcement = {
-  id: string;
-  title: string;
-  message: string;
-  description: string;
-  date: string;
-  slug: string;
-  link?: string;
-  media?: AnnouncementMedia;
+type AnnouncementMedia = {
+  type?: "image" | "video";
+  imageUrl?: string;
+  videoUrl?: string;
 };
+
+type Announcement = AnnouncementRecord;
 
 export default function AnnouncementDetails() {
   const { slug } = useLocalSearchParams();
@@ -45,18 +42,16 @@ export default function AnnouncementDetails() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchAnnouncement = async () => {
       try {
-        console.log("Fetching announcement with slug:", slug);
-        const data: Announcement = await client.fetch(singleAnnouncementQuery, {
-          slug,
-        });
-        console.log("Fetched announcement data:", data);
-        setAnnouncement(data || null);
+        const data = await getAnnouncement(String(slug ?? ""));
+        if (!cancelled) setAnnouncement(data);
       } catch (error) {
         console.error("Error fetching announcement:", error);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
@@ -65,6 +60,10 @@ export default function AnnouncementDetails() {
     } else {
       setLoading(false);
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [slug]);
 
   if (loading) {
@@ -102,11 +101,11 @@ export default function AnnouncementDetails() {
   const AnnouncementMedia = ({ media }: { media?: AnnouncementMedia }) => {
     if (!media) return null;
 
-    if (media.type === "video") {
+    if (media.type === "video" && media.videoUrl) {
       return <VideoPlayer uri={media.videoUrl} muted={false} />;
     }
 
-    if (media.type === "image") {
+    if (media.type === "image" && media.imageUrl) {
       return (
         <Image
           source={{ uri: media.imageUrl }}
@@ -128,7 +127,7 @@ export default function AnnouncementDetails() {
             onPress={() => router.back()}
             className="absolute left-0 p-2"
           >
-            <Ionicons
+            <AppIcon
               name="arrow-back"
               size={24}
               color={isDark ? "#fff" : "#000"}
@@ -161,6 +160,26 @@ export default function AnnouncementDetails() {
             <AnnouncementMedia media={announcement.media} />
           )}
 
+          {announcement.isImportant ? (
+            <View
+              style={{
+                alignSelf: "flex-start",
+                flexDirection: "row",
+                alignItems: "center",
+                marginTop: 16,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 999,
+                backgroundColor: "#F2761B",
+              }}
+            >
+              <AppIcon name="alert-circle" size={14} color="#FFFFFF" />
+              <AutoText className="text-white" style={{ marginLeft: 5 }}>
+                Important
+              </AutoText>
+            </View>
+          ) : null}
+
           {/* Description */}
           <AutoText
             className={`text-base leading-6 mt-10 mb-4 ${
@@ -190,19 +209,7 @@ export default function AnnouncementDetails() {
 
           {/* External link */}
           {announcement.link && (
-            <TouchableOpacity
-              onPress={openLink}
-              className="flex-row items-center justify-center bg-blue-600 rounded-xl p-4 gap-1"
-            >
-              <AutoText className="text-white font-semibold text-sm">
-                Besök länk och läs mer
-              </AutoText>
-              <Image
-                source={icons.glob}
-                style={{ width: 16, height: 16 }}
-                tintColor={resolvedTheme === "dark" ? "#fff" : "#fff"}
-              />
-            </TouchableOpacity>
+            <PrimaryButton label="Besök länk och läs mer" icon="open-outline" iconPosition="trailing" onPress={openLink} />
           )}
         </ScrollView>
       </Animated.View>

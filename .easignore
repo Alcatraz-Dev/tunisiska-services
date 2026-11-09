@@ -6,8 +6,8 @@ web-build/
 npm-debug.*
 
 # Native build folders (Managed workflow handles these via prebuild)
-ios
-android
+/ios
+/android
 
 # Assets not needed for build
 studio-tunisiska-services

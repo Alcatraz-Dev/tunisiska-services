@@ -1,3 +1,5 @@
+import { currentDateLocale } from "@/app/lib/time";
+import { useLanguage } from "@/app/hooks/useLanguage";
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -9,6 +11,7 @@ import {
 import { useUser } from "@clerk/clerk-expo";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
+import AppIcon from "@/app/components/ui/AppIcon";
 import { AutoText } from "./ui/AutoText";
 import Input from "./ui/Input";
 // Payment component removed - Stripe dependency eliminated
@@ -43,6 +46,7 @@ export default function ServiceBooking({
   onBack,
 }: ServiceBookingProps) {
   const { resolvedTheme } = useTheme();
+  const { language } = useLanguage();
   const isDark = resolvedTheme === "dark";
   const { user } = useUser();
 
@@ -473,7 +477,7 @@ export default function ServiceBooking({
       {/* Header */}
       <View className="flex-row items-center justify-center mb-6 relative">
         <TouchableOpacity onPress={onBack} className="absolute left-0 p-2">
-          <Ionicons
+          <AppIcon
             name="arrow-back"
             size={24}
             color={isDark ? "#fff" : "#000"}
@@ -550,13 +554,14 @@ export default function ServiceBooking({
         onPress={() => setShowDatePicker(!showDatePicker)}
       >
         <AutoText className={isDark ? "text-white" : "text-gray-900"}>
-          {scheduledDate.toLocaleDateString("sv-SE")}
+          {scheduledDate.toLocaleDateString(currentDateLocale())}
         </AutoText>
       </TouchableOpacity>
       {showDatePicker && (
         <DateTimePicker
           value={scheduledDate}
           mode="date"
+          locale={currentDateLocale(language).replace("-", "_")}
           display={Platform.OS === "ios" ? "spinner" : "default"}
           themeVariant={isDark ? "dark" : "light"}
           textColor={isDark ? "#fff" : "#000"}
@@ -580,7 +585,7 @@ export default function ServiceBooking({
         onPress={() => setShowTimePicker(!showTimePicker)}
       >
         <AutoText className={isDark ? "text-white" : "text-gray-900"}>
-          {scheduledTime.toLocaleTimeString("sv-SE", {
+          {scheduledTime.toLocaleTimeString(currentDateLocale(), {
             hour: "2-digit",
             minute: "2-digit",
           })}
@@ -590,6 +595,7 @@ export default function ServiceBooking({
         <DateTimePicker
           value={scheduledTime}
           mode="time"
+          locale={currentDateLocale(language).replace("-", "_")}
           display={Platform.OS === "ios" ? "spinner" : "default"}
           themeVariant={isDark ? "dark" : "light"}
           textColor={isDark ? "#fff" : "#000"}
@@ -698,7 +704,7 @@ export default function ServiceBooking({
         </AutoText>
       </TouchableOpacity>
       <View className="flex-row items-center justify-center mt-4">
-        <Ionicons
+        <AppIcon
           name="shield-checkmark-outline"
           size={16}
           color={isDark ? "#9CA3AF" : "#6B7280"}

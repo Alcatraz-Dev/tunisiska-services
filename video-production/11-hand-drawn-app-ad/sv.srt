@@ -1,0 +1,27 @@
+1
+00:00:00,450 --> 00:00:03,900
+Din transport mellan Sverige och Tunisien.
+
+2
+00:00:04,550 --> 00:00:07,850
+Planera din resa.
+
+3
+00:00:08,550 --> 00:00:11,850
+Skicka paket eller boka container.
+
+4
+00:00:12,550 --> 00:00:15,850
+Flytt och städning.
+
+5
+00:00:16,550 --> 00:00:19,850
+Taxi till flygplatsen.
+
+6
+00:00:20,550 --> 00:00:24,800
+Resor, bokningar och spårning i samma app.
+
+7
+00:00:25,300 --> 00:00:29,750
+Utforska appen.

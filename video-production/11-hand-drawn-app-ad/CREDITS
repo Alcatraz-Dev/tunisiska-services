@@ -1,0 +1,7 @@
+Brand design system, source files and logo: Tunisiska Services project supplied by the user. The films use its navy/orange/neutral tokens, Rubik type, rounded-card motifs and supplied logo. The logo is the only bitmap visual.
+
+Font: Rubik Project Authors, SIL Open Font License 1.1. Original bundled font files and the OFL license text are included in assets/fonts/. Handwritten title rendering uses Marker Felt (Swedish) and Geeza Pro (Arabic) as fonts already installed on the production system; they are not bundled or redistributed.
+
+Style reference: Lemo-Opuscar, Urban Sketch · Pen & Wash style guide, MIT License, https://github.com/lemomo-ai/lemo-opuscar. The films use original Canvas drawing code; the library demo, story, artwork and audio are not used.
+
+All vehicles, route graphics, service pictograms, page backgrounds, ink jitter, pigment texture, score and sound effects are original code or procedural audio made for this film. App screenshots were analyzed as references but are not included or shown in the videos. No screen recordings, stock imagery, map data, third-party music or sample libraries are used.

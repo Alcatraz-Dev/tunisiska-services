@@ -1,0 +1,54 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:1:1-39:12
+INJECTED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:1:1-39:12
+	package
+		INJECTED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml
+	xmlns:android
+		ADDED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:1:11-69
+application
+ADDED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:2:3-38:17
+receiver#expo.modules.tuniskaliveactivity.TunisiskaSmallDepartureWidgetProvider
+ADDED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:3:5-13:16
+	android:label
+		ADDED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:6:7-58
+	android:exported
+		ADDED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:5:7-30
+	android:name
+		ADDED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:4:7-92
+intent-filter#action:name:android.appwidget.action.APPWIDGET_UPDATE
+ADDED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:7:7-9:23
+action#android.appwidget.action.APPWIDGET_UPDATE
+ADDED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:8:9-76
+	android:name
+		ADDED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:8:17-73
+meta-data#android.appwidget.provider
+ADDED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:10:7-12:63
+	android:resource
+		ADDED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:12:9-60
+	android:name
+		ADDED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:11:9-50
+receiver#expo.modules.tuniskaliveactivity.TunisiskaMediumDepartureWidgetProvider
+ADDED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:15:5-25:16
+	android:label
+		ADDED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:18:7-59
+	android:exported
+		ADDED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:17:7-30
+	android:name
+		ADDED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:16:7-93
+receiver#expo.modules.tuniskaliveactivity.TunisiskaLargeDepartureWidgetProvider
+ADDED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:27:5-37:16
+	android:label
+		ADDED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:30:7-58
+	android:exported
+		ADDED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:29:7-30
+	android:name
+		ADDED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml:28:7-92
+uses-sdk
+INJECTED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml
+INJECTED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml
+	android:targetSdkVersion
+		INJECTED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml
+	android:minSdkVersion
+		INJECTED from /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/AndroidManifest.xml

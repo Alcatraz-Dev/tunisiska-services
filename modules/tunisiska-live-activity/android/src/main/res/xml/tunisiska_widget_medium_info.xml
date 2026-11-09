@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 4 × 2 — the route card: both stops, the countdown ring and the cargo bar. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+  android:description="@string/tunisiska_widget_medium_description"
+  android:initialLayout="@layout/tunisiska_departure_widget_medium"
+  android:minHeight="110dp"
+  android:minWidth="250dp"
+  android:previewLayout="@layout/tunisiska_departure_widget_medium"
+  android:resizeMode="none"
+  android:targetCellHeight="2"
+  android:targetCellWidth="4"
+  android:updatePeriodMillis="1800000"
+  android:widgetCategory="home_screen" />

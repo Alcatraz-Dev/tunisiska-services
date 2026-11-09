@@ -1,0 +1,21 @@
+# The root Vercel project only builds `server.mjs`. Everything below is app or
+# Studio source, generated output, or local tooling — uploading it made the
+# deployment 1.6 GB and tripped over a Chrome profile symlink.
+app/
+assets/
+components/
+constants/
+contexts/
+hooks/
+lib/
+modules/
+scripts/
+ios/
+android/
+studio-tunisiska-services/
+dist/
+web-build/
+.expo/
+.claude/
+.env*
+*.md

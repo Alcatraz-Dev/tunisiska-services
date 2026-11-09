@@ -11,6 +11,7 @@ import {
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { FontAwesome, Ionicons, MaterialIcons } from "@expo/vector-icons";
+import AppIcon from "@/app/components/ui/AppIcon";
 import { StatusBar } from "expo-status-bar";
 import { useTheme } from "../context/ThemeContext";
 import AnimatedSwipeHint from "./AnimatedSwipeHint";
@@ -172,7 +173,7 @@ export default function OnboardingScreen() {
           }}
           className="w-20 h-20 rounded-full justify-center items-center mb-6 shadow-xl"
         >
-          <Ionicons name={item.icon} size={36} color="#fff" />
+          <AppIcon name={item.icon} size={36} color="#fff" />
         </Animated.View>
 
         <AutoText className="text-3xl font-bold text-white text-center mb-4 drop-shadow-md">

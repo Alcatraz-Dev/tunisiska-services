@@ -1,123 +1,70 @@
-import {
-  View,
-  Text,
-  SafeAreaView,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-} from "react-native";
 import React, { useEffect, useState } from "react";
-import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import { useTheme } from "@/app/context/ThemeContext";
+import { ActivityIndicator, ScrollView, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { AutoText } from "@/app/components/ui/AutoText";
-import { RichTextRenderer } from "@/app/components/ui/RichTextRenderer";
+
+import EmptyState from "@/app/components/ui/EmptyState";
+import ScreenHeader from "@/app/components/ui/ScreenHeader";
+import ThemedText from "@/app/components/ui/ThemedText";
+import { hasRichTextContent, RichTextRenderer } from "@/app/components/ui/RichTextRenderer";
 import { client } from "@/sanityClient";
 import { policyQuery } from "@/app/hooks/useQuery";
+import { useTheme } from "@/app/context/ThemeContext";
+import { useThemeColors } from "@/app/theme";
+import { currentDateLocale } from "@/app/lib/time";
+import { useLanguage } from "@/app/hooks/useLanguage";
+import { spacing } from "@/app/theme/spacing";
 
 export default function Policy() {
   const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === "dark";
-  const router = useRouter();
-
+  const theme = useThemeColors();
+  const { language } = useLanguage();
   const [policy, setPolicy] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let active = true;
     const fetchPolicy = async () => {
       try {
         const data = await client.fetch(policyQuery);
-        setPolicy(data);
+        if (active) setPolicy(data);
       } catch (error) {
-        console.error("Error fetching policy:", error);
+        console.error("Error fetching privacy policy:", error);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
-    fetchPolicy();
+    void fetchPolicy();
+    return () => { active = false; };
   }, []);
 
-  if (loading) {
-    return (
-      <SafeAreaView
-        className={`flex-1 items-center justify-center ${
-          isDark ? "bg-dark" : "bg-light"
-        }`}
-      >
-        <ActivityIndicator size="large" color={isDark ? "#fff" : "#000"} />
-      </SafeAreaView>
-    );
-  }
-
-  if (!policy) {
-    return (
-      <SafeAreaView
-        className={`flex-1 items-center justify-center ${
-          isDark ? "bg-dark" : "bg-light"
-        }`}
-      >
-        <AutoText className={isDark ? "text-white" : "text-gray-900"}>
-          Privacy Policy not found
-        </AutoText>
-      </SafeAreaView>
-    );
-  }
-
   return (
-    <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
-      <StatusBar style={isDark ? "light" : "dark"} />
-      {/* Header */}
-      <View className={`px-6 pt-6 pb-4 ${isDark ? "bg-dark" : "bg-light"}`}>
-        <View className="flex-row items-center justify-center relative mb-2">
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="absolute left-0 p-2"
-          >
-            <Ionicons
-              name="arrow-back"
-              size={24}
-              color={isDark ? "#fff" : "#000"}
-            />
-          </TouchableOpacity>
-          <AutoText
-            className={`text-2xl font-extrabold text-center ${
-              isDark ? "text-white" : "text-gray-900"
-            }`}
-          >
-            {policy?.title || "Policy"}
-          </AutoText>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.canvas }}>
+      <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
+      <ScreenHeader title={policy?.title || "Privacy Policy"} subtitle="Learn how we protect and use your information." showBack />
+      {loading ? (
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingBottom: 80 }}>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <ThemedText variant="caption" tone="secondary" style={{ marginTop: spacing.md }}>Loading…</ThemedText>
         </View>
-        <AutoText
-          className={`text-sm text-center mt-3 ${
-            isDark ? "text-gray-400" : "text-gray-600"
-          }`}
-        >
-          Läs vår integritetspolicy och användarvillkor
-        </AutoText>
-      </View>
-
-      {/* Content */}
-      <ScrollView
-        className="flex-1 px-6 mt-4"
-        showsVerticalScrollIndicator={false}
-      >
-        <RichTextRenderer
-          content={policy?.content || []}
-          className={isDark ? "text-gray-300" : "text-gray-700"}
-        />
-
-        {/* Last Updated */}
-        {policy?.lastUpdated && (
-          <AutoText
-            className={`text-xs text-center mt-10 mb-6 ${
-              isDark ? "text-gray-500" : "text-gray-500"
-            }`}
-          >
-            Senast uppdaterad: {new Date(policy.lastUpdated).toLocaleDateString('sv-SE')}
-          </AutoText>
-        )}
-      </ScrollView>
+      ) : policy && hasRichTextContent(policy.content) ? (
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing.gutter, paddingTop: spacing.sm, paddingBottom: spacing.xxxl }}>
+          <RichTextRenderer content={policy.content || []} className={resolvedTheme === "dark" ? "text-gray-300" : "text-gray-700"} />
+          {policy.lastUpdated ? (
+            <ThemedText variant="footnote" tone="tertiary" align="center" translate={false} style={{ marginTop: spacing.xxl }}>
+              <><ThemedText variant="footnote" tone="tertiary">Last updated</ThemedText>{" "}{new Intl.DateTimeFormat(currentDateLocale(language), { dateStyle: "long" }).format(new Date(policy.lastUpdated))}</>
+            </ThemedText>
+          ) : null}
+        </ScrollView>
+      ) : (
+        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: "center", paddingHorizontal: spacing.gutter, paddingBottom: 72 }}>
+          <EmptyState
+            icon="shield-checkmark-outline"
+            title="Legal information is not available right now."
+            description="Please try again later or contact support for help."
+          />
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }

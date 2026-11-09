@@ -1,0 +1,27 @@
+1
+00:00:00,700 --> 00:00:03,800
+Resa eller frakt?
+
+2
+00:00:02,100 --> 00:00:04,000
+Sverige ↔ Tunisien
+
+3
+00:00:04,100 --> 00:00:08,800
+Frakt. Flytt. Flygtaxi.
+
+4
+00:00:09,100 --> 00:00:13,800
+Se resans rutt.
+
+5
+00:00:14,100 --> 00:00:19,700
+Följ din nästa resa.
+
+6
+00:00:20,200 --> 00:00:24,700
+Resor och tjänster i samma app.
+
+7
+00:00:26,000 --> 00:00:29,700
+Utforska appen.

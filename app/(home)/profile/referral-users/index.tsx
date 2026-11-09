@@ -1,3 +1,4 @@
+import { currentDateLocale } from "@/app/lib/time";
 import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
@@ -9,14 +10,20 @@ import {
 } from "react-native";
 import { useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
+import AppIcon from "@/app/components/ui/AppIcon";
+import PrimaryButton from "@/app/components/ui/PrimaryButton";
+import ScreenHeader from "@/app/components/ui/ScreenHeader";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/app/context/ThemeContext";
+import { useThemeColors } from "@/app/theme";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { getPremiumGradient } from "@/app/utils/getPremiumGradient";
 import { AutoText } from "@/app/components/ui/AutoText";
 import Input from "@/app/components/ui/Input";
+import { useLanguage } from "@/app/hooks/useLanguage";
+import { useTranslationText } from "@/app/hooks/useTranslation";
 import { showAlert } from "@/app/utils/showAlert";
 import { nativeNotifyAPI } from "@/app/services/nativeNotifyApi";
 import Constants from "expo-constants";
@@ -47,9 +54,12 @@ interface Stats {
 }
 
 export default function ReferralUsers() {
+  const { language } = useLanguage();
+  const referralCodeHint = useTranslationText("Ange referral-koden", language);
   const { user, isLoaded } = useUser();
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
+  const theme = useThemeColors();
   const router = useRouter();
 
   const [activeTab, setActiveTab] = useState<"code" | "users" | "add-referral">(
@@ -425,54 +435,21 @@ export default function ReferralUsers() {
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
       {/* Header */}
-      <Animated.View
-        entering={FadeInDown.delay(100).springify()}
-        className="pb-4 px-6"
-      >
-        <View className="flex-row items-center justify-center mb-4 mt-5 relative">
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="absolute left-0 p-2"
-          >
-            <Ionicons
-              name="arrow-back"
-              size={24}
-              color={isDark ? "#fff" : "#000"}
-            />
-          </TouchableOpacity>
-          <AutoText
-            className={`text-xl font-extrabold ${
-              isDark ? "text-white" : "text-gray-900"
-            }`}
-          >
-            Referral
+      <Animated.View entering={FadeInDown.delay(100).springify()}>
+        <ScreenHeader
+          title="Referrals"
+          subtitle="Earn bonus points by inviting friends"
+          showBack
+          rightIcon="refresh"
+          onRightPress={loadReferralData}
+          rightAccessibilityLabel="Refresh referrals"
+        />
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 20, paddingBottom: 12 }}>
+          <AppIcon name="warning-outline" size={15} color={theme.accent} />
+          <AutoText className={`flex-1 text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+            Each user can refer up to 10 other users.
           </AutoText>
-          <TouchableOpacity
-            onPress={loadReferralData}
-            className="absolute right-0 p-2"
-            disabled={refreshing}
-          >
-            <Ionicons
-              name="refresh"
-              size={24}
-              color={isDark ? "#fff" : "#000"}
-            />
-          </TouchableOpacity>
         </View>
-        <AutoText
-          className={`text-sm text-center my-2 ${
-            isDark ? "text-gray-300" : "text-gray-600"
-          }`}
-        >
-          Få bonuspoäng genom att bjuda in dina vänner 
-        </AutoText>
-        <AutoText
-          className={`text-xs text-center mb-4 mt-1 ${
-            isDark ? "text-gray-400" : "text-gray-500"
-          }`}
-        >
-          ⚠️ Varje användare kan endast referera upp till 10 andra användare (max 10 användare).
-        </AutoText>
       </Animated.View>
 
       {/* Content */}
@@ -628,16 +605,14 @@ export default function ReferralUsers() {
                 key={tab.key}
                 onPress={() => setActiveTab(tab.key as any)}
                 onPressIn={() => setActiveTab(tab.key as any)}
-                className={`px-4 py-2 rounded-t-lg border-b-2 mx-2 ${
-                  isActive ? "border-blue-500" : "border-transparent"
-                }`}
+                className="relative mx-2 rounded-t-lg px-4 py-2"
               >
                 <View className="flex-row items-center gap-1">
-                  <Ionicons
+                  <AppIcon
                     name={tab.icon as any}
                     size={12}
                     color={
-                      isActive ? "#3b82f6" : isDark ? "#9ca3af" : "#6b7280"
+                      isActive ? "#132B55" : isDark ? "#9ca3af" : "#6b7280"
                     }
                   />
                   <AutoText
@@ -652,6 +627,9 @@ export default function ReferralUsers() {
                     {tab.label}
                   </AutoText>
                 </View>
+                {isActive ? (
+                  <View className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-primary" />
+                ) : null}
               </TouchableOpacity>
             );
           })}
@@ -695,17 +673,10 @@ export default function ReferralUsers() {
               </View>
 
               <View className="flex-row gap-3">
-                <TouchableOpacity
-                  onPress={() => {
-                    Share.share({ message: referralCode });
-                    showAlert("Kopierad", "Koden kopierad!");
-                  }}
-                  className="flex-1 bg-blue-500 p-3 rounded-xl items-center"
-                >
-                  <AutoText className="text-white font-semibold text-base">
-                    Kopiera kod
-                  </AutoText>
-                </TouchableOpacity>
+                <PrimaryButton label="Kopiera kod" variant="secondary" onPress={() => {
+                  Share.share({ message: referralCode });
+                  showAlert("Kopierad", "Koden kopierad!");
+                }} style={{ flex: 1 }} />
                 <TouchableOpacity
                   onPress={handleShare}
                   className="flex-1 bg-green-500 p-3 rounded-xl items-center"
@@ -738,7 +709,7 @@ export default function ReferralUsers() {
                     : "bg-light-card border-gray-100"
                 }`}
               >
-                <Ionicons
+                <AppIcon
                   name="people-outline"
                   size={40}
                   color={isDark ? "#9ca3af" : "#6b7280"}
@@ -809,7 +780,7 @@ export default function ReferralUsers() {
                               </View>
                               {ref.status === "active" && (
                                 <View className="flex-row items-center gap-1">
-                                  <Ionicons name="checkmark-circle" size={14} color="#22c55e" />
+                                  <AppIcon name="checkmark-circle" size={14} color="#22c55e" />
                                   <AutoText className="text-xs text-green-600 font-medium">
                                     Bonus mottagen
                                   </AutoText>
@@ -832,11 +803,11 @@ export default function ReferralUsers() {
                                 isDark ? "text-gray-500" : "text-gray-500"
                               }`}
                             >
-                              Anslöt: {new Date(ref.joinedAt).toLocaleDateString("sv-SE")}
+                              Anslöt: {new Date(ref.joinedAt).toLocaleDateString(currentDateLocale())}
                             </AutoText>
 
                             <View className="flex-row items-center gap-1 mt-2">
-                              <Ionicons
+                              <AppIcon
                                 name="trophy-outline"
                                 size={12}
                                 color={ref.pointsEarned > 0 ? "#22c55e" : "#9ca3af"}
@@ -882,7 +853,7 @@ export default function ReferralUsers() {
               }`}
             >
               <Input
-                placeholder="Ange referral-koden"
+                placeholder={referralCodeHint}
                 value={inputReferralCode}
                 onChangeText={setInputReferralCode}
                 placeholderTextColor={isDark ? "#9ca3af" : "#6b7280"}
@@ -892,19 +863,12 @@ export default function ReferralUsers() {
                     : "bg-light/50 text-black border-gray-100"
                 }`}
               />
-              <TouchableOpacity
+              <PrimaryButton
+                label={isProcessingReferral ? "Bearbetar..." : "Använd referral-kod"}
                 onPress={handleAddReferralCode}
-                disabled={isProcessingReferral || !inputReferralCode.trim()}
-                className={`p-3 rounded-xl items-center ${
-                  isProcessingReferral || !inputReferralCode.trim()
-                    ? "bg-gray-500"
-                    : "bg-blue-500"
-                }`}
-              >
-                <AutoText className="text-white font-bold">
-                  {isProcessingReferral ? "Bearbetar..." : "Använd referral-kod"}
-                </AutoText>
-              </TouchableOpacity>
+                loading={isProcessingReferral}
+                disabled={!inputReferralCode.trim()}
+              />
             </View>
           </Animated.View>
         )}

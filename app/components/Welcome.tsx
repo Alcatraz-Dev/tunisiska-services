@@ -19,7 +19,12 @@ import { LinearGradient } from "expo-linear-gradient";
 import { getPremiumGradient } from "../utils/getPremiumGradient";
 import { useUser } from "@clerk/clerk-expo";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Feather } from "@expo/vector-icons";
+
+type AsyncStorageModule = typeof AsyncStorage;
+
+function isAsyncStorageSafe(module: any): module is AsyncStorageModule {
+  return typeof module?.getItem === "function" && typeof module?.setItem === "function" && typeof module?.removeItem === "function";
+}
 import { AutoText } from "./ui/AutoText";
 
 const gap = 10;
@@ -174,20 +179,18 @@ export default function () {
     if (isLoaded && !user) {
       router.push("/sign-in");
       return;
-    }
-
-    try {
-      const hasSeenOnboarding = await AsyncStorage.getItem("hasSeenOnboarding");
-      if (!hasSeenOnboarding) {
-        router.push("/onboarding");
+    }      try {
+        if (!isAsyncStorageSafe(AsyncStorage)) {
+          console.log("AsyncStorage not ready; skipping onboarding flag write");
+          router.replace("/");
+          return;
+        }
         await AsyncStorage.setItem("hasSeenOnboarding", "true");
-      } else {
-        router.push("/");
+        router.replace("/onboarding");
+      } catch (error) {
+        console.log("Error writing onboarding flag:", error);
+        router.replace("/");
       }
-    } catch (error) {
-      console.log("Error reading onboarding flag:", error);
-      router.push("/");
-    }
   };
 
   return (
@@ -203,13 +206,15 @@ export default function () {
         end={{ x: 0.5, y: 1 }}
         style={{
           position: "absolute",
-          bottom: 0,
+          top: 0,
           width: "100%",
           height: "100%",
-          opacity: 0.3,
+          opacity: 0.2,
         }}
       />
 
+      {/* Keep the mobile-first word/image rows at a phone-sized width on web. */}
+      <View style={{ width: "100%", maxWidth: 480, alignSelf: "center" }}>
       <View
         style={{ gap, marginHorizontal: 5 }}
         className="bottom-20 gap-5 mx-5"
@@ -217,12 +222,12 @@ export default function () {
         <HeadText
           text="Snabb"
           side="left"
-          image={require("../assets/images/welcome_fast_v2.jpg")}
+          image={require("../assets/images/welcome_fast.jpg")}
         />
         <HeadText
           text="Trygg"
           side="right"
-          image={require("../assets/images/welcome_safe_v2.jpg")}
+          image={require("../assets/images/welcome_safe.jpg")}
         />
         <HeadText
           text="Smart"
@@ -242,24 +247,22 @@ export default function () {
         >
           <TouchableOpacity
             onPress={handleRoute}
-            className={`px-10 py-4 rounded-2xl flex-row items-center shadow-lg backdrop-blur-md gap-3 mx-5 ${
-              isDark ? " bg-light" : "bg-dark"
-            }`}
+            className={
+              `px-10 py-4 rounded-2xl flex-row items-center shadow-lg backdrop-blur-md gap-3 mx-5 ${
+                isDark ? " bg-light" : "bg-dark"
+              }`
+            }
           >
             <AutoText
               className={`font-bold text-base ml-5 ${
                 isDark ? "text-black" : "text-white"
               }`}
             >
-              Gå vidare
+              Gå vidare
             </AutoText>
-            <Feather
-              name="arrow-right"
-              size={14}
-              color={isDark ? "black" : "white"}
-            />
           </TouchableOpacity>
         </Animated.View>
+      </View>
       </View>
     </View>
   );

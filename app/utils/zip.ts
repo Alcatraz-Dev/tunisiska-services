@@ -7,7 +7,7 @@ export function encode(str: object) {
 }
 
 export function decode(str: string) {
-  return ungzip(Buffer.from(decodeURIComponent(str), "base64"), {
+  return ungzip(new Uint8Array(Buffer.from(decodeURIComponent(str), "base64")), {
     to: "string",
   });
 }

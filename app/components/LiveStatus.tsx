@@ -3,6 +3,7 @@ import { View, Animated } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import AppIcon from "@/app/components/ui/AppIcon";
 import { getPremiumGradientWithOpacity } from "../utils/getPremiumGradient";
 import { AutoText } from "./ui/AutoText";
 
@@ -84,7 +85,7 @@ export default function LiveStatus() {
         <View className="ml-2 my-1.5">
           {/* Header */}
           <View className="flex-row items-center mb-1 ">
-            <Ionicons
+            <AppIcon
               name="pulse"
               size={10}
               color={isDark ? "#fff" : "#000"}

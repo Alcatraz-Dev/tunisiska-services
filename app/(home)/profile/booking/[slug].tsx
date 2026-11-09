@@ -7,6 +7,9 @@ import {
   Share,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import AppIcon from "@/app/components/ui/AppIcon";
+import ScreenHeader from "@/app/components/ui/ScreenHeader";
+import PrimaryButton from "@/app/components/ui/PrimaryButton";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useTheme } from "@/app/context/ThemeContext";
 import Animated, {
@@ -25,6 +28,7 @@ import { TaxiOrderService } from "@/app/services/taxiOrderService";
 import { MoveOrderService } from "@/app/services/moveOrderService";
 import { ShippingOrderService } from "@/app/services/shippingOrderService";
 import { ContainerShippingOrderService } from "@/app/services/containerShippingOrderService";
+import { currentDateLocale } from "@/app/lib/time";
 import * as Linking from "expo-linking";
 import { showAlert } from "@/app/utils/showAlert";
 
@@ -84,7 +88,7 @@ export default function BookingDetailsScreen() {
           transformedBooking = {
             id: order._id || "N/A",
             category: "Taxi",
-            date: order.scheduledDateTime ? new Date(order.scheduledDateTime).toLocaleDateString('sv-SE') : "Datum saknas",
+            date: order.scheduledDateTime ? new Date(order.scheduledDateTime).toLocaleDateString(currentDateLocale()) : "Datum saknas",
             pickup: order.pickupAddress || "Plats saknas",
             dropoff: order.destinationAddress || "Plats saknas",
             status: getStatusText(order.status || "unknown"),
@@ -104,7 +108,7 @@ export default function BookingDetailsScreen() {
           transformedBooking = {
             id: order._id || "N/A",
             category: "Flytt utan städning",
-            date: order.scheduledDateTime ? new Date(order.scheduledDateTime).toLocaleDateString('sv-SE') : "Datum saknas",
+            date: order.scheduledDateTime ? new Date(order.scheduledDateTime).toLocaleDateString(currentDateLocale()) : "Datum saknas",
             pickup: order.pickupAddress || "Plats saknas",
             dropoff: order.deliveryAddress || "Plats saknas",
             status: getStatusText(order.status || "unknown"),
@@ -145,7 +149,7 @@ export default function BookingDetailsScreen() {
           transformedBooking = {
             id: order._id || "N/A",
             category: "Frakt",
-            date: order.scheduledDateTime ? new Date(order.scheduledDateTime).toLocaleDateString('sv-SE') : "Datum saknas",
+            date: order.scheduledDateTime ? new Date(order.scheduledDateTime).toLocaleDateString(currentDateLocale()) : "Datum saknas",
             pickup: pickupLocation,
             dropoff: dropoffLocation,
             status: getStatusText(order.status || "unknown"),
@@ -187,7 +191,7 @@ export default function BookingDetailsScreen() {
           transformedBooking = {
             id: order._id || "N/A",
             category: "Container shipping",
-            date: order.scheduledDateTime ? new Date(order.scheduledDateTime).toLocaleDateString('sv-SE') : "Datum saknas",
+            date: order.scheduledDateTime ? new Date(order.scheduledDateTime).toLocaleDateString(currentDateLocale()) : "Datum saknas",
             pickup: pickupLocation,
             dropoff: dropoffLocation,
             status: getStatusText(order.status || "unknown"),
@@ -389,27 +393,7 @@ Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
     return (
       <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
         <StatusBar style={isDark ? "light" : "dark"} />
-        <View className={`px-6 pt-6 pb-4 ${isDark ? "bg-dark" : "bg-light"}`}>
-          <View className="flex-row items-center justify-center relative mb-2">
-            <TouchableOpacity
-              onPress={() => router.back()}
-              className="absolute left-0 p-2"
-            >
-              <Ionicons
-                name="arrow-back"
-                size={24}
-                color={isDark ? "#fff" : "#000"}
-              />
-            </TouchableOpacity>
-            <AutoText
-              className={`text-2xl font-bold ${
-                isDark ? "text-white" : "text-gray-900"
-              }`}
-            >
-              Bokningsdetaljer
-            </AutoText>
-          </View>
-        </View>
+        <ScreenHeader title="Booking details" showBack />
         <View className="flex-1 items-center justify-center">
           <AutoText className={`${isDark ? "text-gray-300" : "text-gray-600"}`}>
             Laddar bokningsdetaljer...
@@ -423,27 +407,7 @@ Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
     return (
       <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
         <StatusBar style={isDark ? "light" : "dark"} />
-        <View className={`px-6 pt-6 pb-4 ${isDark ? "bg-dark" : "bg-light"}`}>
-          <View className="flex-row items-center justify-center relative mb-2">
-            <TouchableOpacity
-              onPress={() => router.back()}
-              className="absolute left-0 p-2"
-            >
-              <Ionicons
-                name="arrow-back"
-                size={24}
-                color={isDark ? "#fff" : "#000"}
-              />
-            </TouchableOpacity>
-            <AutoText
-              className={`text-2xl font-bold ${
-                isDark ? "text-white" : "text-gray-900"
-              }`}
-            >
-              Bokningsdetaljer
-            </AutoText>
-          </View>
-        </View>
+        <ScreenHeader title="Booking details" showBack />
         <View className="flex-1 items-center justify-center">
           <AutoText className={`${isDark ? "text-gray-300" : "text-gray-600"}`}>
             Bokning hittades inte
@@ -469,36 +433,8 @@ Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
       {/* Header */}
-      <Animated.View
-        entering={FadeInDown.duration(500)}
-        className={`px-6  pb-2  `}
-      >
-        <View className="flex-row items-center justify-center relative my-3">
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="absolute left-0 p-2 "
-          >
-            <Ionicons
-              name="arrow-back"
-              size={20}
-              color={isDark ? "#fff" : "#000"}
-            />
-          </TouchableOpacity>
-          <AutoText
-            className={`text-2xl font-bold ${
-              isDark ? "text-white" : "text-gray-900"
-            }`}
-          >
-            Bokningsdetaljer
-          </AutoText>
-        </View>
-        <AutoText
-          className={`text-sm text-center mt-3 ${
-            isDark ? "text-gray-400" : "text-gray-600"
-          }`}
-        >
-          Se din historik detailjer av bokade tjänster
-        </AutoText>
+      <Animated.View entering={FadeInDown.duration(500)}>
+        <ScreenHeader title="Shipment details" subtitle={serviceType ?? "Booking"} showBack />
       </Animated.View>
 
       {/* Details */}
@@ -509,8 +445,8 @@ Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={[isDark ? "#60A5FA" : "#3B82F6"]}
-            tintColor={isDark ? "#60A5FA" : "#3B82F6"}
+            colors={[isDark ? "#6A85B4" : "#132B55"]}
+            tintColor={isDark ? "#6A85B4" : "#132B55"}
           />
         }
       >
@@ -553,13 +489,13 @@ Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
               {/* Quick Info Row */}
               <View className="flex-row justify-between items-center mt-4 pt-4 border-t border-white/20">
                 <View className="items-center">
-                  <Ionicons name="calendar-outline" size={20} color={`${isDark ? "white" :"black"}`} />
+                  <AppIcon name="calendar-outline" size={20} color={`${isDark ? "white" :"black"}`} />
                   <AutoText className={`text-xs mt-1 ${isDark ? "text-white" : "text-black"}`}>
                     {String(booking.date || "Datum saknas")}
                   </AutoText>
                 </View>
                 <View className="items-center">
-                  <Ionicons name={serviceType === 'shipping' || serviceType === 'container-shipping' ? (serviceType === 'container-shipping' ? "boat-outline" : "scale-outline") : "people-outline"} size={20} color={`${isDark ? "white" :"black"}`} />
+                  <AppIcon name={serviceType === 'shipping' || serviceType === 'container-shipping' ? (serviceType === 'container-shipping' ? "boat-outline" : "scale-outline") : "people-outline"} size={20} color={`${isDark ? "white" :"black"}`} />
                    <AutoText className={`text-xs mt-1 ${isDark ? "text-white" : "text-black"}`}>
                      {serviceType === 'container-shipping' 
                        ? `Storlek: ${booking.packageDetails?.size || "N/A"}`
@@ -569,7 +505,7 @@ Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
                    </AutoText>
                 </View>
                 <View className="items-center">
-                  <Ionicons name="cash-outline" size={20} color={`${isDark ? "white" :"black"}`} />
+                  <AppIcon name="cash-outline" size={20} color={`${isDark ? "white" :"black"}`} />
                    <AutoText className={`text-xs mt-1 ${isDark ? "text-white" : "text-black"}`}>
                      {String(booking.price || "Pris saknas")}
                    </AutoText>
@@ -580,7 +516,7 @@ Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
                {(serviceType === 'shipping' || serviceType === 'container-shipping') && booking.packageDetails && (
                  <View className="flex-row justify-center items-center mt-3 pt-3 border-t border-white/20">
                    <View className="items-center">
-                     <Ionicons name="cube-outline" size={20} color={`${isDark ? "white" :"black"}`} />
+                     <AppIcon name="cube-outline" size={20} color={`${isDark ? "white" :"black"}`} />
                      <AutoText className={`text-xs mt-1 ${isDark ? "text-white" : "text-black"}`}>
                        {serviceType === 'container-shipping' 
                          ? `Container: ${booking.packageDetails.size || "Beskrivning saknas"}`
@@ -610,10 +546,10 @@ Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
               <View className="flex-row items-center justify-between mb-3">
                 <View className="flex-row items-center">
                   <View className={`p-3 rounded-xl ${isDark ? "bg-blue-500/20" : "bg-blue-100"}`}>
-                    <Ionicons
+                    <AppIcon
                       name="location-outline"
                       size={20}
-                      color={isDark ? "#60A5FA" : "#3B82F6"}
+                      color={isDark ? "#6A85B4" : "#132B55"}
                     />
                   </View>
                   <View className="ml-3">
@@ -625,8 +561,8 @@ Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
                     </AutoText>
                   </View>
                 </View>
-                <View className={`px-3 py-1 rounded-full ${booking.isRoundTrip ? (isDark ? "bg-purple-500/20" : "bg-purple-100") : (isDark ? "bg-green-500/20" : "bg-green-100")}`}>
-                  <AutoText className={`text-xs font-medium ${booking.isRoundTrip ? (isDark ? "text-purple-300" : "text-purple-700") : (isDark ? "text-green-300" : "text-green-700")}`}>
+                <View className={`px-3 py-1 rounded-full ${booking.isRoundTrip ? (isDark ? "bg-orange-500/20" : "bg-orange-100") : (isDark ? "bg-navy-500/20" : "bg-navy-100")}`}>
+                  <AutoText className={`text-xs font-medium ${booking.isRoundTrip ? (isDark ? "text-orange-300" : "text-orange-700") : (isDark ? "text-navy-300" : "text-navy-700")}`}>
                     {String(booking.isRoundTrip ? "Tur & Retur" : "Enkel")}
                   </AutoText>
                 </View>
@@ -671,7 +607,7 @@ Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
                 >
                   <View className="items-center">
                     <View className={`p-3 rounded-xl mb-3 ${isDark ? "bg-amber-500/20" : "bg-amber-100"}`}>
-                      <Ionicons
+                      <AppIcon
                         name="time-outline"
                         size={22}
                         color={isDark ? "#FCD34D" : "#F59E0B"}
@@ -681,14 +617,14 @@ Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
                       Avhämtning
                     </AutoText>
                     <AutoText className={`text-sm text-center mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                      {String(booking.scheduledDateTime ? new Date(booking.scheduledDateTime).toLocaleDateString('sv-SE') : "Datum saknas")}
+                      {String(booking.scheduledDateTime ? new Date(booking.scheduledDateTime).toLocaleDateString(currentDateLocale()) : "Datum saknas")}
                     </AutoText>
                     <AutoText className={`text-sm text-center font-semibold ${isDark ? "text-amber-300" : "text-amber-700"}`}>
-                      {String(booking.scheduledDateTime ? new Date(booking.scheduledDateTime).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) : "Tid saknas")}
+                      {String(booking.scheduledDateTime ? new Date(booking.scheduledDateTime).toLocaleTimeString(currentDateLocale(), { hour: '2-digit', minute: '2-digit' }) : "Tid saknas")}
                     </AutoText>
                     {booking.returnDateTime && (
                       <AutoText className={`text-xs text-center mt-1 ${isDark ? "text-blue-300" : "text-blue-600"}`}>
-                        Retur: {String(new Date(booking.returnDateTime).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }))}
+                        Retur: {String(new Date(booking.returnDateTime).toLocaleTimeString(currentDateLocale(), { hour: '2-digit', minute: '2-digit' }))}
                       </AutoText>
                     )}
                   </View>
@@ -710,17 +646,17 @@ Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
                   }}
                 >
                   <View className="items-center">
-                    <View className={`p-3 rounded-xl mb-3 ${isDark ? "bg-purple-500/20" : "bg-purple-100"}`}>
-                      <Ionicons
+                    <View className={`p-3 rounded-xl mb-3 ${isDark ? "bg-orange-500/20" : "bg-orange-100"}`}>
+                      <AppIcon
                         name={serviceType === 'taxi' ? "people-outline" : (serviceType === 'shipping' || serviceType === 'container-shipping' ? (serviceType === 'container-shipping' ? "boat-outline" : "scale-outline") : "cube-outline")}
                         size={22}
-                        color={isDark ? "#C084FC" : "#8B5CF6"}
+                        color={isDark ? "#FFA971" : "#F2761B"}
                       />
                     </View>
                     <AutoText className={`font-semibold text-base mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>
                       {serviceType === 'taxi' ? 'Passagerare' : serviceType === 'container-shipping' ? 'Size' : serviceType === 'shipping' ? 'Vikt' : 'Personer'}
                     </AutoText>
-                    <AutoText className={`text-xl font-bold mb-2 ${isDark ? "text-purple-300" : "text-purple-700"}`}>
+                    <AutoText className={`text-xl font-bold mb-2 ${isDark ? "text-navy-300" : "text-navy-700"}`}>
                       {serviceType === 'container-shipping' ? booking.packageDetails?.size : serviceType === 'shipping' ? `${String(booking.passengers || 0)} kg` : `${String(booking.passengers || 1)} ${serviceType === 'taxi' ? 'pass' : 'pers'}`}
                     </AutoText>
                     {serviceType === 'taxi' && booking.estimatedDistance && (
@@ -749,7 +685,7 @@ Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
               <View className="flex-row items-center justify-between mb-3">
                 <View className="flex-row items-center">
                   <View className={`p-3 rounded-xl ${isDark ? "bg-indigo-500/20" : "bg-indigo-100"}`}>
-                    <Ionicons
+                    <AppIcon
                       name="person-outline"
                       size={20}
                       color={isDark ? "#818CF8" : "#6366F1"}
@@ -817,7 +753,7 @@ Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
                     isDark ? "bg-gray-500" : "bg-orange-100"
                   }`}
                 >
-                  <Ionicons
+                  <AppIcon
                     name="document-text-outline"
                     size={16}
                     color={isDark ? "#ffffff" : "#EA580C"}
@@ -858,7 +794,7 @@ Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
           >
             <View className="items-center">
               <View className="flex-row items-center mb-2">
-                <Ionicons name="cash-outline" size={24} color={isDark ? "#fff" : "#000"} />
+                <AppIcon name="cash-outline" size={24} color={isDark ? "#fff" : "#000"} />
                 <AutoText className={`text-lg font-semibold ml-2 ${isDark ? "text-white" : "text-gray-900"}`}>
                   Betalning
                 </AutoText>
@@ -882,52 +818,9 @@ Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
           {/* Modern Action Buttons */}
           <View className="space-y-4">
 
-            <View className="flex-row gap-4" style={{ marginTop: 8 }}>
-              <TouchableOpacity
-                className={`flex-1 py-4 rounded-2xl items-center ${
-                  isDark ? "bg-green-600" : "bg-green-500"
-                }`}
-                style={{
-                  shadowColor: "#10B981",
-                  shadowOpacity: 0.3,
-                  shadowRadius: 8,
-                  shadowOffset: { width: 0, height: 4 },
-                  elevation: 6,
-                }}
-                onPress={shareOrderDetails}
-              >
-                <View className="flex-row items-center mx-2">
-                  <Ionicons name="share-outline" size={14} color="white" />
-                  <AutoText className="text-white font-medium ml-2 text-sm">
-                    Dela kvitto
-                  </AutoText>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                className={`flex-1 py-4 rounded-2xl items-center ${
-                  isDark ? "bg-blue-600" : "bg-blue-500"
-                }`}
-                style={{
-                  shadowColor: isDark ? "#2563EB" : "#3B82F6",
-                  shadowOpacity: 0.3,
-                  shadowRadius: 8,
-                  shadowOffset: { width: 0, height: 4 },
-                  elevation: 6,
-                }}
-                onPress={handleContactSupport}
-              >
-                <View className="flex-row items-center mx-2">
-                  <Ionicons
-                    name="mail-outline"
-                    size={14}
-                    color="white"
-                  />
-                  <AutoText className="text-white font-medium ml-2 text-sm">
-                    Support
-                  </AutoText>
-                </View>
-              </TouchableOpacity>
+            <View style={{ flexDirection: "row", gap: 12, marginTop: 8 }}>
+              <PrimaryButton label="Dela kvitto" icon="share-outline" variant="secondary" onPress={shareOrderDetails} style={{ flex: 1 }} />
+              <PrimaryButton label="Support" icon="mail-outline" onPress={handleContactSupport} style={{ flex: 1 }} />
 
               <TouchableOpacity
                 className={`flex-1 py-4 rounded-2xl items-center ${
@@ -944,7 +837,7 @@ Bokningsnummer: ${booking.id?.slice(-8) || 'N/A'}`;
                 disabled={booking?.status === "Avbokad" || booking?.status === "Avslutad"}
               >
                 <View className="flex-row items-center mx-2">
-                  <Ionicons name="close-circle-outline" size={14} color="white" />
+                  <AppIcon name="close-circle-outline" size={14} color="white" />
                   <AutoText className="text-white font-medium ml-2 text-sm">
                     Avboka
                   </AutoText>

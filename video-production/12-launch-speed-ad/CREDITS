@@ -1,0 +1,5 @@
+Brand design system, source files and logo: Tunisiska Services project supplied by the user. The logo is the only imported visual; it is not an app screenshot. Rubik font files and SIL Open Font License 1.1 text are bundled in assets/fonts/.
+
+Motion-design workflow references: iart-ai/motion-skills (MIT), specifically the launch-video structure and the JavaScript animation / soundtrack guidance: https://github.com/iart-ai/motion-skills · https://github.com/iart-ai/ad-video-skills · https://github.com/iart-ai/javascript-animation-skills. The project's scene drawings, animation code, score and soundtrack are original; no repository demo code, example art or music was copied.
+
+All transport and service illustrations are hand-built canvas vectors. The app screenshots were used only to understand the product; no screenshots, screen recordings, stock visuals, map imagery or third-party music appear in either video.

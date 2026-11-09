@@ -1,0 +1,13 @@
+{
+  "duration": 30,
+  "fps": 24,
+  "bpm": 112,
+  "sections": [0, 4, 8, 12, 16, 20, 25, 30],
+  "silence": [[24.5, 25]],
+  "hits": [0, 4, 8, 12, 16, 20, 25, 27.5],
+  "foley": [0.4, 4.2, 8.2, 12.2, 16.2, 20.2, 21.0, 22.0, 26.0, 28.0],
+  "copy": {
+    "sv": ["Din transport mellan Sverige och Tunisien.", "Planera din resa.", "Skicka paket eller boka container.", "Flytt och städning.", "Taxi till flygplatsen.", "Resor, bokningar och spårning i samma app.", "Utforska appen."],
+    "ar": ["نقلك بين السويد وتونس.", "خطط رحلتك.", "أرسل الطرود أو احجز حاوية.", "النقل والتنظيف.", "تاكسي المطار.", "الرحلات والحجوزات والتتبع في تطبيق واحد.", "استكشف التطبيق."]
+  }
+}

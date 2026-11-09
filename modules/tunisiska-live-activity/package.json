@@ -1,0 +1,15 @@
+{
+  "name": "tunisiska-live-activity",
+  "version": "1.0.0",
+  "description": "Genuine ActivityKit Live Activity for the next scheduled departure.",
+  "license": "UNLICENSED",
+  "author": "Tunisiska Mega Transport",
+  "homepage": "https://tunisiska.com",
+  "main": "index.ts",
+  "private": true,
+  "peerDependencies": {
+    "expo": "*",
+    "react": "*",
+    "react-native": "*"
+  }
+}

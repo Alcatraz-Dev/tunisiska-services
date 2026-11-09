@@ -12,8 +12,8 @@ web-build/
 .env*
 .env*.production
 .env*.local
-ios
-android
+/ios
+/android
 
 # macOS
 .DS_Store

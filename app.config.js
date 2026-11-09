@@ -108,7 +108,10 @@ module.exports = {
     },
     web: {
       bundler: "metro",
-      output: "static",
+      // Single-page output: the web build is a client-rendered app. Static
+      // per-route rendering runs through Expo Router 58's server route registry,
+      // which fails on this project's non-route files under `app/`.
+      output: "single",
       favicon: "./app/assets/expo-icons/favicon.png",
     },
     scheme: "tunisiska-mega-service",
@@ -146,6 +149,12 @@ module.exports = {
       ],
       "expo-localization",
       [
+        "expo-build-properties",
+        {
+          ios: { deploymentTarget: "16.4" },
+        },
+      ],
+      [
         "expo-notifications",
         {
           icon: "./app/assets/expo-icons/icon.png",
@@ -175,23 +184,29 @@ module.exports = {
       "@react-native-google-signin/google-signin",
       "./plugins/withAudioBackgroundFix",
       "./plugins/withKlarnaRepo",
+      // Makes a clean prebuild produce a buildable Podfile (modular headers
+      // for the Google Sign-in pods, and pod deployment targets Xcode accepts).
+      "./plugins/withPodfileFixes",
+      // Adds the WidgetKit extension that renders the next-departure Live
+      // Activity in the Dynamic Island and on the Lock Screen.
+      "./plugins/withLiveActivities",
     ],
 
     experiments: {
       typedRoutes: true,
-      newArch: true,
-      reactNativeNewArchitecture: false,
     },
     extra: {
       router: {},
       eas: {
         projectId: "febc1a59-7c3b-4754-a888-3246bca56018",
       },
-      // Expose Sanity config so it's available at runtime on device/web
+      // Expose Sanity config so it's available at runtime on device/web.
+      // The API token is deliberately NOT exposed here: a second copy in the
+      // build manifest only widens the leak. See `sanityClient.ts` for the
+      // remaining client token, which must move server-side before release.
       sanity: {
         projectId: process.env.EXPO_PUBLIC_SANITY_PROJECT_ID,
         dataset: process.env.EXPO_PUBLIC_SANITY_DATASET,
-        token: process.env.EXPO_PUBLIC_SANITY_TOKEN,
       },
       // Environment variables for different build types
       env: process.env.APP_VARIANT || "production",

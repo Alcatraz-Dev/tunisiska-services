@@ -1,24 +1,117 @@
-import React, { useState, useEffect } from "react";
-import { View, TouchableOpacity, ScrollView, Alert } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import React, { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Platform, ScrollView, View } from "react-native";
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { useTheme } from "@/app/context/ThemeContext";
-import Animated, { FadeInUp } from "react-native-reanimated";
-import { AutoText } from "@/app/components/ui/AutoText";
+import { StatusBar } from "expo-status-bar";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
+import Animated, { FadeInUp } from "react-native-reanimated";
+
+import AppIcon from "@/app/components/ui/AppIcon";
+import Badge from "@/app/components/ui/Badge";
+import EmptyState from "@/app/components/ui/EmptyState";
+import PrimaryButton from "@/app/components/ui/PrimaryButton";
+import ScreenHeader from "@/app/components/ui/ScreenHeader";
+import ThemedText from "@/app/components/ui/ThemedText";
+import { useTheme } from "@/app/context/ThemeContext";
+import { useThemeColors } from "@/app/theme";
+import { radii, shadows, spacing } from "@/app/theme/spacing";
 import { ShippingOrderService } from "@/app/services/shippingOrderService";
-import { useAuth } from "@clerk/clerk-expo";
-import { GoogleMaps } from "expo-maps";
+import { showAlert } from "@/app/utils/showAlert";
+import { currentDateLocale, zonedDateLabel, zonedTime } from "@/app/lib/time";
+import { getRoute } from "@/app/lib/routes";
+import {
+  coordinatesForCity,
+  formatDistanceKm,
+  formatDuration,
+  getRouteMetrics,
+  interpolatePath,
+} from "@/app/lib/routeMetrics";
+import { useLanguage } from "@/app/hooks/useLanguage";
+import { useTranslationText } from "@/app/hooks/useTranslation";
+
+function statusTone(status: string): "success" | "warning" | "info" | "neutral" {
+  if (status === "confirmed") return "info";
+  if (status === "in_progress") return "warning";
+  if (status === "completed") return "success";
+  return "neutral";
+}
+
+function MapPin({
+  glyph,
+  tint,
+  accessibilityLabel,
+}: {
+  glyph: string;
+  tint: string;
+  accessibilityLabel: string;
+}) {
+  return (
+    <View accessible accessibilityLabel={accessibilityLabel} style={{ alignItems: "center" }}>
+      <View
+        style={{
+          width: 48,
+          height: 48,
+          borderRadius: 24,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: `${tint}22`,
+          shadowColor: tint,
+          shadowOpacity: 0.45,
+          shadowRadius: 10,
+          shadowOffset: { width: 0, height: 7 },
+          elevation: 9,
+        }}
+      >
+        <LinearGradient
+          colors={["rgba(255,255,255,0.95)", tint]}
+          start={{ x: 0.2, y: 0 }}
+          end={{ x: 0.8, y: 1 }}
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            alignItems: "center",
+            justifyContent: "center",
+            borderWidth: 2,
+            borderColor: "rgba(255,255,255,0.85)",
+          }}
+        >
+          <ThemedText style={{ fontSize: 17, lineHeight: 21 }} translate={false}>
+            {glyph}
+          </ThemedText>
+        </LinearGradient>
+      </View>
+      <View style={{ width: 4, height: 8, marginTop: -3, borderRadius: 2, backgroundColor: tint }} />
+      <View
+        style={{
+          width: 12,
+          height: 4,
+          marginTop: 1,
+          borderRadius: 2,
+          backgroundColor: "rgba(0,0,0,0.22)",
+        }}
+      />
+    </View>
+  );
+}
 
 export default function ShipmentMapScreen() {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
+  const theme = useThemeColors();
   const router = useRouter();
   const { slug } = useLocalSearchParams();
-  const { userId } = useAuth();
+  const { language } = useLanguage();
+  const locale = currentDateLocale(language);
   const [shipment, setShipment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [driverLocation, setDriverLocation] = useState<any>(null);
+
+  const distanceLabel = useTranslationText("Distance", language);
+  const durationLabel = useTranslationText("Duration", language);
+  const departureLabel = useTranslationText("Departure", language);
+  const pickupLabel = useTranslationText("Collection", language);
+  const deliveryLabel = useTranslationText("Delivery", language);
 
   // Handle slug parameter
   const shipmentId = Array.isArray(slug) ? slug[0] : slug;
@@ -32,83 +125,66 @@ export default function ShipmentMapScreen() {
 
       try {
         const result = await ShippingOrderService.getShippingOrder(shipmentId);
-
-        if (result.success && result.order) {
-          setShipment(result.order);
-
-
-          // Simulate driver location updates (in real app, this would come from GPS tracking)
-          // For demo purposes, we'll set a mock location
-          setDriverLocation({
-            latitude: 59.3293, // Stockholm coordinates
-            longitude: 18.0686,
-            heading: 45,
-            speed: 60, // km/h
-            lastUpdate: new Date(),
-          });
-        }
+        if (result.success && result.order) setShipment(result.order);
       } catch (error) {
-        console.error('Error fetching shipment:', error);
+        console.error("Error fetching shipment:", error);
       } finally {
         setLoading(false);
       }
     };
 
     fetchShipment();
-
-    // Simulate real-time location updates
-    const locationInterval = setInterval(() => {
-      if (driverLocation) {
-        setDriverLocation((prev: any) => ({
-          ...prev,
-          lastUpdate: new Date(),
-          // Simulate slight movement
-          latitude: prev.latitude + (Math.random() - 0.5) * 0.001,
-          longitude: prev.longitude + (Math.random() - 0.5) * 0.001,
-        }));
-      }
-    }, 10000); // Update every 10 seconds
-
-    return () => clearInterval(locationInterval);
   }, [shipmentId]);
+
+  /**
+   * The shipment's own route drives the map. Coordinates come from the served
+   * cities; nothing is drawn when the route cannot be resolved, so the screen
+   * never falls back to a placeholder line.
+   */
+  const geometry = useMemo(() => {
+    if (!shipment) return null;
+
+    const route = getRoute(shipment.route);
+    const from =
+      coordinatesForCity(route.origin) ?? coordinatesForCity(shipment.pickupAddress);
+    const to =
+      coordinatesForCity(route.destination) ??
+      coordinatesForCity(shipment.deliveryAddress);
+
+    if (!from || !to) return null;
+
+    return {
+      route,
+      from,
+      to,
+      path: interpolatePath(from, to),
+      metrics: getRouteMetrics(shipment.route, shipment.vehicle),
+    };
+  }, [shipment]);
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case 'confirmed': return 'Bekräftad';
-      case 'in_progress': return 'Pågående';
-      case 'completed': return 'Avslutad';
-      default: return 'Okänd';
+      case "confirmed":
+        return "Confirmed";
+      case "in_progress":
+        return "In progress";
+      case "completed":
+        return "Completed";
+      default:
+        return "Unknown";
     }
   };
 
   if (loading) {
     return (
-      <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
-        <View className={`px-6 pt-6 pb-4 ${isDark ? "bg-dark" : "bg-light"}`}>
-          <View className="flex-row items-center justify-center relative mb-2">
-            <TouchableOpacity
-              onPress={() => router.back()}
-              className="absolute left-0 p-2"
-            >
-              <Ionicons
-                name="arrow-back"
-                size={24}
-                color={isDark ? "#fff" : "#000"}
-              />
-            </TouchableOpacity>
-            <AutoText
-              className={`text-2xl font-bold ${
-                isDark ? "text-white" : "text-gray-900"
-              }`}
-            >
-              Kartvy
-            </AutoText>
-          </View>
-        </View>
-        <View className="flex-1 items-center justify-center">
-          <AutoText className={`${isDark ? "text-gray-300" : "text-gray-600"}`}>
-            Laddar kartdata...
-          </AutoText>
+      <SafeAreaView edges={["top", "left", "right"]} style={{ flex: 1, backgroundColor: theme.canvas }}>
+        <StatusBar style={isDark ? "light" : "dark"} />
+        <ScreenHeader title="Map view" showBack />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.sm }}>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <ThemedText variant="bodySm" tone="secondary">
+            Loading map data...
+          </ThemedText>
         </View>
       </SafeAreaView>
     );
@@ -116,270 +192,241 @@ export default function ShipmentMapScreen() {
 
   if (!shipment) {
     return (
-      <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
-        <View className={`px-6 pt-6 pb-4 ${isDark ? "bg-dark" : "bg-light"}`}>
-          <View className="flex-row items-center justify-center relative mb-2">
-            <TouchableOpacity
-              onPress={() => router.back()}
-              className="absolute left-0 p-2"
-            >
-              <Ionicons
-                name="arrow-back"
-                size={24}
-                color={isDark ? "#fff" : "#000"}
-              />
-            </TouchableOpacity>
-            <AutoText
-              className={`text-2xl font-bold ${
-                isDark ? "text-white" : "text-gray-900"
-              }`}
-            >
-              Kartvy
-            </AutoText>
-          </View>
-        </View>
-        <View className="flex-1 items-center justify-center">
-          <AutoText className={`${isDark ? "text-gray-300" : "text-gray-600"}`}>
-            Leverans hittades inte
-          </AutoText>
+      <SafeAreaView edges={["top", "left", "right"]} style={{ flex: 1, backgroundColor: theme.canvas }}>
+        <StatusBar style={isDark ? "light" : "dark"} />
+        <ScreenHeader title="Map view" showBack />
+        <View style={{ flex: 1, paddingHorizontal: spacing.gutter, justifyContent: "center" }}>
+          <EmptyState
+            icon="map-outline"
+            title="Delivery not found"
+            description="This shipment could not be loaded"
+          />
         </View>
       </SafeAreaView>
     );
   }
 
-  return (
-    <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
-      {/* Header */}
-      <View className={`px-6 pt-6 pb-4 ${isDark ? "bg-dark" : "bg-light"}`}>
-        <View className="flex-row items-center justify-center relative mb-2">
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="absolute left-0 p-2"
-          >
-            <Ionicons
-              name="arrow-back"
-              size={24}
-              color={isDark ? "#fff" : "#000"}
-            />
-          </TouchableOpacity>
-          <AutoText
-            className={`text-2xl font-bold ${
-              isDark ? "text-white" : "text-gray-900"
-            }`}
-          >
-            Kartvy - Frakt #{shipment._id?.slice(-6)}
-          </AutoText>
-        </View>
-        <AutoText
-          className={`text-sm text-center ${
-            isDark ? "text-gray-400" : "text-gray-600"
-          }`}
-        >
-          Spåra din leverans i realtid
-        </AutoText>
-      </View>
+  const distance = formatDistanceKm(geometry?.metrics.distanceKm ?? null, locale);
+  const duration = formatDuration(geometry?.metrics.durationHours ?? null);
+  const timezone = (geometry?.route.timezone ?? "Europe/Stockholm") as
+    | "Europe/Stockholm"
+    | "Africa/Tunis";
 
-      {/* Map Placeholder */}
-      <View className="flex-1 mx-6 mb-4">
+  return (
+    <SafeAreaView edges={["top", "left", "right"]} style={{ flex: 1, backgroundColor: theme.canvas }}>
+      <StatusBar style={isDark ? "light" : "dark"} />
+      <ScreenHeader
+        title={`Map view — Shipment #${shipment._id?.slice(-6)}`}
+        subtitle="Track your delivery in real time"
+        showBack
+      />
+
+      <ScrollView
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: spacing.gutter, paddingBottom: 48, gap: spacing.md }}
+      >
+        {/* Real route between the shipment's two cities */}
         <View
-          className={`flex-1 rounded-2xl ${
-            isDark ? "bg-gray-800" : "bg-gray-200"
-          } items-center justify-center relative overflow-hidden`}
           style={{
-            shadowColor: "#000",
-            shadowOpacity: 0.15,
-            shadowRadius: 8,
-            shadowOffset: { width: 0, height: 4 },
-            elevation: 6,
+            height: 300,
+            borderRadius: radii.lg,
+            backgroundColor: theme.surface,
+            borderWidth: 1,
+            borderColor: theme.borderSubtle,
+            overflow: "hidden",
+            ...shadows.sm,
           }}
         >
-          {/* Map Background Pattern */}
-          <View className="absolute inset-0 opacity-10">
-            <View className="w-full h-full bg-gradient-to-br from-blue-500 to-green-500" />
-          </View>
-
-          {/* Map Content */}
-          <View className="absolute inset-0 p-6">
-            {/* Route Line */}
-            <View className="absolute top-1/4 left-1/4 right-1/4 h-1 bg-blue-500 rounded-full" />
-            <View className="absolute top-1/4 left-1/4 w-3 h-3 bg-green-500 rounded-full" />
-            <View className="absolute top-1/4 right-1/4 w-3 h-3 bg-red-500 rounded-full" />
-
-            {/* Truck Icon */}
-            {driverLocation && (
-              <View className="absolute top-1/3 left-1/2 transform -translate-x-2 -translate-y-2">
-                <View className={`w-8 h-8 rounded-full ${isDark ? "bg-blue-600" : "bg-blue-500"} items-center justify-center`}>
-                  <Ionicons name="car" size={16} color="white" />
-                </View>
-              </View>
-            )}
-
-            {/* Center Text */}
-            <View className="flex-1 items-center justify-center">
-              <Ionicons
-                name="map-outline"
-                size={48}
-                color={isDark ? "#6B7280" : "#9CA3AF"}
+          {geometry ? (
+            <MapView
+              style={{ flex: 1 }}
+              provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
+              initialRegion={{
+                latitude: (geometry.from.latitude + geometry.to.latitude) / 2,
+                longitude: (geometry.from.longitude + geometry.to.longitude) / 2,
+                latitudeDelta: Math.abs(geometry.from.latitude - geometry.to.latitude) * 1.5 || 1,
+                longitudeDelta: Math.abs(geometry.from.longitude - geometry.to.longitude) * 1.5 || 1,
+              }}
+              scrollEnabled={false}
+              zoomEnabled={false}
+              pitchEnabled={false}
+              rotateEnabled={false}
+            >
+              <Polyline
+                coordinates={geometry.path}
+                strokeColor={isDark ? "#F2761B" : "#E0620C"}
+                strokeWidth={4}
+                lineJoin="round"
+                lineCap="round"
+                geodesic
               />
-              <AutoText
-                className={`mt-4 text-lg font-medium ${
-                  isDark ? "text-gray-300" : "text-gray-600"
-                }`}
-              >
-                Kartintegration
-              </AutoText>
-              <AutoText
-                className={`mt-2 text-sm text-center px-4 ${
-                  isDark ? "text-gray-400" : "text-gray-500"
-                }`}
-              >
-                Här skulle en riktig kartkomponent visas (t.ex. Google Maps eller Mapbox)
-              </AutoText>
+              <Marker coordinate={geometry.from} anchor={{ x: 0.5, y: 1 }}>
+                <MapPin
+                  glyph="📦"
+                  tint="#22C55E"
+                  accessibilityLabel={`${pickupLabel}: ${geometry.route.origin}`}
+                />
+              </Marker>
+              <Marker coordinate={geometry.to} anchor={{ x: 0.5, y: 1 }}>
+                <MapPin
+                  glyph="🎯"
+                  tint={theme.accent}
+                  accessibilityLabel={`${deliveryLabel}: ${geometry.route.destination}`}
+                />
+              </Marker>
+            </MapView>
+          ) : (
+            <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.lg, gap: spacing.sm }}>
+              <AppIcon name="map-outline" size={36} color={theme.textQuaternary} />
+              <ThemedText variant="bodySm" tone="secondary" align="center">
+                This delivery's route could not be located on the map.
+              </ThemedText>
             </View>
-          </View>
+          )}
         </View>
-      </View>
 
-      {/* Shipment Details */}
-      <View className="px-6 pb-6">
+        {/* Shipment Details */}
         <Animated.View
           entering={FadeInUp.duration(600)}
-          className={`p-5 rounded-2xl ${
-            isDark ? "bg-dark-card" : "bg-light-card"
-          }`}
           style={{
-            shadowColor: "#000",
-            shadowOpacity: 0.1,
-            shadowRadius: 8,
-            shadowOffset: { width: 0, height: 4 },
-            elevation: 6,
+            padding: spacing.lg,
+            borderRadius: radii.lg,
+            backgroundColor: theme.surface,
+            borderWidth: 1,
+            borderColor: theme.borderSubtle,
+            ...shadows.sm,
           }}
         >
           {/* Status */}
-          <View className="flex-row justify-between items-center mb-4">
-            <AutoText className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.md }}>
+            <ThemedText variant="headline" translate={false}>
               Status: {getStatusText(shipment.status)}
-            </AutoText>
-            <View className={`px-3 py-1 rounded-full ${
-              shipment.status === 'in_progress' ? 'bg-yellow-100' :
-              shipment.status === 'confirmed' ? 'bg-blue-100' : 'bg-green-100'
-            }`}>
-              <AutoText className={`text-xs font-bold ${
-                shipment.status === 'in_progress' ? 'text-yellow-700' :
-                shipment.status === 'confirmed' ? 'text-blue-700' : 'text-green-700'
-              }`}>
-                {getStatusText(shipment.status)}
-              </AutoText>
-            </View>
+            </ThemedText>
+            <Badge label={getStatusText(shipment.status)} tone={statusTone(shipment.status)} />
           </View>
 
           {/* Route */}
-          <View className="mb-4">
-            <View className="flex-row items-center mb-2">
-              <View className="w-3 h-3 bg-green-500 rounded-full mr-3" />
-              <AutoText className={`font-medium ${isDark ? "text-gray-200" : "text-gray-800"}`}>
-                Från: {shipment.pickupAddress}
-              </AutoText>
+          <View style={{ marginBottom: spacing.md, gap: spacing.sm }}>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: "#22C55E", marginRight: spacing.md }} />
+              <ThemedText variant="bodySm" style={{ flex: 1, fontWeight: "500" }} translate={false}>
+                From: {shipment.pickupAddress}
+              </ThemedText>
             </View>
-            <View className="flex-row items-center ml-1.5 mb-2">
-              <View className={`w-0.5 h-6 ${isDark ? "bg-gray-600" : "bg-gray-300"} mr-3`} />
+            <View style={{ flexDirection: "row", alignItems: "center", marginLeft: 4 }}>
+              <View style={{ width: 2, height: 24, backgroundColor: theme.separator, marginRight: spacing.md, marginLeft: 3 }} />
             </View>
-            <View className="flex-row items-center">
-              <View className="w-3 h-3 bg-red-500 rounded-full mr-3" />
-              <AutoText className={`font-medium ${isDark ? "text-gray-200" : "text-gray-800"}`}>
-                Till: {shipment.deliveryAddress}
-              </AutoText>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: theme.accent, marginRight: spacing.md }} />
+              <ThemedText variant="bodySm" style={{ flex: 1, fontWeight: "500" }} translate={false}>
+                To: {shipment.deliveryAddress}
+              </ThemedText>
             </View>
           </View>
 
-          {/* Driver Info */}
-          {driverLocation && (
-            <View className="mb-4 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20">
-              <View className="flex-row items-center justify-between">
-                <View className="flex-row items-center">
-                  <Ionicons name="car" size={20} color={isDark ? "#60A5FA" : "#3B82F6"} />
-                  <View className="ml-2">
-                    <AutoText className={`text-sm font-medium ${isDark ? "text-gray-200" : "text-gray-800"}`}>
-                      Förare på väg
-                    </AutoText>
-                    <AutoText className={`text-xs ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                      Uppdaterad {driverLocation.lastUpdate.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
-                    </AutoText>
-                  </View>
-                </View>
-                <View className="items-end">
-                  <AutoText className={`text-sm font-medium ${isDark ? "text-gray-200" : "text-gray-800"}`}>
-                    {driverLocation.speed} km/h
-                  </AutoText>
-                  <AutoText className={`text-xs ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                    Hastighet
-                  </AutoText>
-                </View>
-              </View>
+          {/* Route metrics, from the shipment's own schedule */}
+          <View
+            style={{
+              marginBottom: spacing.md,
+              padding: spacing.md,
+              borderRadius: radii.md,
+              backgroundColor: theme.primarySoft,
+              flexDirection: "row",
+              gap: spacing.md,
+            }}
+          >
+            <View style={{ flex: 1 }}>
+              <ThemedText variant="footnote" tone="tertiary">
+                {distanceLabel}
+              </ThemedText>
+              <ThemedText variant="headline" translate={false}>
+                {distance ?? "—"}
+              </ThemedText>
             </View>
-          )}
+            <View style={{ flex: 1 }}>
+              <ThemedText variant="footnote" tone="tertiary">
+                {durationLabel}
+              </ThemedText>
+              <ThemedText variant="headline" translate={false}>
+                {duration ?? "—"}
+              </ThemedText>
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText variant="footnote" tone="tertiary">
+                {departureLabel}
+              </ThemedText>
+              <ThemedText variant="headline" translate={false} numberOfLines={1}>
+                {shipment.scheduledDateTime
+                  ? `${zonedDateLabel(new Date(shipment.scheduledDateTime), timezone, locale)} ${zonedTime(
+                      new Date(shipment.scheduledDateTime),
+                      timezone,
+                    )}`
+                  : "—"}
+              </ThemedText>
+            </View>
+          </View>
+
+          {/* Driver */}
+          <View
+            style={{
+              marginBottom: spacing.md,
+              padding: spacing.md,
+              borderRadius: radii.md,
+              backgroundColor: theme.surfaceAlt,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing.sm,
+            }}
+          >
+            <AppIcon name="person-circle-outline" size={22} color={theme.primary} />
+            <View style={{ flex: 1 }}>
+              <ThemedText variant="bodySm" style={{ fontWeight: "500" }} translate={false}>
+                {shipment.driverInfo?.name || "Driver to be assigned"}
+              </ThemedText>
+              <ThemedText variant="caption" tone="secondary" translate={false}>
+                {shipment.driverInfo?.phone || "No phone yet"}
+              </ThemedText>
+            </View>
+          </View>
 
           {/* Action Buttons */}
-          <View className="flex-row gap-3">
-            <TouchableOpacity
-              className={`flex-1 py-3 rounded-xl items-center ${
-                isDark ? "bg-blue-600" : "bg-blue-500"
-              }`}
-              style={{
-                shadowColor: isDark ? "#2563EB" : "#3B82F6",
-                shadowOpacity: 0.3,
-                shadowRadius: 6,
-                shadowOffset: { width: 0, height: 3 },
-                elevation: 4,
-              }}
-              onPress={() => {
-                const phoneNumber = shipment.driverInfo?.phone;
-                if (phoneNumber) {
-                  Alert.alert("Ring förare", `Ring ${phoneNumber}?`, [
-                    { text: "Avbryt", style: "cancel" },
-                    { text: "Ring", onPress: () => {
-                      // In a real app, this would open tel: URL
-                      console.log(`Calling ${phoneNumber}`);
-                    }}
-                  ]);
-                } else {
-                  Alert.alert("Info", "Förarens telefonnummer är inte tillgängligt ännu.");
-                }
-              }}
-            >
-              <View className="flex-row items-center">
-                <Ionicons name="call" size={16} color="white" />
-                <AutoText className="text-white font-medium ml-2">
-                  Ring förare
-                </AutoText>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              className={`flex-1 py-3 rounded-xl items-center ${
-                isDark ? "bg-green-600" : "bg-green-500"
-              }`}
-              style={{
-                shadowColor: "#10B981",
-                shadowOpacity: 0.3,
-                shadowRadius: 6,
-                shadowOffset: { width: 0, height: 3 },
-                elevation: 4,
-              }}
-              onPress={() => {
-                Alert.alert("Support", "Kontakta support för hjälp med din leverans.");
-              }}
-            >
-              <View className="flex-row items-center">
-                <Ionicons name="help-circle" size={16} color="white" />
-                <AutoText className="text-white font-medium ml-2">
-                  Support
-                </AutoText>
-              </View>
-            </TouchableOpacity>
+          <View style={{ flexDirection: "row", gap: spacing.sm }}>
+            <View style={{ flex: 1 }}>
+              <PrimaryButton
+                label="Call driver"
+                icon="call-outline"
+                onPress={() => {
+                  const phoneNumber = shipment.driverInfo?.phone;
+                  if (phoneNumber) {
+                    void showAlert("Call driver", `Call ${phoneNumber}?`, [
+                      { text: "Cancel", style: "cancel" },
+                      {
+                        text: "Call",
+                        onPress: () => {
+                          console.log(`Calling ${phoneNumber}`);
+                        },
+                      },
+                    ]);
+                  } else {
+                    void showAlert("Info", "The driver's phone number is not available yet.");
+                  }
+                }}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <PrimaryButton
+                label="Support"
+                variant="secondary"
+                icon="help-circle-outline"
+                onPress={() => {
+                  void showAlert("Support", "Contact support for help with your delivery.");
+                }}
+              />
+            </View>
           </View>
         </Animated.View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
-import { View, Text } from "react-native";
+import { View } from "react-native";
+import ThemedText from "@/app/components/ui/ThemedText";
 import Reanimated, {
   useSharedValue,
   useAnimatedStyle,
@@ -33,9 +34,9 @@ export default function AutoSwipeHint() {
       >
         <MaterialIcons name="swipe" size={30} color="white" />
       </Reanimated.View>
-      <Text className="items-center text-white font-semibold text-sm bg-black/40 px-4 py-2 rounded-full">
+      <ThemedText className="items-center text-white font-semibold text-sm bg-black/40 px-4 py-2 rounded-full">
         Svep för att fortsätta
-      </Text>
+      </ThemedText>
     </View>
   );
 }

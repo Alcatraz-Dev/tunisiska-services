@@ -2,14 +2,23 @@ import React, { useState, useEffect } from "react";
 import { View, TouchableOpacity, Alert, ScrollView } from "react-native";
 import { useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
+import AppIcon from "@/app/components/ui/AppIcon";
+import PrimaryButton from "@/app/components/ui/PrimaryButton";
+import ScreenHeader from "@/app/components/ui/ScreenHeader";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/app/context/ThemeContext";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AutoText } from "@/app/components/ui/AutoText";
 import Input from "@/app/components/ui/Input";
+import { useLanguage } from "@/app/hooks/useLanguage";
+import { useTranslationText } from "@/app/hooks/useTranslation";
 import { showAlert } from "@/app/utils/showAlert";
 
 export default function UpdatePassword() {
+  const { language } = useLanguage();
+  const currentHint = useTranslationText("Ange nuvarande lösenord", language);
+  const newHint = useTranslationText("Välj ett nytt lösenord", language);
+  const confirmHint = useTranslationText("Bekräfta ditt nya lösenord", language);
   const { user, isLoaded } = useUser();
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
@@ -68,38 +77,11 @@ export default function UpdatePassword() {
 
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
-      {/* Header */}
-      <View className={`pb-4 px-6 ${isDark ? "bg-dark" : "bg-light"}`}>
-        <View className="flex-row items-center justify-center mb-4 mt-5 relative">
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="absolute left-0 p-2"
-          >
-            <Ionicons
-              name="arrow-back"
-              size={24}
-              color={isDark ? "#fff" : "#000"}
-            />
-          </TouchableOpacity>
-          <AutoText
-            className={`text-xl font-extrabold text-center tracking-tighter ${
-              isDark ? "text-white" : "text-gray-900"
-            }`}
-          >
-            {hasPassword ? "Uppdatera Lösenord" : "Skapa Lösenord"}
-          </AutoText>
-        </View>
-
-        <AutoText
-          className={`text-sm text-center my-4 ${
-            isDark ? "text-gray-300" : "text-gray-600"
-          }`}
-        >
-          {hasPassword
-            ? "Uppdatera ditt lösenord för att hålla ditt konto säkert"
-            : "Skapa ett lösenord för att kunna logga in med e-post"}
-        </AutoText>
-      </View>
+      <ScreenHeader
+        title={hasPassword ? "Update password" : "Create password"}
+        subtitle={hasPassword ? "Keep your account secure" : "Add a password to sign in with email"}
+        showBack
+      />
 
       <ScrollView className="flex-1 p-6">
         {/* Current Password (only if has password) */}
@@ -116,7 +98,7 @@ export default function UpdatePassword() {
               <Input
                 value={currentPassword}
                 onChangeText={setCurrentPassword}
-                placeholder="Ange nuvarande lösenord"
+                placeholder={currentHint}
                 placeholderTextColor={isDark ? "#9CA3AF" : "#6B7280"}
                 secureTextEntry={!showCurrent}
                 className={`border rounded-xl p-4 pr-12 ${
@@ -129,7 +111,7 @@ export default function UpdatePassword() {
                 onPress={() => setShowCurrent(!showCurrent)}
                 className="absolute right-4 top-4"
               >
-                <Ionicons
+                <AppIcon
                   name={showCurrent ? "eye-off-outline" : "eye-outline"}
                   size={18}
                   color={isDark ? "#9CA3AF" : "#6B7280"}
@@ -152,7 +134,7 @@ export default function UpdatePassword() {
             <Input
               value={newPassword}
               onChangeText={setNewPassword}
-              placeholder="Välj ett nytt lösenord"
+              placeholder={newHint}
               placeholderTextColor={isDark ? "#9CA3AF" : "#6B7280"}
               secureTextEntry={!showNew}
               className={`border rounded-xl p-4 pr-12 ${
@@ -165,7 +147,7 @@ export default function UpdatePassword() {
               onPress={() => setShowNew(!showNew)}
               className="absolute right-4 top-4"
             >
-              <Ionicons
+              <AppIcon
                 name={showNew ? "eye-off-outline" : "eye-outline"}
                 size={18}
                 color={isDark ? "#9CA3AF" : "#6B7280"}
@@ -187,7 +169,7 @@ export default function UpdatePassword() {
             <Input
               value={confirmPassword}
               onChangeText={setConfirmPassword}
-              placeholder="Bekräfta ditt nya lösenord"
+              placeholder={confirmHint}
               placeholderTextColor={isDark ? "#9CA3AF" : "#6B7280"}
               secureTextEntry={!showConfirm}
               className={`border rounded-xl p-4 pr-12 ${
@@ -200,7 +182,7 @@ export default function UpdatePassword() {
               onPress={() => setShowConfirm(!showConfirm)}
               className="absolute right-4 top-4"
             >
-              <Ionicons
+              <AppIcon
                 name={showConfirm ? "eye-off-outline" : "eye-outline"}
                 size={18}
                 color={isDark ? "#9CA3AF" : "#6B7280"}
@@ -210,23 +192,12 @@ export default function UpdatePassword() {
         </View>
 
         {/* Set / Update Password Button */}
-        <TouchableOpacity
+        <PrimaryButton
+          label={loading ? (hasPassword ? "Uppdaterar..." : "Skapar...") : hasPassword ? "Uppdatera lösenord" : "Skapa lösenord"}
           onPress={handleSetOrUpdatePassword}
-          disabled={loading}
-          className={`bg-blue-500 p-4 rounded-xl items-center mb-4 ${
-            loading ? "opacity-50" : ""
-          }`}
-        >
-          <AutoText className="text-white font-semibold text-base">
-            {loading
-              ? hasPassword
-                ? "Uppdaterar..."
-                : "Skapar..."
-              : hasPassword
-              ? "Uppdatera lösenord"
-              : "Skapa lösenord"}
-          </AutoText>
-        </TouchableOpacity>
+          loading={loading}
+          style={{ marginBottom: 16 }}
+        />
 
         {/* Info text explaining password removal is not available */}
         {hasPassword && (

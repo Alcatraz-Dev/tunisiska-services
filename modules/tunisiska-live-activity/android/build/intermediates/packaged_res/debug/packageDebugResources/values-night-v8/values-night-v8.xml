@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="tunisiska_widget_accent">#F2761B</color>
+    <color name="tunisiska_widget_accent_soft">#263B5D</color>
+    <color name="tunisiska_widget_accent_text">#FFB27A</color>
+    <color name="tunisiska_widget_action_secondary_bg">#1B3560</color>
+    <color name="tunisiska_widget_action_secondary_border">#2C4A78</color>
+    <color name="tunisiska_widget_bar_track">#3D5170</color>
+    <color name="tunisiska_widget_border">#27416C</color>
+    <color name="tunisiska_widget_divider">#2C4A78</color>
+    <color name="tunisiska_widget_pill_danger_bg">#4A2126</color>
+    <color name="tunisiska_widget_pill_danger_fg">#F5A3A8</color>
+    <color name="tunisiska_widget_pill_neutral_bg">#263B5D</color>
+    <color name="tunisiska_widget_pill_neutral_fg">#FFFFFF</color>
+    <color name="tunisiska_widget_pill_success_bg">#1E3F38</color>
+    <color name="tunisiska_widget_pill_success_fg">#7DD8A9</color>
+    <color name="tunisiska_widget_pill_warning_bg">#4A3018</color>
+    <color name="tunisiska_widget_pill_warning_fg">#FFB27A</color>
+    <color name="tunisiska_widget_ring_fill">#1F3559</color>
+    <color name="tunisiska_widget_surface">#132B55</color>
+    <color name="tunisiska_widget_surface_alt">#1B3560</color>
+    <color name="tunisiska_widget_text_primary">#FFFFFF</color>
+    <color name="tunisiska_widget_text_secondary">#C7D3E6</color>
+    <color name="tunisiska_widget_text_tertiary">#A9BAD2</color>
+</resources>

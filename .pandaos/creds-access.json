@@ -1,0 +1,57 @@
+{
+  "enabled": true,
+  "files": {
+    ".env": {
+      "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "no-access",
+      "EXPO_PUBLIC_CLERK_SECRET_KEY": "no-access",
+      "EXPO_PUBLIC_SUPPORT_WHATSAPP": "no-access",
+      "EXPO_PUBLIC_SWISH_NUMBER": "no-access",
+      "EXPO_PUBLIC_SANITY_PROJECT_ID": "no-access",
+      "EXPO_PUBLIC_SANITY_DATASET": "no-access",
+      "EXPO_PUBLIC_SANITY_TOKEN": "no-access",
+      "EXPO_PUBLIC_DEV_URL": "no-access",
+      "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "no-access",
+      "EXPO_PUBLIC_STRIPE_SECRET_KEY": "no-access",
+      "EXPO_PUBLIC_SERVER_URL": "no-access",
+      "PORT": "no-access",
+      "NODE_ENV": "no-access",
+      "EXPO_PUBLIC_SUPPORT_EMAIL": "no-access",
+      "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "no-access",
+      "WHATSAPP_TOKEN": "no-access",
+      "WHATSAPP_PHONE_NUMBER_ID": "no-access",
+      "WHATSAPP_VERIFY_TOKEN": "no-access",
+      "WHATSAPP_APP_SECRET": "no-access",
+      "WHATSAPP_ADMIN_NUMBERS": "no-access"
+    },
+    ".env.production": {
+      "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "no-access",
+      "EXPO_PUBLIC_CLERK_SECRET_KEY": "no-access",
+      "EXPO_PUBLIC_SUPPORT_WHATSAPP": "no-access",
+      "EXPO_PUBLIC_SWISH_NUMBER": "no-access",
+      "EXPO_PUBLIC_SANITY_PROJECT_ID": "no-access",
+      "EXPO_PUBLIC_SANITY_DATASET": "no-access",
+      "EXPO_PUBLIC_SANITY_TOKEN": "no-access",
+      "EXPO_PUBLIC_DEV_URL": "no-access",
+      "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "no-access",
+      "EXPO_PUBLIC_STRIPE_SECRET_KEY": "no-access",
+      "EXPO_PUBLIC_SERVER_URL": "no-access",
+      "PORT": "no-access",
+      "NODE_ENV": "no-access",
+      "EXPO_PUBLIC_SUPPORT_EMAIL": "no-access",
+      "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "no-access"
+    },
+    "ios/.xcode.env": {
+      "NODE_BINARY": "no-access"
+    },
+    ".env.whatsapp.example": {
+      "WHATSAPP_TOKEN": "no-access",
+      "WHATSAPP_PHONE_NUMBER_ID": "no-access",
+      "WHATSAPP_VERIFY_TOKEN": "no-access",
+      "WHATSAPP_APP_SECRET": "no-access",
+      "WHATSAPP_ADMIN_NUMBERS": "no-access"
+    },
+    ".env.local": {
+      "VERCEL_OIDC_TOKEN": "no-access"
+    }
+  }
+}

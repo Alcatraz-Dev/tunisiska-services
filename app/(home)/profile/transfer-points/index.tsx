@@ -9,12 +9,16 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import AppIcon from "@/app/components/ui/AppIcon";
+import ScreenHeader from "@/app/components/ui/ScreenHeader";
 import { useTheme } from "../../../context/ThemeContext";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useUser, useClerk } from "@clerk/clerk-expo";
 import { AutoText } from "@/app/components/ui/AutoText";
 import Input from "@/app/components/ui/Input";
+import { useLanguage } from "@/app/hooks/useLanguage";
+import { useTranslationText } from "@/app/hooks/useTranslation";
 import { showAlert } from "@/app/utils/showAlert";
 import { getPremiumGradient } from "@/app/utils/getPremiumGradient";
 import { LinearGradient } from "expo-linear-gradient";
@@ -66,6 +70,8 @@ interface UserMetadata {
 }
 
 export default function TransferPointsScreen() {
+  const { language } = useLanguage();
+  const minimumPointsHint = useTranslationText("Minst 10 poäng", language);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
   const router = useRouter();
@@ -354,35 +360,7 @@ export default function TransferPointsScreen() {
   };
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
-      {/* Header */}
-      <View className="p-6">
-        <View className="flex-row items-center justify-center mb-6 relative">
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="absolute left-0 p-2"
-          >
-            <Ionicons
-              name="arrow-back"
-              size={24}
-              color={isDark ? "#fff" : "#000"}
-            />
-          </TouchableOpacity>
-          <AutoText
-            className={`text-2xl font-extrabold ${
-              isDark ? "text-white" : "text-gray-900"
-            }`}
-          >
-            Överför poäng
-          </AutoText>
-        </View>
-        <AutoText
-          className={`text-sm text-center ${
-            isDark ? "text-gray-400" : "text-gray-600"
-          }`}
-        >
-          Överför poäng till andra användare
-        </AutoText>
-      </View>
+      <ScreenHeader title="Transfer points" subtitle="Send points to another user" showBack />
 
       <View className=" mt-4 px-6 ">
         {/* Modern Wallet Card */}
@@ -426,7 +404,7 @@ export default function TransferPointsScreen() {
               <View
                 className={`p-3 rounded-xl ${isDark ? "bg-white/20" : "bg-black/20"}`}
               >
-                <Ionicons
+                <AppIcon
                   name="swap-horizontal"
                   size={28}
                   color={isDark ? "#fff" : "#000"}
@@ -545,7 +523,7 @@ export default function TransferPointsScreen() {
                 Antal poäng att överföra *
               </AutoText>
               <Input
-                placeholder="Minst 10 poäng"
+                placeholder={minimumPointsHint}
                 keyboardType="numeric"
                 value={pointsToTransfer}
                 onChangeText={setPointsToTransfer}
@@ -585,7 +563,7 @@ export default function TransferPointsScreen() {
               }}
             >
               <View className="flex-row items-center">
-                <Ionicons name="person-add-outline" size={14} color="white" />
+                <AppIcon name="person-add-outline" size={14} color="white" />
                 <AutoText className="text-white font-semibold ml-2">
                   {currentUserFriends.length === 0
                     ? "Lägg till vän först"
@@ -604,7 +582,7 @@ export default function TransferPointsScreen() {
                 isLoading || currentUserFriends.length === 0 ? "opacity-50" : ""
               }`}
               style={{
-                shadowColor: "#3B82F6",
+                shadowColor: "#132B55",
                 shadowOpacity: 0.3,
                 shadowRadius: 10,
                 shadowOffset: { width: 0, height: 5 },
@@ -612,7 +590,7 @@ export default function TransferPointsScreen() {
               }}
             >
               <View className="flex-row items-center">
-                <Ionicons
+                <AppIcon
                   name={isLoading ? "hourglass-outline" : "send-outline"}
                   size={14}
                   color={isDark ? "#fff" : "#fff"}

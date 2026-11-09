@@ -1,0 +1,13 @@
+[mcp_servers.rea]
+command = "npx"
+args = [
+    "-y",
+    "rea-agents@6.7.0",
+    "mcp",
+]
+
+[mcp_servers.rea.env]
+HOPPER_LAUNCHER_PATH = "/Users/haythem_dhahri/Applications/Hopper Disassembler.app/Contents/MacOS/hopper"
+
+[mcp_servers.trader-dev]
+url = "https://mcp.trader.dev/mcp?key=pk_qIfHVDNaVmUvE1a__RbUIHX0uK8oquOq"

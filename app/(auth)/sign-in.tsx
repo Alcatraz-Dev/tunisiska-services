@@ -1,5 +1,5 @@
 import * as React from "react";
-import { TouchableOpacity, View, ScrollView, Image, Alert, ActivityIndicator } from "react-native";
+import { View, ScrollView, Image } from "react-native";
 import { useSignIn } from "@clerk/clerk-expo";
 import { Link, useRouter } from "expo-router";
 import { useTheme } from "../context/ThemeContext";
@@ -11,11 +11,16 @@ import Input from "../components/ui/Input";
 import { showAlert } from "../utils/showAlert";
 import GoogleSignInButton from "../components/GoogleSignInButton";
 import AppleSignInButton from "../components/AppleSignInButton";
+import PrimaryButton from "../components/ui/PrimaryButton";
+import ThemedText from "../components/ui/ThemedText";
+import { useThemeColors } from "@/app/theme";
+import { radii, spacing } from "@/app/theme/spacing";
 
 export default function SignInScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
   const router = useRouter();
   const { resolvedTheme } = useTheme();
+  const theme = useThemeColors();
   const isDark = resolvedTheme === "dark";
   const [userProfile, setUserProfile] = useState<any>(null);
   const [emailAddress, setEmailAddress] = React.useState("");
@@ -57,60 +62,46 @@ export default function SignInScreen() {
     }
   };
 
-  const inputStyle = `w-full p-4 rounded-xl border mb-4 border-gray-700 bg-dark-card text-white`;
-
-  const buttonStyle = `w-full p-4 rounded-xl items-center bg-blue-600`;
-
-  const buttonTextStyle = "text-white font-semibold";
-
   return (
-    <View className="flex-1 bg-dark">
+    <View style={{ flex: 1, backgroundColor: theme.canvas }}>
       <ScrollView
-        className="flex-1 px-6 pt-12"
-        contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
+        contentContainerStyle={{ flexGrow: 1, justifyContent: "center", paddingHorizontal: spacing.xl, paddingVertical: spacing.xxxl }}
       >
-        <AutoText
-          className="text-3xl font-bold mb-6 text-center text-white"
-        >
-          Logga in
-        </AutoText>
+        <View style={{ alignItems: "center", marginBottom: spacing.xl }}>
+          <View style={{ width: 88, height: 88, borderRadius: radii.xl, backgroundColor: "#ffffff", alignItems: "center", justifyContent: "center", marginBottom: spacing.md }}>
+            <Image source={require("../assets/logo-transparent.png")} style={{ width: 64, height: 64 }} resizeMode="contain" accessibilityLabel="Tunisiska Mega Transport" />
+          </View>
+          <ThemedText variant="title1" style={{ textAlign: "center" }}>Welcome back</ThemedText>
+          <ThemedText variant="bodySm" tone="secondary" style={{ textAlign: "center", marginTop: spacing.xs }}>Your journey starts here</ThemedText>
+          <ThemedText variant="caption" tone="tertiary" style={{ textAlign: "center", marginTop: spacing.xs }}>Sign in to manage trips, shipments and points.</ThemedText>
+        </View>
 
+        <ThemedText variant="caption" style={{ marginBottom: spacing.xs }}>Email address</ThemedText>
         <Input
           value={emailAddress}
           onChangeText={setEmailAddress}
-          placeholder="Ange e-postadress"
-          placeholderTextColor="#9CA3AF"
+          placeholder="name@example.com"
           autoCorrect={false}
           autoCapitalize="none"
-          className={inputStyle}
-          style={{ color: "#FFFFFF" }}
+          style={{ height: 48, borderRadius: radii.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.surface, paddingHorizontal: spacing.md, color: theme.textPrimary, marginBottom: spacing.md }}
         />
 
+        <ThemedText variant="caption" style={{ marginBottom: spacing.xs }}>Password</ThemedText>
         <Input
           value={password}
           onChangeText={setPassword}
-          placeholder="Ange lösenord"
-          placeholderTextColor="#9CA3AF"
+          placeholder="Enter your password"
           isPassword={true}
-          className={inputStyle}
-          style={{ color: "#FFFFFF" }}
+          style={{ height: 48, borderRadius: radii.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.surface, paddingHorizontal: spacing.md, color: theme.textPrimary, marginBottom: spacing.sm }}
         />
 
-        <TouchableOpacity
-          className={`${buttonStyle} ${loading ? 'opacity-70' : ''}`}
-          onPress={onSignInPress}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <AutoText className={buttonTextStyle}>Fortsätt</AutoText>
-          )}
-        </TouchableOpacity>
+        <PrimaryButton label="Sign in" onPress={onSignInPress} loading={loading} disabled={!emailAddress.trim() || !password} />
 
-        <View
-          className="flex-row justify-center my-4 border border-zinc-600"
-        />
+        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, marginVertical: spacing.lg }}>
+          <View style={{ height: 1, flex: 1, backgroundColor: theme.separator }} />
+          <ThemedText variant="overline" tone="tertiary">OR CONTINUE WITH</ThemedText>
+          <View style={{ height: 1, flex: 1, backgroundColor: theme.separator }} />
+        </View>
 
         {!userProfile ? (
           <>
@@ -141,17 +132,13 @@ export default function SignInScreen() {
           </View>
         )}
 
-        <View className="flex-row justify-center mt-4 gap-2">
-          <AutoText className="text-gray-400">
-            Har du inget konto ?
-          </AutoText>
+        <View style={{ flexDirection: "row", justifyContent: "center", marginTop: spacing.lg, gap: spacing.xs }}>
+          <ThemedText variant="bodySm" tone="secondary">New to Tunisiska?</ThemedText>
           <Link href="/sign-up">
-            <AutoText className="text-blue-500 font-semibold">
-              Skapa konto
-            </AutoText>
+            <ThemedText variant="bodySm" style={{ color: theme.accent, fontWeight: "700" }}>Create account</ThemedText>
           </Link>
         </View>
-        <StatusBar style="light" />
+        <StatusBar style={isDark ? "light" : "dark"} />
       </ScrollView>
     </View>
   );

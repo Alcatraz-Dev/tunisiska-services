@@ -1,0 +1,9 @@
+expo.modules.tuniskaliveactivity.tunisiska-live-activity-pngs-0 /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/build/generated/res/pngs/debug
+expo.modules.tuniskaliveactivity.tunisiska-live-activity-updated_navigation_xml-1 /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/build/generated/updated_navigation_xml/debug
+expo.modules.tuniskaliveactivity.tunisiska-live-activity-mergeDebugResources-2 /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/build/intermediates/incremental/debug/mergeDebugResources/merged.dir
+expo.modules.tuniskaliveactivity.tunisiska-live-activity-mergeDebugResources-3 /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/build/intermediates/incremental/debug/mergeDebugResources/stripped.dir
+expo.modules.tuniskaliveactivity.tunisiska-live-activity-debug-4 /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/build/intermediates/merged_res/debug/mergeDebugResources
+expo.modules.tuniskaliveactivity.tunisiska-live-activity-debug-5 /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/build/intermediates/packaged_res/debug/packageDebugResources
+expo.modules.tuniskaliveactivity.tunisiska-live-activity-debug-6 /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/debug/res
+expo.modules.tuniskaliveactivity.tunisiska-live-activity-main-7 /Users/haythem_dhahri/Desktop/projects/application/tunisiska-services/modules/tunisiska-live-activity/android/src/main/res
+gradleHome-0 /Users/haythem_dhahri/.gradle

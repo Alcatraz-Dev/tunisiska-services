@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, Linking } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
+import AppIcon from "@/app/components/ui/AppIcon";
 import { useRouter } from "expo-router";
 import { AutoText } from "./ui/AutoText";
 import { client } from "@/sanityClient";
@@ -103,7 +104,7 @@ export default function AppFooter() {
               onPress={() => openUrl(social.url)}
               activeOpacity={0.7}
             >
-              <Ionicons
+              <AppIcon
                 name={getSocialIconName(social.platform)}
                 size={18}
                 color={isDark ? "#9CA3AF" : "#4B5563"}

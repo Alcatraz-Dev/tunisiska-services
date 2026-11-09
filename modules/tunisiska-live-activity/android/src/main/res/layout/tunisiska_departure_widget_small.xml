@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 2 × 2 (110 × 110 dp) — the Glance card from the canvas: the day of the
+     month leads, the route closes the card. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@+id/widget_root"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:background="@drawable/tunisiska_widget_background"
+  android:layoutDirection="ltr"
+  android:padding="13dp">
+
+  <LinearLayout
+    android:id="@+id/widget_departure_content"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center_vertical"
+    android:orientation="vertical">
+
+    <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:gravity="center_vertical"
+      android:orientation="horizontal">
+
+      <ImageView
+        android:layout_width="6dp"
+        android:layout_height="6dp"
+        android:background="@drawable/tunisiska_widget_dot" />
+
+      <TextView
+        android:id="@+id/widget_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="5dp"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:letterSpacing="0.1"
+        android:maxLines="1"
+        android:text="NEXT"
+        android:textColor="@color/tunisiska_widget_text_tertiary"
+        android:textSize="8sp"
+        android:textStyle="bold" />
+    </LinearLayout>
+
+    <TextView
+      android:id="@+id/widget_day"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="12dp"
+      android:ellipsize="end"
+      android:maxLines="1"
+      android:text="15"
+      android:textColor="@color/tunisiska_widget_text_primary"
+      android:textSize="26sp"
+      android:textStyle="bold" />
+
+    <TextView
+      android:id="@+id/widget_meta"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:ellipsize="end"
+      android:maxLines="1"
+      android:text="Nov · 14:00"
+      android:textColor="@color/tunisiska_widget_text_secondary"
+      android:textSize="9sp" />
+
+    <TextView
+      android:id="@+id/widget_route"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="14dp"
+      android:ellipsize="end"
+      android:maxLines="1"
+      android:text="Stockholm → Tunis"
+      android:textColor="@color/tunisiska_widget_text_tertiary"
+      android:textSize="8.5sp" />
+  </LinearLayout>
+
+  <include layout="@layout/tunisiska_widget_empty_content" />
+</FrameLayout>

@@ -27,6 +27,7 @@ import dog from "../assets/icons/dog.png";
 import dumbell from "../assets/icons/dumbell.png";
 import laundry from "../assets/icons/laundry.png";
 import run from "../assets/icons/run.png";
+import news from "../assets/icons/news.png";
 import swim from "../assets/icons/swim.png";
 import wifi from "../assets/icons/wifi.png";
 import location from "../assets/icons/location.png";
@@ -56,6 +57,7 @@ export default {
   heart,
   backArrow,
   calendar,
+  news,
   info,
   language,
   logout,

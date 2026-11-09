@@ -1,0 +1,15 @@
+{
+  "title": "One Route, More Possibilities",
+  "duration": 30,
+  "fps": 24,
+  "bpm": 120,
+  "beat_seconds": 0.5,
+  "sections": [0, 3, 5, 7, 9, 13, 15.5, 18, 20.5, 23, 25.5, 30],
+  "reveal_drop": 9,
+  "cues": [3, 5, 7, 9, 13, 15.5, 18, 20.5, 23, 25.5],
+  "silence": [[8.75, 9.0]],
+  "copy": {
+    "sv": ["SVERIGE ↔ TUNISIEN", "RESOR", "PAKET", "FLYTT", "Tunisiska Mega", "RESOR", "FRAKT", "FLYTT + STÄD", "FLYGTAXI", "BOKA + SPÅRA", "Resor & transport", "Utforska appen"],
+    "ar": ["السويد ↔ تونس", "رحلات", "طرود", "نقل", "تونيسكا ميغا", "رحلات", "شحن", "نقل وتنظيف", "تاكسي المطار", "احجز وتتبع", "رحلات ونقل", "استكشف التطبيق"]
+  }
+}

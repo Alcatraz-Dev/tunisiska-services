@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 4 × 2 (250 × 110 dp) — route and departure on the left, countdown ring and
+     the tracking link on the right, exactly as on the canvas. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@+id/widget_root"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:background="@drawable/tunisiska_widget_background"
+  android:layoutDirection="ltr"
+  android:padding="14dp">
+
+  <LinearLayout
+    android:id="@+id/widget_departure_content"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal">
+
+    <LinearLayout
+      android:layout_width="0dp"
+      android:layout_height="match_parent"
+      android:layout_weight="1"
+      android:gravity="center_vertical"
+      android:orientation="vertical">
+
+      <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+          android:layout_width="6dp"
+          android:layout_height="6dp"
+          android:background="@drawable/tunisiska_widget_dot" />
+
+        <TextView
+          android:id="@+id/widget_title"
+          android:layout_width="0dp"
+          android:layout_height="wrap_content"
+          android:layout_marginStart="6dp"
+          android:layout_weight="1"
+          android:ellipsize="end"
+          android:letterSpacing="0.12"
+          android:maxLines="1"
+          android:text="NEXT DEPARTURE"
+          android:textColor="@color/tunisiska_widget_text_tertiary"
+          android:textSize="8sp"
+          android:textStyle="bold" />
+
+        <TextView
+          android:id="@+id/widget_status"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:background="@drawable/tunisiska_widget_pill_success"
+          android:ellipsize="end"
+          android:letterSpacing="0.04"
+          android:maxLines="1"
+          android:paddingStart="7dp"
+          android:paddingEnd="7dp"
+          android:paddingTop="3dp"
+          android:paddingBottom="3dp"
+          android:text="SCHEDULED"
+          android:textColor="@color/tunisiska_widget_pill_success_fg"
+          android:textSize="8sp"
+          android:textStyle="bold"
+          android:visibility="gone" />
+      </LinearLayout>
+
+      <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="9dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+          android:id="@+id/widget_origin"
+          android:layout_width="0dp"
+          android:layout_height="wrap_content"
+          android:layout_weight="1"
+          android:ellipsize="end"
+          android:maxLines="1"
+          android:text="Stockholm"
+          android:textColor="@color/tunisiska_widget_text_primary"
+          android:textSize="15sp"
+          android:textStyle="bold" />
+
+        <TextView
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:layout_marginHorizontal="6dp"
+          android:text="→"
+          android:textColor="@color/tunisiska_widget_accent"
+          android:textSize="14sp"
+          android:textStyle="bold" />
+
+        <TextView
+          android:id="@+id/widget_destination"
+          android:layout_width="0dp"
+          android:layout_height="wrap_content"
+          android:layout_weight="1"
+          android:ellipsize="end"
+          android:gravity="end"
+          android:maxLines="1"
+          android:text="Tunis"
+          android:textColor="@color/tunisiska_widget_text_primary"
+          android:textSize="15sp"
+          android:textStyle="bold" />
+      </LinearLayout>
+
+      <TextView
+        android:id="@+id/widget_meta"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:text="15 Nov · 14:00 · Cargo van"
+        android:textColor="@color/tunisiska_widget_text_secondary"
+        android:textSize="9sp" />
+
+      <LinearLayout
+        android:id="@+id/widget_capacity_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ProgressBar
+          android:id="@+id/widget_capacity_progress"
+          style="?android:attr/progressBarStyleHorizontal"
+          android:layout_width="0dp"
+          android:layout_height="4dp"
+          android:layout_weight="1"
+          android:max="24"
+          android:progress="19"
+          android:progressDrawable="@drawable/tunisiska_widget_progress" />
+
+        <TextView
+          android:id="@+id/widget_capacity"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:layout_marginStart="7dp"
+          android:ellipsize="end"
+          android:maxLines="1"
+          android:text="19/24"
+          android:textColor="@color/tunisiska_widget_text_secondary"
+          android:textSize="8.5sp"
+          android:textStyle="bold" />
+      </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+      android:layout_width="52dp"
+      android:layout_height="match_parent"
+      android:layout_marginStart="10dp"
+      android:gravity="center_horizontal|center_vertical"
+      android:orientation="vertical">
+
+      <FrameLayout
+        android:layout_width="46dp"
+        android:layout_height="46dp"
+        android:background="@drawable/tunisiska_widget_ring">
+
+        <LinearLayout
+          android:layout_width="match_parent"
+          android:layout_height="match_parent"
+          android:gravity="center"
+          android:orientation="vertical">
+
+          <TextView
+            android:id="@+id/widget_days"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:text="05"
+            android:textColor="@color/tunisiska_widget_text_primary"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+          <TextView
+            android:id="@+id/widget_days_unit"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:letterSpacing="0.08"
+            android:maxLines="1"
+            android:text="DAYS"
+            android:textColor="@color/tunisiska_widget_text_tertiary"
+            android:textSize="6sp"
+            android:textStyle="bold" />
+        </LinearLayout>
+      </FrameLayout>
+
+      <TextView
+        android:id="@+id/widget_track"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:maxLines="1"
+        android:text="TRACK"
+        android:textColor="@color/tunisiska_widget_accent_text"
+        android:textSize="7.5sp"
+        android:textStyle="bold" />
+    </LinearLayout>
+  </LinearLayout>
+
+  <include layout="@layout/tunisiska_widget_empty_content" />
+</FrameLayout>

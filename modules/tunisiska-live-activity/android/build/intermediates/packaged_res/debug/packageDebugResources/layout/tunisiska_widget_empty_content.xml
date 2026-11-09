@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shared empty state. Every size includes it, so "no departure" looks the same
+     at 2 × 2, 4 × 2 and 4 × 4. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@+id/widget_empty_content"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:gravity="center_vertical"
+  android:orientation="vertical"
+  android:visibility="gone">
+
+  <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal">
+
+    <ImageView
+      android:layout_width="6dp"
+      android:layout_height="6dp"
+      android:background="@drawable/tunisiska_widget_dot" />
+
+    <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_marginStart="6dp"
+      android:letterSpacing="0.1"
+      android:maxLines="1"
+      android:text="TUNISISKA MEGA"
+      android:textColor="@color/tunisiska_widget_accent_text"
+      android:textSize="8sp"
+      android:textStyle="bold" />
+  </LinearLayout>
+
+  <TextView
+    android:id="@+id/widget_empty_title"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="9dp"
+    android:ellipsize="end"
+    android:maxLines="2"
+    android:text="No upcoming trip"
+    android:textColor="@color/tunisiska_widget_text_primary"
+    android:textSize="15sp"
+    android:textStyle="bold" />
+
+  <TextView
+    android:id="@+id/widget_empty_message"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="4dp"
+    android:ellipsize="end"
+    android:maxLines="2"
+    android:text="Open the app to see the next departure."
+    android:textColor="@color/tunisiska_widget_text_secondary"
+    android:textSize="10sp" />
+</LinearLayout>

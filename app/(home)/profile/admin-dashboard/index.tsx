@@ -1,586 +1,265 @@
-import { AutoText } from "@/app/components/ui/AutoText";
-import { useTheme } from "@/app/context/ThemeContext";
-import { client } from "@/sanityClient";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  ScrollView,
-  TouchableOpacity,
-  View,
-  Dimensions,
-} from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+type AsyncStorageModule = typeof AsyncStorage;
+
+function isAsyncStorageSafe(module: any): module is AsyncStorageModule {
+  return typeof module?.getItem === "function" && typeof module?.setItem === "function" && typeof module?.removeItem === "function";
+}
+import { RefreshControl, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
+import { StatusBar } from "expo-status-bar";
+import { useRouter } from "expo-router";
+import { useTheme } from "@/app/context/ThemeContext";
+import { useThemeColors } from "@/app/theme";
+import AppIcon from "@/app/components/ui/AppIcon";
+import Badge from "@/app/components/ui/Badge";
+import IconButton from "@/app/components/ui/IconButton";
+import PressableScale from "@/app/components/ui/PressableScale";
+import ScreenHeader from "@/app/components/ui/ScreenHeader";
+import SectionHeader from "@/app/components/ui/SectionHeader";
+import Skeleton from "@/app/components/ui/Skeleton";
+import ThemedText from "@/app/components/ui/ThemedText";
+import { client } from "@/sanityClient";
+import { radii, shadows, spacing } from "@/app/theme/spacing";
+import { currentDateLocale } from "@/app/lib/time";
+import { useLanguage } from "@/app/hooks/useLanguage";
+import { useTranslationText } from "@/app/hooks/useTranslation";
 
-const { width } = Dimensions.get("window");
+type DashboardStats = { trips: number; shipments: number; customers: number; announcements: number; pending: number };
+type ActivityRecord = { _id: string; _type: string; customerName?: string; status?: string; route?: string; _createdAt?: string };
 
-interface StatCardProps {
-  title: string;
-  value: string | number;
-  icon: string;
-  colors: [string, string];
-  isDark: boolean;
+const INITIAL_STATS: DashboardStats = { trips: 0, shipments: 0, customers: 0, announcements: 0, pending: 0 };
+const COLLECTIONS = [
+  { title: "Trip schedules", subtitle: "Departures and capacity", icon: "calendar-outline" as const, type: "shipping-schedules" },
+  { title: "Shipment orders", subtitle: "Customer shipments", icon: "cube-outline" as const, type: "shipping-orders" },
+  { title: "Customers", subtitle: "Accounts and access", icon: "people-outline" as const, type: "users" },
+  { title: "Announcements", subtitle: "Published company news", icon: "megaphone-outline" as const, type: "announcements" },
+];
+
+// Dedicated admin screens. They are real routes, so they need an entry here to
+// be reachable at all; the quick access list above only opens the generic
+// collection editor.
+const ADMIN_SCREENS = [
+  { title: "Shipping orders", subtitle: "Every shipment booking", icon: "cube-outline" as const, route: "/(home)/profile/admin-shipping-orders" },
+  { title: "Taxi orders", subtitle: "Airport transfer requests", icon: "car-outline" as const, route: "/(home)/profile/admin-taxi-orders" },
+  { title: "Customers", subtitle: "Accounts and access", icon: "people-outline" as const, route: "/(home)/profile/admin-users" },
+  { title: "Announcements", subtitle: "Published company news", icon: "megaphone-outline" as const, route: "/(home)/profile/admin-announcements" },
+  { title: "Notification history", subtitle: "Everything that was sent", icon: "time-outline" as const, route: "/(home)/profile/admin-history" },
+  { title: "Data backup", subtitle: "Export the Sanity dataset", icon: "cloud-download-outline" as const, route: "/(home)/profile/admin-backup" },
+];
+
+function metricTitle(type: string) {
+  if (type === "shippingSchedule" || type === "containerShippingSchedule") return "Schedule updated";
+  if (type === "announcement") return "Announcement published";
+  if (type === "users") return "Customer account created";
+  if (type === "taxiOrder") return "Taxi request received";
+  return "New shipment booking";
 }
 
-const StatCard = ({ title, value, icon, colors, isDark }: StatCardProps) => (
-  <View
-    className="mb-4"
-    style={{
-      width: (width - 48 - 16) / 2,
-      // Accounting for screen padding (24*2) and gap (16)
-    }}
-  >
-    <LinearGradient
-      colors={colors}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      className="rounded-3xl p-4 h-32 justify-between"
-      style={{
-        elevation: 8,
-        shadowColor: colors[0],
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        borderRadius: 15,
-        paddingHorizontal: 10,
-        paddingVertical: 10,
-      }}
-    >
-      <View className="flex-row justify-between items-center">
-        <View className="bg-white/20 p-2 rounded-2xl">
-          <Ionicons name={icon as any} size={20} color="white" />
-        </View>
-        <Ionicons name="trending-up" size={16} color="white/40" />
-      </View>
-
-      <View>
-        <AutoText className="text-white text-2xl font-black">{value}</AutoText>
-        <AutoText className="text-white/80 text-[11px] font-black uppercase tracking-widest mt-1">
-          {title}
-        </AutoText>
-      </View>
-    </LinearGradient>
-  </View>
-);
-
-const RecentOrderCard = ({
-  order,
-  isDark,
-  isLast,
-}: {
-  order: any;
-  isDark: boolean;
-  isLast: boolean;
-}) => (
-  <View
-    className={`p-5 flex-row items-center justify-between ${!isLast ? (isDark ? "border-b border-white/5" : "border-b border-gray-100") : ""}`}
-  >
-    <View className="flex-row items-center flex-1">
-      <View
-        className={`w-12 h-12 rounded-[20px] items-center justify-center mr-4 ${isDark ? "bg-white/5 shadow-inner" : "bg-gray-50 shadow-sm border border-gray-100"}`}
-      >
-        <Ionicons
-          name="receipt-outline"
-          size={24}
-          color={isDark ? "#3b82f6" : "#2563eb"}
-        />
-      </View>
-      <View className="flex-1">
-        <AutoText
-          className={`text-base font-black ${isDark ? "text-white" : "text-gray-900"}`}
-          numberOfLines={1}
-        >
-          {order.customerName || "Okänd Kund"}
-        </AutoText>
-        <AutoText
-          className={`${isDark ? "text-gray-400" : "text-gray-500"} text-[10px] font-black mt-1 uppercase tracking-tighter`}
-        >
-          {order._createdAt
-            ? new Date(order._createdAt).toLocaleDateString("sv-SE", {
-                month: "short",
-                day: "numeric",
-              })
-            : "NYSS"}
-        </AutoText>
-      </View>
-    </View>
-
-    <View className="items-end ml-4">
-      <AutoText
-        className={`text-base font-black ${isDark ? "text-white" : "text-gray-900"}`}
-      >
-        {order.totalPrice || 0} SEK
-      </AutoText>
-      <View
-        className={`mt-2 px-3 py-1 rounded-full ${
-          order.status === "completed"
-            ? "bg-green-500/10"
-            : order.status === "pending"
-              ? "bg-yellow-500/10"
-              : "bg-blue-500/10"
-        }`}
-      >
-        <AutoText
-          className={`text-[8px] font-black uppercase tracking-widest ${
-            order.status === "completed"
-              ? "text-green-500"
-              : order.status === "pending"
-                ? "text-yellow-600"
-                : "text-blue-500"
-          }`}
-        >
-          {order.status || "PENDING"}
-        </AutoText>
-      </View>
-    </View>
-  </View>
-);
+function metricIcon(type: string) {
+  if (type.toLowerCase().includes("schedule")) return "calendar-outline";
+  if (type === "announcement") return "megaphone-outline";
+  if (type === "users") return "person-outline";
+  return "cube-outline";
+}
 
 export default function AdminDashboard() {
+  const theme = useThemeColors();
   const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === "dark";
   const router = useRouter();
+
+  const clearOnboarding = useCallback(async () => {
+    try {
+      await AsyncStorage.removeItem("hasSeenOnboarding");
+    } catch (error) {
+      console.warn("Error clearing onboarding flag:", error);
+    }
+  }, []);
+  const [stats, setStats] = useState(INITIAL_STATS);
+  const [activity, setActivity] = useState<ActivityRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    users: 0,
-    shippingOrders: 0,
-    taxiOrders: 0,
-    containers: 0,
-    moves: 0,
-    announcements: 0,
-    friendRequests: 0,
-    revenue: 0,
-  });
-  const [recentOrders, setRecentOrders] = useState<any[]>([]);
-  const [pendingCount, setPendingCount] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
+  const { language } = useLanguage();
+  const openNotificationsLabel = useTranslationText("Open notifications", language);
+  const pendingUnit = useTranslationText("pending", language);
+  const allCaughtUpText = useTranslationText("All caught up", language);
+  const openWord = useTranslationText("Open", language);
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const [
-          users,
-          shipping,
-          taxi,
-          containers,
-          moves,
-          announcements,
-          totalRevenue,
-          recent,
-          pending,
-          pendingFriends,
-        ] = await Promise.all([
-          client.fetch(`count(*[_type == "users"])`),
-          client.fetch(`count(*[_type == "shippingOrder"])`),
-          client.fetch(`count(*[_type == "taxiOrder"])`),
-          client.fetch(`count(*[_type == "containerShippingOrder"])`),
-          client.fetch(
-            `count(*[_type == "moveOrder" || _type == "moveCleaningOrder"])`,
-          ),
-          client.fetch(`count(*[_type == "announcement"])`),
-          client.fetch(`coalesce(math::sum(*[_type in ["shippingOrder", "taxiOrder", "containerShippingOrder", "moveOrder", "moveCleaningOrder"] && status == "completed"].totalPrice), 0)`),
-          client.fetch(`*[_type == "shippingOrder"] | order(_createdAt desc)[0...5] {
-            _id,
-            "customerName": customerInfo.name,
-            totalPrice,
-            status,
-            _createdAt
-          }`),
-          client.fetch(
-            `count(*[_type in ["shippingOrder", "taxiOrder", "containerShippingOrder", "moveOrder", "moveCleaningOrder"] && status == "pending"])`,
-          ),
-          client.fetch(
-            `count(*[_type == "friendRequest" && status == "pending"])`,
-          ),
-        ]);
-
-        setStats({
-          users: users || 0,
-          shippingOrders: shipping || 0,
-          taxiOrders: taxi || 0,
-          containers: containers || 0,
-          moves: moves || 0,
-          announcements: announcements || 0,
-          friendRequests: pendingFriends || 0,
-          revenue: totalRevenue || 0,
-        });
-        setRecentOrders(recent || []);
-        setPendingCount(pending || 0);
-      } catch (error) {
-        console.error("Error fetching stats:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchStats();
+  const load = useCallback(async (refresh = false) => {
+    setError(false);
+    if (refresh) setRefreshing(true); else setLoading(true);
+    try {
+      const [trips, shipments, customers, announcements, pending, recent] = await Promise.all([
+        client.fetch('count(*[_type in ["shippingSchedule", "containerShippingSchedule"]])'),
+        client.fetch('count(*[_type in ["shippingOrder", "taxiOrder", "containerShippingOrder", "moveOrder", "moveCleaningOrder"]])'),
+        client.fetch('count(*[_type == "users"])'),
+        client.fetch('count(*[_type == "announcement"])'),
+        client.fetch('count(*[_type in ["shippingOrder", "taxiOrder", "containerShippingOrder", "moveOrder", "moveCleaningOrder"] && status == "pending"])'),
+        client.fetch('*[_type in ["shippingSchedule", "containerShippingSchedule", "shippingOrder", "taxiOrder", "announcement"]] | order(_createdAt desc)[0...4] { _id, _type, status, _createdAt, "customerName": coalesce(customerInfo.name, customer.name, title), "route": route }'),
+      ]);
+      setStats({ trips: trips || 0, shipments: shipments || 0, customers: customers || 0, announcements: announcements || 0, pending: pending || 0 });
+      setActivity(Array.isArray(recent) ? recent : []);
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
-  const adminActions = [
-    {
-      title: "Användare",
-      description: "Hantering & Roller",
-      icon: "people",
-      href: "/profile/admin-manage?type=users",
-      color: "#3b82f6",
-    },
-    {
-      title: "Sändningar",
-      description: "Logistik & Frakt",
-      icon: "cube",
-      href: "/profile/admin-manage?type=shipping-orders",
-      color: "#8b5cf6",
-    },
-    {
-      title: "Containers",
-      description: "Frakt & Logistik",
-      icon: "boat",
-      href: "/profile/admin-manage?type=container-shipping-orders",
-      color: "#0ea5e9",
-    },
-    {
-      title: "Sändningsschema",
-      description: "Schema & Planering",
-      icon: "calendar",
-      href: "/profile/admin-manage?type=shipping-schedules",
-      color: "#ec4899",
-    },
-    {
-      title: "Container Schema",
-      description: "Båtrutter & Tider",
-      icon: "time",
-      href: "/profile/admin-manage?type=container-shipping-schedules",
-      color: "#6366f1",
-    },
-    {
-      title: "Taxibokningar",
-      description: "Resor & Drift",
-      icon: "car",
-      href: "/profile/admin-manage?type=taxi-orders",
-      color: "#f59e0b",
-    },
-    {
-      title: "Flyttordrar",
-      description: "Flyttuppdrag",
-      icon: "bus",
-      href: "/profile/admin-manage?type=move-orders",
-      color: "#10b981",
-    },
-    {
-      title: "Flytt & Städ",
-      description: "Kombinerade jobb",
-      icon: "home",
-      href: "/profile/admin-manage?type=move-clean-orders",
-      color: "#06b6d4",
-    },
-    {
-      title: "Annonser",
-      description: "Push & Kampanjer",
-      icon: "megaphone",
-      href: "/profile/admin-manage?type=announcements",
-      color: "#f43f5e",
-    },
-    {
-      title: "Vänförfrågningar",
-      description: "Poäng & Nätverk",
-      icon: "person-add",
-      href: "/profile/admin-manage?type=friend-requests",
-      color: "#6366f1",
-    },
-    {
-      title: "Live Status",
-      description: "Systemets hälsa",
-      icon: "pulse",
-      href: "/profile/admin-manage?type=live-status",
-      color: "#84cc16",
-    },
-    {
-      title: "Footer",
-      description: "Design & Copy",
-      icon: "reorder-four",
-      href: "/profile/admin-manage?type=footer",
-      color: "#64748b",
-    },
-    {
-      title: "Användarvillkor",
-      description: "Regler & Krav",
-      icon: "document-text",
-      href: "/profile/admin-manage?type=terms",
-      color: "#94a3b8",
-    },
-    {
-      title: "Integritetspolicy",
-      description: "GDPR & Data",
-      icon: "shield-checkmark",
-      href: "/profile/admin-manage?type=privacy",
-      color: "#475569",
-    },
-    {
-      title: "Notifikationer",
-      description: "Notifikationshistorik",
-      icon: "notifications",
-      href: "/profile/admin-manage?type=notification-history",
-      color: "#8b5cf6",
-    },
+  useEffect(() => { void load(); }, [load]);
+
+  const metrics = [
+    { label: "Trips", value: stats.trips, icon: "calendar-outline" as const },
+    { label: "Shipments", value: stats.shipments, icon: "cube-outline" as const },
+    { label: "Customers", value: stats.customers, icon: "people-outline" as const },
+    { label: "Announcements", value: stats.announcements, icon: "megaphone-outline" as const },
   ];
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "completed":
-        return "text-green-500";
-      case "pending":
-        return "text-yellow-500";
-      case "cancelled":
-        return "text-red-500";
-      default:
-        return "text-blue-500";
-    }
-  };
-
   return (
-    <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-white"}`}>
-      <StatusBar style={isDark ? "light" : "dark"} />
-
-      {/* Header */}
-      <View className="px-6 pt-6 pb-2 flex-row items-center justify-between">
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className={`p-2 rounded-2xl ${isDark ? "bg-white/5" : "bg-gray-100"}`}
-        >
-          <Ionicons
-            name="arrow-back"
-            size={20}
-            color={isDark ? "#fff" : "#000"}
-          />
-        </TouchableOpacity>
-        <AutoText
-          className={`text-xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}
-        >
-          Admin Kontrollpanel
-        </AutoText>
-        <TouchableOpacity
-          onPress={() => router.push("/(home)/profile/admin-notifications")}
-          className={`p-2 rounded-2xl ${isDark ? "bg-white/5" : "bg-gray-100"}`}
-        >
-          <Ionicons
-            name="notifications-outline"
-            size={20}
-            color={isDark ? "#fff" : "#000"}
-          />
-          {pendingCount > 0 && (
-            <View
-              className="absolute -top-1 -right-1 bg-red-500 rounded-full w-5 h-5 items-center justify-center border-2"
-              style={{ borderColor: isDark ? "#000" : "#fff" }}
-            >
-              <AutoText className="text-white text-[10px] font-bold">
-                {pendingCount > 9 ? "9+" : pendingCount}
-              </AutoText>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
-
+    <SafeAreaView edges={["top", "left", "right"]} style={{ flex: 1, backgroundColor: theme.canvas }}>
+      <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
+      <ScreenHeader
+        title="Operations"
+        subtitle="Manage the transport service"
+        showBack
+        right={<IconButton icon="notifications-outline" onPress={() => router.push("/(home)/profile/admin-notifications" as any)} accessibilityLabel={openNotificationsLabel || "Open notifications"} surface />}
+      />
       <ScrollView
-        className="flex-1"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40 }}
+        contentContainerStyle={{ paddingHorizontal: spacing.gutter, paddingBottom: 64 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} tintColor={theme.primary} />}
       >
-        {loading ? (
-          <View className="py-20 items-center">
-            <ActivityIndicator color="#3b82f6" />
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing.sm, marginBottom: spacing.md }}>
+          <View style={{ flex: 1, paddingRight: spacing.md }}>
+            <ThemedText variant="overline" tone="secondary">ADMIN OVERVIEW</ThemedText>
+            <ThemedText variant="title1" style={{ marginTop: 4 }}>Good morning</ThemedText>
+            <ThemedText variant="bodySm" tone="secondary" style={{ marginTop: 3 }}>Manage trips, customers and service requests.</ThemedText>
           </View>
-        ) : (
-          <>
-            {/* Main Revenue Card */}
-            <LinearGradient
-              colors={isDark ? ["#1e293b", "#0f172a"] : ["#3b82f6", "#2563eb"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              className="rounded-3xl  p-8 mb-8 mt-6 overflow-hidden relative shadow-2xl"
-              style={{
-                shadowColor: isDark ? "#000" : "#3b82f6",
-                shadowOffset: { width: 0, height: 10 },
-                shadowOpacity: 0.3,
-                shadowRadius: 20,
-                borderRadius: 15,
-                padding: 15,
-                margin: 15,
-              }}
-            >
-              <View className="absolute -right-10 -top-10 opacity-10">
-                <Ionicons name="stats-chart" size={240} color="white" />
-              </View>
-              <AutoText className="text-white/60 text-[10px] font-black uppercase tracking-[3px]">
-                Total Intäkt
-              </AutoText>
-              <View className="flex-row items-baseline mt-2">
-                <AutoText className="text-white text-5xl font-black">
-                  {(stats.revenue || 0).toLocaleString()}
-                </AutoText>
-                <AutoText className="text-white/80 text-xl font-bold ml-2">
-                  SEK
-                </AutoText>
-              </View>
-            </LinearGradient>
+          <Badge label={stats.pending ? `${stats.pending} ${pendingUnit || "pending"}` : allCaughtUpText || "All caught up"} tone={stats.pending ? "warning" : "success"} translate={false} />
+        </View>
 
-            {/* Live Status Overview */}
-            <TouchableOpacity
-              onPress={() => router.push("/profile/admin-manage/live-status")}
-              className={`mb-8 p-6 mx-4 rounded-[20px] shadow-sm flex-row items-center border ${isDark ? "bg-dark-card border-white/5" : "bg-white border-gray-100"}`}
-            >
-              <View className="w-12 h-12 rounded-2xl bg-green-500/10 items-center justify-center mr-4">
-                <Ionicons name="pulse" size={24} color="#22c55e" />
-              </View>
-              <View className="flex-1">
-                <AutoText
-                  className={`text-sm font-bold uppercase tracking-widest ${isDark ? "text-gray-400" : "text-gray-500"}`}
-                >
-                  Aktiv Status
-                </AutoText>
-                <AutoText
-                  className={`text-base font-black mt-1 ${isDark ? "text-white" : "text-gray-900"}`}
-                  numberOfLines={1}
-                >
-                  Systemet är aktivt och snurrar
-                </AutoText>
-              </View>
-              <Ionicons
-                name="chevron-forward"
-                size={20}
-                color={isDark ? "#555" : "#ccc"}
-              />
-            </TouchableOpacity>
+        {error ? (
+          <PressableScale onPress={() => void load()} accessibilityRole="button" haptic="light" style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md, marginBottom: spacing.md, borderRadius: radii.md, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border }}>
+            <AppIcon name="refresh-outline" size={18} color={theme.primary} />
+            <ThemedText variant="bodySm" tone="secondary" style={{ flex: 1 }}>Dashboard data could not load. Tap to retry.</ThemedText>
+          </PressableScale>
+        ) : null}
 
-            {/* Stats Grid */}
-            <View className="flex-row flex-wrap justify-between">
-              <StatCard
-                title="Användare"
-                value={stats.users.toString()}
-                icon="people"
-                colors={["#00d2ff", "#3a7bd5"]}
-                isDark={isDark}
-              />
-              <StatCard
-                title="Sändningar"
-                value={stats.shippingOrders.toString()}
-                icon="cube"
-                colors={["#8E2DE2", "#4A00E0"]}
-                isDark={isDark}
-              />
-              <StatCard
-                title="Containrar"
-                value={stats.containers.toString()}
-                icon="boat"
-                colors={["#0ea5e9", "#2563eb"]}
-                isDark={isDark}
-              />
-              <StatCard
-                title="Taxi"
-                value={stats.taxiOrders.toString()}
-                icon="car"
-                colors={["#f7971e", "#ffd200"]}
-                isDark={isDark}
-              />
-              <StatCard
-                title="Flytt"
-                value={stats.moves.toString()}
-                icon="bus"
-                colors={["#10b981", "#059669"]}
-                isDark={isDark}
-              />
-              <StatCard
-                title="Vänner"
-                value={stats.friendRequests.toString()}
-                icon="person-add"
-                colors={["#6366f1", "#a855f7"]}
-                isDark={isDark}
-              />
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>
+          {metrics.map((metric) => (
+            <View key={metric.label} style={{ width: "48.5%", minHeight: 104, justifyContent: "space-between", padding: spacing.md, borderRadius: radii.lg, borderWidth: 1, borderColor: theme.borderSubtle, backgroundColor: theme.surface, ...shadows.sm }}>
+              <View style={{ width: 34, height: 34, alignItems: "center", justifyContent: "center", borderRadius: 11, backgroundColor: theme.primarySoft }}>
+                <AppIcon name={metric.icon} size={18} color={theme.primary} />
+              </View>
+              <View style={{ marginTop: spacing.sm }}>
+                <ThemedText variant="title2">{loading ? "—" : metric.value.toLocaleString(currentDateLocale())}</ThemedText>
+                <ThemedText variant="caption" tone="secondary" style={{ marginTop: 2 }}>{metric.label}</ThemedText>
+              </View>
             </View>
+          ))}
+        </View>
 
-            {/* Recent Orders Section */}
-            <View className="flex-row justify-between items-center mt-6 mb-4">
-              <AutoText
-                className={`text-lg font-black ${isDark ? "text-white" : "text-gray-900"}`}
-              >
-                Senaste Ordrar
-              </AutoText>
-              <TouchableOpacity
-                onPress={() =>
-                  router.push("/profile/admin-manage/shipping-orders")
-                }
-              >
-                <AutoText className="text-primary font-bold">
-                  Visa alla
-                </AutoText>
-              </TouchableOpacity>
-            </View>
-
-            <View
-              className={`rounded-[32px] p-2 mb-6 ${isDark ? "bg-dark-card border border-white/5" : "bg-gray-50 border border-gray-100"}`}
-            >
-              {recentOrders.length > 0 ? (
-                recentOrders.map((order, index) => (
-                  <RecentOrderCard
-                    key={order._id}
-                    order={order}
-                    isDark={isDark}
-                    isLast={index === recentOrders.length - 1}
-                  />
-                ))
-              ) : (
-                <View className="py-10 items-center">
-                  <AutoText className="text-gray-500">
-                    Inga ordrar hittades
-                  </AutoText>
+        <View style={{ marginTop: spacing.xl }}>
+          <SectionHeader title="Recent activity" subtitle="Latest updates" />
+          <View style={{ paddingHorizontal: spacing.md, borderRadius: radii.lg, borderWidth: 1, borderColor: theme.borderSubtle, backgroundColor: theme.surface, ...shadows.sm }}>
+            {loading ? [0, 1, 2].map((item) => <View key={item} style={{ height: 62, justifyContent: "center", borderBottomWidth: item < 2 ? 1 : 0, borderColor: theme.separator }}><Skeleton height={12} width="68%" radius={6} /><Skeleton height={9} width="42%" radius={5} style={{ marginTop: 7 }} /></View>) : activity.length ? activity.map((item, index) => (
+              <View key={item._id} style={{ minHeight: 66, flexDirection: "row", alignItems: "center", gap: spacing.md, borderBottomWidth: index < activity.length - 1 ? 1 : 0, borderColor: theme.separator }}>
+                <View style={{ width: 36, height: 36, alignItems: "center", justifyContent: "center", borderRadius: 12, backgroundColor: theme.primarySoft }}>
+                  <AppIcon name={metricIcon(item._type)} size={17} color={theme.primary} />
                 </View>
-              )}
-            </View>
+                <View style={{ flex: 1 }}>
+                  <ThemedText variant="bodySm" style={{ fontWeight: "700" }}>{metricTitle(item._type)}</ThemedText>
+                  <ThemedText variant="caption" tone="secondary" numberOfLines={1} style={{ marginTop: 2 }}>
+                    {item.route || item.customerName || item.status || "Operations update"}
+                  </ThemedText>
+                </View>
+                <ThemedText variant="caption" tone="tertiary">{item._createdAt ? new Date(item._createdAt).toLocaleTimeString(currentDateLocale(), { hour: "2-digit", minute: "2-digit" }) : "—"}</ThemedText>
+              </View>
+            )) : <View style={{ paddingVertical: spacing.xl, alignItems: "center" }}><ThemedText variant="bodySm" tone="secondary">No recent activity yet</ThemedText></View>}
+          </View>
+        </View>
 
-            {/* Quick Actions Grid */}
-            <AutoText
-              className={`text-lg font-black mt-4 mb-6 ${isDark ? "text-white" : "text-gray-900"}`}
-            >
-              Snabbhantering
-            </AutoText>
+        <View style={{ marginTop: spacing.xl }}>
+          <SectionHeader title="Automation" subtitle="Publish without the CMS" />
+          <PressableScale
+            onPress={() => router.push("/(home)/profile/admin-whatsapp" as any)}
+            accessibilityRole="button"
+            accessibilityLabel="WhatsApp gateway"
+            haptic="light"
+            style={{ minHeight: 68, flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md, borderRadius: radii.lg, borderWidth: 1, borderColor: theme.borderSubtle, backgroundColor: theme.surface }}
+          >
+            <View style={{ width: 40, height: 40, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: theme.primarySoft }}><AppIcon name="logo-whatsapp" size={20} color={theme.primary} /></View>
+            <View style={{ flex: 1 }}><ThemedText variant="headline">WhatsApp gateway</ThemedText><ThemedText variant="caption" tone="secondary" style={{ marginTop: 2 }}>Photos and videos become news</ThemedText></View>
+            <AppIcon name="chevron-forward" size={17} color={theme.textQuaternary} />
+          </PressableScale>
+        </View>
 
-            <View className="flex-row flex-wrap justify-between">
-              {adminActions.map((action, index) => (
-                <TouchableOpacity
-                  key={index}
-                  onPress={() => router.push(action.href as any)}
-                  className={`mb-4 p-5 rounded-[32px] items-center justify-center ${isDark ? "bg-dark-card border border-white/5 shadow-sm" : "bg-white border border-gray-100 shadow-sm"}`}
-                  style={{ width: (width - 48 - 12) / 2 }}
-                >
-                  <View
-                    className="w-12 h-12 rounded-2xl items-center justify-center mb-3"
-                    style={{ backgroundColor: `${action.color}15` }}
-                  >
-                    <Ionicons
-                      name={action.icon as any}
-                      size={24}
-                      color={action.color}
-                    />
-                  </View>
-                  <AutoText
-                    className={`text-[13px] font-black text-center px-1 ${isDark ? "text-white" : "text-gray-900"}`}
-                    numberOfLines={1}
-                  >
-                    {action.title}
-                  </AutoText>
-                  <AutoText
-                    className={`${isDark ? "text-gray-400" : "text-gray-500"} text-[9px] mt-0.5 text-center font-bold tracking-tighter`}
-                    numberOfLines={1}
-                  >
-                    {action.description.toUpperCase()}
-                  </AutoText>
-                </TouchableOpacity>
-              ))}
+        <View style={{ marginTop: spacing.xl }}>
+          <SectionHeader title="Debug" subtitle="Testing helpers" />
+          <PressableScale
+            onPress={async () => {
+              if (!isAsyncStorageSafe(AsyncStorage)) {
+                console.warn("AsyncStorage not ready; cannot reset onboarding");
+                return;
+              }
+              await AsyncStorage.removeItem("hasSeenOnboarding");
+              router.replace("/onboarding");
+            }}
+            accessibilityRole="button"
+            haptic="light"
+            style={{ minHeight: 58, flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md, borderRadius: radii.lg, borderWidth: 1, borderColor: theme.borderSubtle, backgroundColor: theme.surface }}
+          >
+            <AppIcon name="refresh-outline" size={19} color={theme.primary} />
+            <View style={{ flex: 1 }}>
+              <ThemedText variant="headline">Reset onboarding</ThemedText>
+              <ThemedText variant="caption" tone="secondary" style={{ marginTop: 2 }}>Clear the welcoming screen flag so it shows again on next launch.</ThemedText>
             </View>
-            <View className="h-10" />
-          </>
-        )}
+            <AppIcon name="chevron-forward" size={17} color={theme.textQuaternary} />
+          </PressableScale>
+        </View>
+
+        <View style={{ marginTop: spacing.xl }}>
+          <SectionHeader title="Quick access" subtitle="Common admin tasks" />
+          <View style={{ gap: spacing.sm }}>
+            {COLLECTIONS.map((item) => (
+              <PressableScale
+                key={item.type}
+                onPress={() => router.push(`/(home)/profile/admin-manage?type=${item.type}` as any)}
+                accessibilityRole="button"
+                accessibilityLabel={`${openWord || "Open"} ${item.title}`}
+                haptic="light"
+                style={{ minHeight: 68, flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md, borderRadius: radii.lg, borderWidth: 1, borderColor: theme.borderSubtle, backgroundColor: theme.surface }}
+              >
+                <View style={{ width: 40, height: 40, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: theme.primarySoft }}><AppIcon name={item.icon} size={19} color={theme.primary} /></View>
+                <View style={{ flex: 1 }}><ThemedText variant="headline">{item.title}</ThemedText><ThemedText variant="caption" tone="secondary" style={{ marginTop: 2 }}>{item.subtitle}</ThemedText></View>
+                <AppIcon name="chevron-forward" size={17} color={theme.textQuaternary} />
+              </PressableScale>
+            ))}
+          </View>
+        </View>
+
+        <View style={{ marginTop: spacing.xl }}>
+          <SectionHeader title="More tools" subtitle="Every admin screen" />
+          <View style={{ gap: spacing.sm }}>
+            {ADMIN_SCREENS.map((item) => (
+              <PressableScale
+                key={item.route}
+                onPress={() => router.push(item.route as any)}
+                accessibilityRole="button"
+                accessibilityLabel={`${openWord || "Open"} ${item.title}`}
+                haptic="light"
+                style={{ minHeight: 68, flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md, borderRadius: radii.lg, borderWidth: 1, borderColor: theme.borderSubtle, backgroundColor: theme.surface }}
+              >
+                <View style={{ width: 40, height: 40, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: theme.primarySoft }}><AppIcon name={item.icon} size={19} color={theme.primary} /></View>
+                <View style={{ flex: 1 }}><ThemedText variant="headline">{item.title}</ThemedText><ThemedText variant="caption" tone="secondary" style={{ marginTop: 2 }}>{item.subtitle}</ThemedText></View>
+                <AppIcon name="chevron-forward" size={17} color={theme.textQuaternary} />
+              </PressableScale>
+            ))}
+          </View>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );

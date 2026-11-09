@@ -1,6 +1,7 @@
 import { useAuth } from "@clerk/clerk-expo";
 import { TouchableOpacity, Text, Alert, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import AppIcon from "@/app/components/ui/AppIcon";
 import { useState } from "react";
 import { AutoText } from "./ui/AutoText";
 import { showAlert } from "../utils/showAlert";
@@ -41,7 +42,7 @@ function SignOutButton() {
         <ActivityIndicator color="#EF4444" />
       ) : (
         <>
-          <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+          <AppIcon name="log-out-outline" size={20} color="#EF4444" />
           <AutoText className="text-danger font-semibold ml-2">Logga ut</AutoText>
         </>
       )}

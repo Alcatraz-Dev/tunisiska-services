@@ -4,6 +4,9 @@ import { useUser } from "@clerk/clerk-expo";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import AppIcon from "@/app/components/ui/AppIcon";
+import PrimaryButton from "@/app/components/ui/PrimaryButton";
+import ScreenHeader from "@/app/components/ui/ScreenHeader";
 import { useTheme } from "@/app/context/ThemeContext";
 import { OtpInput } from "react-native-otp-entry";
 import { AutoText } from "@/app/components/ui/AutoText";
@@ -58,36 +61,7 @@ export default function VerifyEmail() {
 
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
-      {/* Header */}
-      <View className={`pb-4 px-6 ${isDark ? "bg-dark" : "bg-light"}`}>
-        <View className="flex-row items-center justify-center mb-4 mt-5 relative">
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="absolute left-0 p-2"
-          >
-            <Ionicons
-              name="arrow-back"
-              size={24}
-              color={isDark ? "#fff" : "#000"}
-            />
-          </TouchableOpacity>
-          <AutoText
-            className={`text-xl font-extrabold text-center tracking-tighter ${
-              isDark ? "text-white" : "text-gray-900"
-            }`}
-          >
-            Verifiera e-post
-          </AutoText>
-        </View>
-
-        <AutoText
-          className={`text-sm text-center my-4 ${
-            isDark ? "text-gray-300" : "text-gray-600"
-          }`}
-        >
-          Ange koden vi skickade till din nya e-postadress.
-        </AutoText>
-      </View>
+      <ScreenHeader title="Verify email" subtitle="Enter the code sent to your new email address" showBack />
 
       {/* Content */}
       <View className="flex-1 p-6">
@@ -95,7 +69,7 @@ export default function VerifyEmail() {
         <OtpInput
           numberOfDigits={6}
           onTextChange={setCode}
-          focusColor={isDark ? "#60A5FA" : "#3B82F6"}
+          focusColor={isDark ? "#6A85B4" : "#132B55"}
           theme={{
             pinCodeContainerStyle: {
               borderColor: isDark ? "#374151" : "#D1D5DB",
@@ -110,17 +84,7 @@ export default function VerifyEmail() {
         />
 
         {/* Verify Button */}
-        <TouchableOpacity
-          onPress={handleVerify}
-          disabled={loading || code.length < 6}
-          className={`bg-blue-500 p-4 rounded-xl items-center mt-6 ${
-            loading ? "opacity-50" : ""
-          }`}
-        >
-          <AutoText className="text-white font-semibold text-base">
-            {loading ? "Verifierar..." : "Verifiera"}
-          </AutoText>
-        </TouchableOpacity>
+        <PrimaryButton label={loading ? "Verifierar..." : "Verifiera"} onPress={handleVerify} loading={loading} disabled={code.length < 6} style={{ marginTop: 24 }} />
 
         {/* Resend Code */}
         <TouchableOpacity onPress={handleResend} className="mt-4">

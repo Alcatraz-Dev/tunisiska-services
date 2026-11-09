@@ -22,6 +22,15 @@ export const MARGIN_WIDTH = MIN_LEDGE + 50;
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
+// `@react-native-masked-view/masked-view` ships a class component whose types
+// no longer line up with React 19's JSX element contract, so it is re-typed
+// here rather than globally suppressed.
+const Masked = MaskedView as unknown as React.FC<{
+  style?: React.ComponentProps<typeof View>["style"];
+  maskElement?: React.ReactElement;
+  children?: React.ReactNode;
+}>;
+
 const vec2 = (x: number, y: number) => {
   "worklet";
   return { x, y };
@@ -143,9 +152,9 @@ const Wave = ({
   }
   return (
    
-      <MaskedView style={StyleSheet.absoluteFill} maskElement={maskElement  } >
+      <Masked style={StyleSheet.absoluteFill} maskElement={maskElement}>
         {children}
-      </MaskedView>
+      </Masked>
    
   );
 };

@@ -218,6 +218,15 @@ export class PricingService {
         { name: 'Move Out Clean', type: 'percentage', value: 50 },
         { name: 'Weekend', type: 'percentage', value: 20 },
       ]
+    },
+    [ServiceType.CONTAINER_SHIPPING]: {
+      serviceType: ServiceType.CONTAINER_SHIPPING,
+      basePrice: 5000, // SEK
+      pricePerKm: 15,
+      modifiers: [
+        { name: 'Customs Clearance', type: 'fixed', value: 1000 },
+        { name: 'Insurance', type: 'percentage', value: 5 },
+      ]
     }
   };
 

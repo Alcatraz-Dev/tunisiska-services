@@ -55,7 +55,65 @@ export interface NotificationItem {
   date_sent?: string;
   image?: string;
   route?: string;
+  /**
+   * Identifier the OS assigned to the delivered notification. Needed to dismiss
+   * it from the system tray once the customer deletes it from the inbox.
+   */
+  nativeId?: string;
   screenImage?: string;
   mediaType?: string;
   videoUrl?: string;
+  /**
+   * Where the item came from. `remote` items mirror a Sanity document, so the
+   * device must drop them when that document is deleted. Device-only items
+   * (local test notifications, system pushes) have no source and are kept.
+   */
+  source?: "remote" | "device";
+}
+
+/**
+ * The identity of a notification.
+ *
+ * Sources disagree: Sanity rows carry `_id` mapped to `id`, push payloads carry
+ * `notification_id`, and system pushes only have a title and a timestamp. Every
+ * consumer must key on the same value or read state and de-duplication break,
+ * so the resolution lives here instead of being re-invented per screen.
+ */
+export function notificationKey(item: NotificationItem, fallback = ""): string {
+  return (
+    item.id ||
+    item.notification_id ||
+    `${item.title ?? ""}|${item.date ?? item.date_sent ?? fallback}`
+  );
+}
+
+/**
+ * Test notifications are for administrators, never for the customer inbox.
+ *
+ * Two shapes exist: admin broadcasts are prefixed `[TEST]`, and the "send test"
+ * button presents a device-local notification carrying `test` in its payload.
+ * Both are recognised here so every consumer filters them the same way.
+ */
+export function isTestNotification(
+  item: Partial<NotificationItem> | null | undefined,
+): boolean {
+  if (!item) return false;
+
+  const type = String(item.type ?? "").toLowerCase();
+  if (type === "test" || type === "test_notification") return true;
+
+  const title = String(item.title ?? "").trim().toLowerCase();
+  return (
+    title.startsWith("[test]") ||
+    title === "test notification" ||
+    title === "testnotis"
+  );
+}
+
+/** Sort newest first; items without a date keep their incoming order. */
+export function notificationTimestamp(item: NotificationItem): number {
+  const value = item.date ?? item.date_sent;
+  if (!value) return 0;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? 0 : time;
 }

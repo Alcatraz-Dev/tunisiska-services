@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["TunisiskaLiveActivityModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.tuniskaliveactivity.TunisiskaLiveActivityModule"]
+  }
+}

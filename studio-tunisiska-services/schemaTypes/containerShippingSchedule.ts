@@ -1,4 +1,12 @@
 import {defineType, defineField} from 'sanity'
+import {
+  destinationField,
+  imageField,
+  originField,
+  summaryField,
+  swedenCollectionField,
+  tunisiaLocationsField,
+} from './scheduleFields'
 
 export default defineType({
   name: 'containerShippingSchedule',
@@ -76,6 +84,15 @@ export default defineType({
       type: 'text',
       rows: 2,
     }),
+
+    // ── Redesign additions ──────────────────────────────────────────
+    // All optional, so documents created before these fields keep working.
+    imageField,
+    summaryField,
+    originField,
+    destinationField,
+    tunisiaLocationsField,
+    swedenCollectionField,
   ],
 
   preview: {

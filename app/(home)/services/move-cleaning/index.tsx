@@ -5,25 +5,44 @@ import {
   Alert,
   Platform,
 } from "react-native";
+import {
+  BookingScreen,
+  BookingScroll,
+  BookingSection,
+  BookingChoice,
+  BookingInput,
+  BookingPickerField,
+  BookingToggle,
+  PaymentMethodPicker,
+  BookingSummary,
+  BookingFooter,
+  BookingFooterNote,
+} from "@/app/components/booking/BookingKit";
 import React, { useState, useEffect } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useTheme } from "@/app/context/ThemeContext";
-import { StatusBar } from "expo-status-bar";
+import { spacing } from "@/app/theme/spacing";
 import MoveCategoryCheckbox from "@/app/components/MoveCategoryCheckbox";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import AppIcon from "@/app/components/ui/AppIcon";
+import PrimaryButton from "@/app/components/ui/PrimaryButton";
 import { AutoText } from "@/app/components/ui/AutoText";
 import Input from "@/app/components/ui/Input";
 import { showAlert } from "@/app/utils/showAlert";
 import { useUser } from "@clerk/clerk-expo";
 import { MoveCleaningOrderService } from "@/app/services/moveCleaningOrderService";
 import PaymentStripeJS from "@/app/components/PaymentStripeJS";
+import { currentDateLocale } from "@/app/lib/time";
+import { useLanguage } from "@/app/hooks/useLanguage";
+import { translateNow } from "@/app/hooks/useTranslation";
 
 // Stripe removed - payment functions updated
 
 export default function MoveCleaning() {
   const { resolvedTheme } = useTheme();
+  const { language } = useLanguage();
   const isDark = resolvedTheme === "dark";
   const { user } = useUser();
 
@@ -56,7 +75,6 @@ export default function MoveCleaning() {
   const [userPoints, setUserPoints] = useState(0);
   const [pointsToUse, setPointsToUse] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'points' | 'combined' | 'cash'>('cash');
-  const [showPayment, setShowPayment] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [notes, setNotes] = useState("");
 
@@ -137,10 +155,10 @@ export default function MoveCleaning() {
         const currentPoints = (user.unsafeMetadata as any)?.points || 0;
 
         if (currentPoints < pointsNeeded) {
-          showAlert("Otillräckliga poäng", `Du har ${currentPoints} poäng men behöver ${pointsNeeded} poäng för denna betalning. Vill du fylla på dina poäng?`, [
-            { text: "Avbryt", style: "cancel" },
+          showAlert(translateNow("Not enough points", language), translateNow("You have {have} points but need {need} points for this payment. Would you like to top up?", language).replace("{have}", String(currentPoints)).replace("{need}", String(pointsNeeded)), [
+            { text: translateNow("Cancel", language), style: "cancel" },
             {
-              text: "Fyll på poäng",
+              text: translateNow("Top up points", language),
               onPress: () => {
                 // router.push("/profile/wallet");
               }
@@ -186,10 +204,10 @@ export default function MoveCleaning() {
         const currentPoints = (user.unsafeMetadata as any)?.points || 0;
 
         if (currentPoints < pointsToUse) {
-          showAlert("Otillräckliga poäng", `Du har ${currentPoints} poäng men behöver ${pointsToUse} poäng för denna kombinerade betalning. Vill du fylla på dina poäng?`, [
-            { text: "Avbryt", style: "cancel" },
+          showAlert(translateNow("Not enough points", language), translateNow("You have {have} points but need {need} points for this payment. Would you like to top up?", language).replace("{have}", String(currentPoints)).replace("{need}", String(pointsToUse)), [
+            { text: translateNow("Cancel", language), style: "cancel" },
             {
-              text: "Fyll på poäng",
+              text: translateNow("Top up points", language),
               onPress: () => {
                 // router.push("/profile/wallet");
               }
@@ -251,35 +269,35 @@ export default function MoveCleaning() {
   const createMoveCleaningOrder = async () => {
     // Required field validation
     if (!customerName.trim()) {
-      showAlert("Fel", "Namn är obligatoriskt.");
+      showAlert("Error", "Name is required.");
       return;
     }
     if (!customerPhone.trim()) {
-      showAlert("Fel", "Telefonnummer är obligatoriskt.");
+      showAlert("Error", "Phone number is required.");
       return;
     }
     if (!pickup.trim()) {
-      showAlert("Fel", "Avhämtningsplats är obligatoriskt.");
+      showAlert("Error", "Pickup location is required.");
       return;
     }
     if (!dropoff.trim()) {
-      showAlert("Fel", "Destination är obligatoriskt.");
+      showAlert("Error", "Destination is required.");
       return;
     }
     if (!numPersons.trim() || parseInt(numPersons) < 1) {
-      showAlert("Fel", "Antal personer måste vara minst 1.");
+      showAlert("Error", "Number of people must be at least 1.");
       return;
     }
     if (!numItems.trim() || parseInt(numItems) < 1) {
-      showAlert("Fel", "Antal föremål måste vara minst 1.");
+      showAlert("Error", "Number of items must be at least 1.");
       return;
     }
     if (selectedCategories.length === 0) {
-      showAlert("Fel", "Du måste välja minst en typ av föremål.");
+      showAlert("Error", "Please select at least one item type.");
       return;
     }
     if (cleaningAreas.length === 0) {
-      showAlert("Fel", "Du måste välja minst ett städområde.");
+      showAlert("Error", "Please select at least one cleaning area.");
       return;
     }
 
@@ -289,7 +307,7 @@ export default function MoveCleaning() {
     scheduledDateTime.setHours(time.getHours(), time.getMinutes(), 0, 0);
 
     if (scheduledDateTime <= now) {
-      showAlert("Fel", "Bokningstiden måste vara i framtiden.");
+      showAlert("Error", "Booking time must be in the future.");
       return;
     }
 
@@ -334,7 +352,7 @@ export default function MoveCleaning() {
         console.log(`Processing ${paymentMethod} payment for ${estimatedPrice} SEK`);
         const paymentSuccess = await processPayment(paymentMethod, estimatedPrice);
         if (!paymentSuccess) {
-          showAlert("Betalningsfel", "Betalningen kunde inte genomföras. Försök igen.");
+          showAlert("Payment failed", "Payment could not be completed. Please try again.");
           setIsLoading(false);
           return;
         }
@@ -349,30 +367,30 @@ export default function MoveCleaning() {
         // Send notification for cash payment or points-only payment
         await MoveCleaningOrderService.sendOrderConfirmationNotification(orderData.userId, orderData);
         showAlert(
-          'Beställning skapad! 🎉',
-          `Din flytt & städning har beställts.\\n\\nBeställningsnummer: ${result.order._id}\\nTotalt: ${estimatedPrice} SEK\\nPoäng använda: ${pointsToUse}`
+          'Order created! 🎉',
+          `Your move & cleaning has been booked.\\n\\nOrder number: ${result.order._id}\\nTotal: ${estimatedPrice} SEK\\nPoints used: ${pointsToUse}`
         );
         router.back();
       } else {
-        showAlert('Fel', result.error || 'Kunde inte skapa beställningen');
+        showAlert('Error', result.error || 'Could not create order');
       }
     } catch (error: any) {
       console.error('Error creating move cleaning order:', error);
-      showAlert('Fel', error.message || 'Kunde inte skapa beställningen');
+      showAlert('Error', error.message || 'Could not create order');
     } finally {
       setIsLoading(false);
     }
   };
 
   const cleaningAreaOptions = [
-    { id: 'kitchen', label: 'Kök' },
+    { id: 'kitchen', label: 'Kitchen' },
     { id: 'bathroom', label: 'Badrum' },
     { id: 'living_room', label: 'Vardagsrum' },
     { id: 'bedroom', label: 'Sovrum' },
     { id: 'hallway', label: 'Korridor' },
-    { id: 'windows', label: 'Fönster' },
+    { id: 'windows', label: 'Windows' },
     { id: 'floors', label: 'Golv' },
-    { id: 'entire_apartment', label: 'Hela lägenheten' },
+    { id: 'entire_apartment', label: 'Entire apartment' },
   ];
 
   const toggleCleaningArea = (areaId: string) => {
@@ -384,131 +402,76 @@ export default function MoveCleaning() {
   };
 
   return (
-    <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
-      <View className="p-6">
-        <View className="flex-row items-center justify-center mb-6 relative">
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="absolute left-0 p-2"
-          >
-            <Ionicons
-              name="arrow-back"
-              size={24}
-              color={isDark ? "#fff" : "#000"}
-            />
-          </TouchableOpacity>
-          <AutoText
-            className={`text-2xl font-extrabold ${
-              isDark ? "text-white" : "text-gray-900"
-            }`}
-          >
-            Flytt och städning hjälp
-          </AutoText>
-        </View>
-        <AutoText
-          className={`text-sm text-center ${
-            isDark ? "text-gray-400" : "text-gray-600"
-          }`}
-        >
-          Fyll i dina uppgifter för att boka flytt och städning.
-        </AutoText>
-      </View>
-      <ScrollView className="p-6">
+    <BookingScreen title="Moving & cleaning" subtitle="Moving and cleaning in one booking">
+      <BookingScroll>
         {/* Customer Information */}
-        <AutoText className={`text-lg font-bold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}>
-          Kontaktuppgifter
-        </AutoText>
+        <BookingSection title="Contact details" />
 
-        <AutoText className={`my-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-          Namn *
-        </AutoText>
-        <Input
-          placeholder="Ditt namn"
+        <BookingInput
+          label="Full name"
+          required
+          placeholder="Your name"
           value={customerName}
           onChangeText={setCustomerName}
-          className={`border rounded-lg p-4 mb-4 ${
-            isDark ? "bg-dark-card text-white" : "bg-light-card text-black"
-          }`}
-          placeholderTextColor={isDark ? "gray" : "gray"}
         />
         <AutoText className={`text-xs mb-4 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
-          Informationen fylls automatiskt från din profil
+          Details are filled automatically from your profile
         </AutoText>
 
-        <AutoText className={`my-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-          Telefonnummer *
-        </AutoText>
-        <Input
+        <BookingInput
+          label="Phone number"
+          required
           placeholder="070-123 45 67"
           keyboardType="phone-pad"
           value={customerPhone}
           onChangeText={setCustomerPhone}
-          className={`border rounded-lg p-4 mb-4 ${
-            isDark ? "bg-dark-card text-white" : "bg-light-card text-black"
-          }`}
-          placeholderTextColor={isDark ? "gray" : "gray"}
         />
 
-        <AutoText className={`my-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-          E-post (valfritt)
-        </AutoText>
-        <Input
-          placeholder="din@email.com"
+        <BookingInput
+          label="Email"
+          hint="Optional"
+          placeholder="your@email.com"
           keyboardType="email-address"
           value={customerEmail}
           onChangeText={setCustomerEmail}
-          className={`border rounded-lg p-4 mb-4 ${
-            isDark ? "bg-dark-card text-white" : "bg-light-card text-black"
-          }`}
-          placeholderTextColor={isDark ? "gray" : "gray"}
         />
 
+        <BookingSection title="Move details" icon="cube-outline" />
+
         {/* Pickup */}
-        <AutoText className={`my-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-          Avhämtning plats *
-        </AutoText>
-        <Input
-          placeholder="Ex: Stockholm"
+        <BookingInput
+          label="Pickup location"
+          required
+          placeholder="E.g. Stockholm"
           value={pickup}
           onChangeText={setPickup}
-          className={`border rounded-lg p-4 mb-4 ${
-            isDark ? "bg-dark-card text-white" : "bg-light-card text-black"
-          }`}
-          placeholderTextColor={isDark ? "gray" : "gray"}
         />
 
         {/* Dropoff */}
-        <AutoText className={`my-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-          Destination *
-        </AutoText>
-        <Input
-          placeholder="Ex: Uppsala"
+        <BookingInput
+          label="Destination"
+          required
+          placeholder="E.g. Uppsala"
           value={dropoff}
           onChangeText={setDropoff}
-          className={`border rounded-lg p-4 mb-4 ${
-            isDark ? "bg-dark-card text-white" : "bg-light-card text-black"
-          }`}
-          placeholderTextColor={isDark ? "gray" : "gray"}
         />
 
+        <BookingSection title="Schedule" icon="calendar-outline" />
+
         {/* Date & Time */}
-        <AutoText className={`my-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-          Välj datum *
-        </AutoText>
-        <TouchableOpacity
-          className={`border rounded-lg p-4 mb-4 ${
-            isDark ? "bg-dark-card text-white" : "bg-light-card text-black"
-          }`}
+        <BookingPickerField
+          label="Select date"
+          required
+          icon="calendar-outline"
           onPress={() => setShowDatePicker(!showDatePicker)}
         >
-          <AutoText className={isDark ? "text-white" : "text-gray-900"}>
-            {date.toLocaleDateString()}
-          </AutoText>
-        </TouchableOpacity>
+          {date.toLocaleDateString(currentDateLocale())}
+        </BookingPickerField>
         {showDatePicker && (
           <DateTimePicker
             value={date}
             mode="date"
+            locale={currentDateLocale(language).replace("-", "_")}
             display={Platform.OS === "ios" ? "spinner" : "default"}
             themeVariant={isDark ? "dark" : "light"}
             textColor={isDark ? "white" : "black"}
@@ -520,26 +483,22 @@ export default function MoveCleaning() {
           />
         )}
 
-        <AutoText className={`my-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-          Välj tid *
-        </AutoText>
-        <TouchableOpacity
-          className={`border rounded-lg p-4 mb-4 ${
-            isDark ? "bg-dark-card text-white" : "bg-light-card text-black"
-          }`}
+        <BookingPickerField
+          label="Select time"
+          required
+          icon="time-outline"
           onPress={() => setShowTimePicker(!showTimePicker)}
         >
-          <AutoText className={isDark ? "text-white" : "text-gray-900"}>
-            {time.toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </AutoText>
-        </TouchableOpacity>
+          {time.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          })}
+        </BookingPickerField>
         {showTimePicker && (
           <DateTimePicker
             value={time}
             mode="time"
+            locale={currentDateLocale(language).replace("-", "_")}
             display={Platform.OS === "ios" ? "spinner" : "default"}
             themeVariant={isDark ? "dark" : "light"}
             textColor={isDark ? "white" : "black"}
@@ -551,33 +510,22 @@ export default function MoveCleaning() {
         )}
 
         {/* Number of persons */}
-        <AutoText className={`my-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-          Antal personer *
-        </AutoText>
-        <Input
+        <BookingInput
+          label="Number of people"
+          required
           placeholder="1"
           keyboardType="numeric"
           value={numPersons}
           onChangeText={setNumPersons}
-          className={`border rounded-lg p-4 mb-4 ${
-            isDark ? "bg-dark-card text-white" : "bg-light-card text-black"
-          }`}
-          placeholderTextColor={isDark ? "gray" : "gray"}
         />
 
         {/* Number of items */}
-        <AutoText className={`my-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-          Antal föremål
-        </AutoText>
-        <Input
-          placeholder="Ex: 10"
+        <BookingInput
+          label="Number of items"
+          placeholder="E.g. 10"
           keyboardType="numeric"
           value={numItems}
           onChangeText={setNumItems}
-          className={`border rounded-lg p-4 mb-4 ${
-            isDark ? "bg-dark-card text-white" : "bg-light-card text-black"
-          }`}
-          placeholderTextColor={isDark ? "gray" : "gray"}
         />
 
         {/* Item Type */}
@@ -588,398 +536,81 @@ export default function MoveCleaning() {
         />
 
         {/* Elevator */}
-        <View className="flex-row items-center justify-between mb-4 mx-3">
-          <AutoText className={isDark ? "text-white" : "text-gray-900"}>
-            Hiss tillgänglig?
-          </AutoText>
-          <TouchableOpacity
-            className={`px-4 py-2 rounded-lg ${
-              hasElevator
-                ? "bg-blue-500"
-                : isDark
-                  ? "bg-gray-300"
-                  : "bg-gray-300"
-            }`}
-            onPressIn={() => setHasElevator(!hasElevator)}
-          >
-            <AutoText className={hasElevator ? "text-white" : "text-black"}>
-              {hasElevator ? "Ja" : "Nej"}
-            </AutoText>
-          </TouchableOpacity>
-        </View>
+        <BookingToggle label="Elevator available?" value={hasElevator} onChange={setHasElevator} />
 
-        {/* Cleaning Areas */}
-        <AutoText className={`text-lg font-bold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}>
-          Städområden *
-        </AutoText>
-        <View className="mb-4">
+        <BookingSection title="Cleaning areas" subtitle="Choose every room that needs cleaning" icon="sparkles-outline" />
+
+        <View style={{ gap: spacing.sm, marginBottom: spacing.lg }}>
           {cleaningAreaOptions.map((area) => (
-            <TouchableOpacity
+            <BookingChoice
               key={area.id}
-              className={`flex-row items-center p-3 mb-2 rounded-lg border ${
-                cleaningAreas.includes(area.id)
-                  ? "bg-blue-500 border-blue-500"
-                  : isDark
-                    ? "bg-dark-card border-gray-600"
-                    : "bg-light-card border-gray-300"
-              }`}
+              selected={cleaningAreas.includes(area.id)}
               onPress={() => toggleCleaningArea(area.id)}
-            >
-              <View
-                className={`w-4 h-4 rounded border-2 mr-3 ${
-                  cleaningAreas.includes(area.id)
-                    ? "bg-white border-white"
-                    : isDark
-                      ? "border-gray-400"
-                      : "border-gray-500"
-                }`}
-              >
-                {cleaningAreas.includes(area.id) && (
-                  <View className="w-2 h-2 bg-blue-500 rounded-sm m-0.5" />
-                )}
-              </View>
-              <AutoText
-                className={
-                  cleaningAreas.includes(area.id)
-                    ? "text-white font-semibold"
-                    : isDark
-                      ? "text-white"
-                      : "text-black"
-                }
-              >
-                {area.label}
-              </AutoText>
-            </TouchableOpacity>
+              title={area.label}
+            />
           ))}
         </View>
 
-        {/* Cleaning Intensity */}
-        <AutoText className={`my-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-          Städintensitet *
-        </AutoText>
-        <View className="mb-4">
+        <BookingSection title="Cleaning intensity" icon="options-outline" />
+
+        <View style={{ gap: spacing.sm, marginBottom: spacing.lg }}>
           {[
-            { value: 'basic', label: 'Grundläggande städning' },
-            { value: 'deep', label: 'Djupstädning' },
-            { value: 'move_out', label: 'Flyttstädning' }
+            { value: "basic", label: "Basic cleaning" },
+            { value: "deep", label: "Deep cleaning" },
+            { value: "move_out", label: "Move-out cleaning" },
           ].map((option) => (
-            <TouchableOpacity
+            <BookingChoice
               key={option.value}
-              className={`p-4 rounded-lg border mb-2 ${
-                cleaningIntensity === option.value
-                  ? "bg-blue-500 border-blue-500"
-                  : isDark
-                    ? "bg-dark-card border-gray-600"
-                    : "bg-light-card border-gray-300"
-              }`}
+              selected={cleaningIntensity === option.value}
               onPress={() => setCleaningIntensity(option.value as any)}
-            >
-              <AutoText
-                className={
-                  cleaningIntensity === option.value
-                    ? "text-white font-semibold"
-                    : isDark
-                      ? "text-white"
-                      : "text-black"
-                }
-              >
-                {option.label}
-              </AutoText>
-            </TouchableOpacity>
+              title={option.label}
+            />
           ))}
         </View>
 
         {/* Cleaning Supplies */}
-        <View className="flex-row items-center justify-between mb-4 mx-3">
-          <AutoText className={isDark ? "text-white" : "text-gray-900"}>
-            Städmaterial ingår?
-          </AutoText>
-          <TouchableOpacity
-            className={`px-4 py-2 rounded-lg ${
-              cleaningSupplies
-                ? "bg-blue-500"
-                : isDark
-                  ? "bg-gray-300"
-                  : "bg-gray-300"
-            }`}
-            onPressIn={() => setCleaningSupplies(!cleaningSupplies)}
-          >
-            <AutoText className={cleaningSupplies ? "text-white" : "text-black"}>
-              {cleaningSupplies ? "Ja" : "Nej"}
-            </AutoText>
-          </TouchableOpacity>
-        </View>
+        <BookingToggle label="Cleaning supplies included?" value={cleaningSupplies} onChange={setCleaningSupplies} />
+
+        <BookingSection title="Additional information" icon="create-outline" />
 
         {/* Notes */}
-        <AutoText className={`my-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-          Extra information
-        </AutoText>
-        <Input
-          placeholder="Särskilda önskemål eller instruktioner..."
+        <BookingInput
+          label="Extra information"
+          placeholder="Special requests or instructions..."
           value={notes}
           onChangeText={setNotes}
           multiline
           numberOfLines={3}
-          className={`border rounded-lg p-4 mb-6 ${
-            isDark ? "bg-dark-card text-white" : "bg-light-card text-black"
-          }`}
-          placeholderTextColor={isDark ? "gray" : "gray"}
         />
 
-        {/* Payment Method Selection */}
-        <AutoText className={`my-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-          Betalningsmetod *
-        </AutoText>
-        <View className="mb-4">
-          <TouchableOpacity
-            className={`p-4 rounded-lg border mb-2 ${
-              paymentMethod === 'cash'
-                ? "bg-blue-500 border-blue-500"
-                : isDark
-                  ? "bg-dark-card border-gray-600"
-                  : "bg-light-card border-gray-300"
-            }`}
-            onPress={() => setPaymentMethod('cash')}
-            activeOpacity={0.8}
-          >
-            <View className="flex-row items-center">
-              <View
-                className={`w-4 h-4 rounded border-2 mr-3 ${
-                  paymentMethod === 'cash'
-                    ? "bg-white border-white"
-                    : isDark
-                      ? "border-gray-400"
-                      : "border-gray-500"
-                }`}
-              >
-                {paymentMethod === 'cash' && (
-                  <View className="w-2 h-2 bg-blue-500 rounded-sm m-0.5" />
-                )}
-              </View>
-              <AutoText
-                className={
-                  paymentMethod === 'cash'
-                    ? "text-white font-semibold"
-                    : isDark
-                      ? "text-white"
-                      : "text-black"
-                }
-              >
-                Kontant betalning (vid flytt)
-              </AutoText>
-            </View>
-          </TouchableOpacity>
+        <BookingSection title="Payment method" icon="wallet-outline" />
+              <PaymentMethodPicker
+                value={paymentMethod}
+                onChange={setPaymentMethod}
+                points={userPoints}
+                pointsUsed={pointsToUse}
+                onPointsChange={(value) => handlePointsChange(String(value))}
+                cashLabel="Cash on moving day"
+                cashHint="Pay the movers when the job is done"
+                cardHint="Pay securely by card now"
+              />
 
-          <TouchableOpacity
-            className={`p-4 rounded-lg border mb-2 ${
-              paymentMethod === 'stripe'
-                ? "bg-blue-500 border-blue-500"
-                : isDark
-                  ? "bg-dark-card border-gray-600"
-                  : "bg-light-card border-gray-300"
-            }`}
-            onPress={() => setPaymentMethod('stripe')}
-            activeOpacity={0.8}
-          >
-            <View className="flex-row items-center">
-              <View
-                className={`w-4 h-4 rounded border-2 mr-3 ${
-                  paymentMethod === 'stripe'
-                    ? "bg-white border-white"
-                    : isDark
-                      ? "border-gray-400"
-                      : "border-gray-500"
-                }`}
-              >
-                {paymentMethod === 'stripe' && (
-                  <View className="w-2 h-2 bg-blue-500 rounded-sm m-0.5" />
-                )}
-              </View>
-              <AutoText
-                className={
-                  paymentMethod === 'stripe'
-                    ? "text-white font-semibold"
-                    : isDark
-                      ? "text-white"
-                      : "text-black"
-                }
-              >
-                Kortbetalning (förbetald)
-              </AutoText>
-            </View>
-          </TouchableOpacity>
+        <BookingSummary
+          rows={[{ label: "Base price", value: estimatedPrice + " SEK" }]}
+          total={getFinalPrice() + " SEK"}
+        />
 
-          <TouchableOpacity
-            className={`p-4 rounded-lg border mb-2 ${
-              paymentMethod === 'points'
-                ? "bg-blue-500 border-blue-500"
-                : isDark
-                  ? "bg-dark-card border-gray-600"
-                  : "bg-light-card border-gray-300"
-            }`}
-            onPress={() => setPaymentMethod('points')}
-            activeOpacity={0.8}
-          >
-            <View className="flex-row items-center justify-between">
-              <View className="flex-row items-center">
-                <View
-                  className={`w-4 h-4 rounded border-2 mr-3 ${
-                    paymentMethod === 'points'
-                      ? "bg-white border-white"
-                      : isDark
-                        ? "border-gray-400"
-                        : "border-gray-500"
-                  }`}
-                >
-                  {paymentMethod === 'points' && (
-                    <View className="w-2 h-2 bg-blue-500 rounded-sm m-0.5" />
-                  )}
-                </View>
-                <AutoText
-                  className={
-                    paymentMethod === 'points'
-                      ? "text-white font-semibold"
-                      : isDark
-                        ? "text-white"
-                        : "text-black"
-                  }
-                >
-                  Poäng (förbetald)
-                </AutoText>
-              </View>
-              <AutoText
-                className={`text-sm ${
-                  paymentMethod === 'points'
-                    ? "text-white"
-                    : isDark
-                      ? "text-gray-400"
-                      : "text-gray-600"
-                }`}
-              >
-                {userPoints} poäng
-              </AutoText>
-            </View>
-            {paymentMethod === 'points' && (
-              <View className="mt-3 pt-3 border-t border-white/20">
-                <View className="flex-row items-center justify-between">
-                  <AutoText className="text-white text-sm">Använd poäng:</AutoText>
-                  <Input
-                    placeholder="0"
-                    keyboardType="numeric"
-                    value={pointsToUse.toString()}
-                    onChangeText={handlePointsChange}
-                    className={`border rounded p-2 w-20 text-center ${
-                      isDark ? 'bg-gray-700 text-white' : 'bg-white text-black'
-                    }`}
-                  />
-                </View>
-                <AutoText className="text-white/80 text-xs mt-1">
-                  Du har {userPoints} poäng tillgängliga
-                </AutoText>
-              </View>
-            )}
-          </TouchableOpacity>
+      </BookingScroll>
 
-          <TouchableOpacity
-            className={`p-4 rounded-lg border ${
-              paymentMethod === 'combined'
-                ? "bg-blue-500 border-blue-500"
-                : isDark
-                  ? "bg-dark-card border-gray-600"
-                  : "bg-light-card border-gray-300"
-            }`}
-            onPress={() => setPaymentMethod('combined')}
-            activeOpacity={0.8}
-          >
-            <View className="flex-row items-center justify-between">
-              <View className="flex-row items-center">
-                <View
-                  className={`w-4 h-4 rounded border-2 mr-3 ${
-                    paymentMethod === 'combined'
-                      ? "bg-white border-white"
-                      : isDark
-                        ? "border-gray-400"
-                        : "border-gray-500"
-                  }`}
-                >
-                  {paymentMethod === 'combined' && (
-                    <View className="w-2 h-2 bg-blue-500 rounded-sm m-0.5" />
-                  )}
-                </View>
-                <AutoText
-                  className={
-                    paymentMethod === 'combined'
-                      ? "text-white font-semibold"
-                      : isDark
-                        ? "text-white"
-                        : "text-black"
-                  }
-                >
-                  Kombinerat (kort + poäng)
-                </AutoText>
-              </View>
-              <AutoText
-                className={`text-sm ${
-                  paymentMethod === 'combined'
-                    ? "text-white"
-                    : isDark
-                      ? "text-gray-400"
-                      : "text-gray-600"
-                }`}
-              >
-                {userPoints} poäng
-              </AutoText>
-            </View>
-            {paymentMethod === 'combined' && (
-              <View className="mt-3 pt-3 border-t border-white/20">
-                <View className="flex-row items-center justify-between">
-                  <AutoText className="text-white text-sm">Använd poäng:</AutoText>
-                  <Input
-                    placeholder="0"
-                    keyboardType="numeric"
-                    value={pointsToUse.toString()}
-                    onChangeText={handlePointsChange}
-                    className={`border rounded p-2 w-20 text-center ${
-                      isDark ? 'bg-gray-700 text-white' : 'bg-white text-black'
-                    }`}
-                  />
-                </View>
-                <AutoText className="text-white/80 text-xs mt-1">
-                  Du har {userPoints} poäng tillgängliga
-                </AutoText>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* Price Summary */}
-        <View className={`border rounded-lg p-4 mb-6 ${isDark ? 'bg-dark-card' : 'bg-light-card'}`}>
-          <AutoText className={`text-lg font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-            Prissammanfattning
-          </AutoText>
-          <View className="flex-row justify-between mb-2">
-            <AutoText className={isDark ? 'text-gray-400' : 'text-gray-600'}>Grundpris:</AutoText>
-            <AutoText className={isDark ? 'text-white' : 'text-black'}>{estimatedPrice} SEK</AutoText>
-          </View>
-          <View className="border-t border-gray-300 pt-2 mt-2">
-            <View className="flex-row justify-between">
-              <AutoText className={`font-bold ${isDark ? 'text-white' : 'text-black'}`}>Att betala:</AutoText>
-              <AutoText className={`font-bold ${isDark ? 'text-white' : 'text-black'}`}>
-                {getFinalPrice()} SEK
-              </AutoText>
-            </View>
-          </View>
-        </View>
-
+      <BookingFooter total={getFinalPrice() + " SEK"}>
         {/* Confirm Booking */}
-        <View className="mb-8">
           {paymentMethod === 'stripe' || (paymentMethod === 'combined' && getFinalPrice() > 0) ? (
             <PaymentStripeJS
               amount={getFinalPrice()}
               points={getFinalPrice() * 10}
               isDark={isDark}
-              service="Flytt & Städning"
-              customText={`Betala ${getFinalPrice()} SEK för Flytt & Städning`}
+              service="Moving & Cleaning"
+              customText={`${translateNow("Pay", language)} ${getFinalPrice()} SEK ${translateNow("for", language)} ${translateNow("Moving & cleaning", language)}`}
            
               customStyle={{
                 backgroundColor: isDark ? "#1e1e1e" : "#ffffff",
@@ -992,140 +623,18 @@ export default function MoveCleaning() {
               }}
             />
           ) : (
-            <TouchableOpacity
-              className={`p-4 rounded-xl items-center ${isLoading ? "bg-gray-500" : "bg-blue-500"}`}
+            <PrimaryButton
+              label={isLoading ? "Creating order..." : "Confirm move & cleaning"}
               onPress={createMoveCleaningOrder}
+              loading={isLoading}
               disabled={isLoading || !customerName.trim() || !customerPhone.trim() || !pickup.trim() || !dropoff.trim() || !numPersons.trim() || parseInt(numPersons) < 1 || !numItems.trim() || parseInt(numItems) < 1 || selectedCategories.length === 0 || cleaningAreas.length === 0}
-            >
-               <AutoText className="text-center mt-2  text-white font-semibold text-base">
-                {isLoading ? "Skapar beställning..." : 'Bekräfta flytt & städning'}
-              </AutoText>
-            </TouchableOpacity>
+            />
           )}
 
-          <View className="flex-row items-center justify-center mt-4">
-            <Ionicons
-              name="shield-checkmark-outline"
-              size={16}
-              color={isDark ? "#9CA3AF" : "#6B7280"}
-            />
-            <AutoText className={`text-xs ml-2 text-center  ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              Säker betalning • 24/7 support • Professionella flyttare & städare
-            </AutoText>
-          </View>
+          <BookingFooterNote text="Secure payment • 24/7 support • Professional movers & cleaners" />
 
-          <AutoText className={`text-xs text-center mt-2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-            {paymentMethod === 'cash' && 'Du betalar kontant till flyttfirman vid leverans.'}
-            {paymentMethod === 'stripe' && 'Betalning sker säkert via kort och debiteras direkt.'}
-            {paymentMethod === 'points' && `Betalning sker med ${pointsToUse} poäng (${(pointsToUse / 10).toFixed(0)} SEK).`}
-            {paymentMethod === 'combined' && `Kombinerad betalning: ${pointsToUse} poäng + ${(getFinalPrice()).toFixed(0)} SEK med kort.`}
-          </AutoText>
-        </View>
+      </BookingFooter>
 
-      </ScrollView>
-      {/* Payment Modal */}
-      {showPayment && (
-        <View className="absolute inset-0 bg-black/60 backdrop-blur-sm justify-center items-center z-50">
-          <View className={`mx-6 p-8 rounded-3xl w-full max-w-sm ${isDark ? 'bg-dark-card border border-gray-700' : 'bg-white border border-gray-200'} shadow-2xl`}>
-            {/* Header with Icon */}
-            <View className="items-center mb-6">
-              <View className={`p-4 rounded-full mb-4 ${isDark ? 'bg-blue-500/20' : 'bg-blue-100'}`}>
-                <Ionicons
-                  name="card-outline"
-                  size={32}
-                  color={isDark ? "#60A5FA" : "#3B82F6"}
-                />
-              </View>
-              <AutoText className={`text-center text-2xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                Slutför betalning
-              </AutoText>
-              <AutoText className={`text-center text-base ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                {getFinalPrice()} SEK för din flytt & städning
-              </AutoText>
-            </View>
-
-            {/* Payment Component */}
-            <View className="mb-6">
-              <PaymentStripeJS
-                amount={getFinalPrice()}
-                points={getFinalPrice() * 10}
-                isDark={isDark}
-                customText={`Betala ${getFinalPrice()} SEK för Flytt & Städning`}
-                customClassName="mb-10 text-lg font-semibold"
-                customStyle={{
-                  backgroundColor: isDark ? "#1e1e1e" : "#ffffff",
-                  borderWidth: 1,
-                  borderColor: isDark ? "#3C3C3E" : "#E5E5E5",
-                }}
-                onPaymentSuccess={async (purchasedPoints: number, amountPaid: number) => {
-                  setShowPayment(false);
-                  // Create order after successful payment
-                  try {
-                    const scheduledDateTime = new Date(
-                      date.getFullYear(),
-                      date.getMonth(),
-                      date.getDate(),
-                      time.getHours(),
-                      time.getMinutes()
-                    ).toISOString();
-
-                    const orderData = {
-                      userId: user?.id!,
-                      customerInfo: {
-                        name: customerName,
-                        phone: customerPhone,
-                        email: customerEmail,
-                      },
-                      pickupAddress: pickup,
-                      deliveryAddress: dropoff,
-                      scheduledDateTime,
-                      numberOfItems: parseInt(numItems),
-                      numberOfPersons: parseInt(numPersons),
-                      hasElevator,
-                      itemCategories: selectedCategories,
-                      cleaningAreas,
-                      cleaningIntensity,
-                      cleaningSupplies,
-                      totalPrice: estimatedPrice,
-                      pointsUsed: pointsToUse,
-                      paymentMethod,
-                      notes,
-                      specialRequirements: notes,
-                    };
-
-                    const result = await MoveCleaningOrderService.createMoveCleaningOrder(orderData);
-                    if (result.success) {
-                      // Send notification after successful order creation
-                      await MoveCleaningOrderService.sendOrderConfirmationNotification(orderData.userId, orderData);
-                      showAlert(
-                        'Beställning skapad! 🎉',
-                        `Din flytt & städning har beställts.\\n\\nBeställningsnummer: ${result.order._id}\\nTotalt: ${estimatedPrice} SEK\\nPoäng använda: ${pointsToUse}`
-                      );
-                      router.back();
-                    }
-                  } catch (error) {
-                    console.error('Error creating order after payment:', error);
-                    showAlert('Fel', 'Betalningen lyckades men beställningen kunde inte skapas. Kontakta support.');
-                  }
-                }}
-              />
-            </View>
-
-            {/* Security Note */}
-            <View className="flex-row items-center justify-center mt-4">
-              <Ionicons
-                name="shield-checkmark-outline"
-                size={14}
-                color={isDark ? "#9CA3AF" : "#6B7280"}
-              />
-              <AutoText className={`text-xs ml-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                Säker betalning
-              </AutoText>
-            </View>
-          </View>
-        </View>
-      )}
-      <StatusBar style={isDark ? "light" : "dark"} />
-    </SafeAreaView>
+    </BookingScreen>
   );
 }

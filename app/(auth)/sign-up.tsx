@@ -1,5 +1,5 @@
 import * as React from "react";
-import { TouchableOpacity, View, ScrollView, Image, Alert, ActivityIndicator } from "react-native";
+import { View, ScrollView, Image } from "react-native";
 import { useSignUp } from "@clerk/clerk-expo";
 import { Link, useRouter } from "expo-router";
 import { useTheme } from "../context/ThemeContext";
@@ -13,12 +13,17 @@ import GoogleSignInButton from "../components/GoogleSignInButton";
 import AppleSignInButton from "../components/AppleSignInButton";
 import { nativeNotifyAPI } from "../services/nativeNotifyApi";
 import { useUser } from "@clerk/clerk-expo";
+import PrimaryButton from "../components/ui/PrimaryButton";
+import ThemedText from "../components/ui/ThemedText";
+import { useThemeColors } from "@/app/theme";
+import { radii, spacing } from "@/app/theme/spacing";
 
 export default function SignUpScreen() {
   const { isLoaded, signUp, setActive } = useSignUp();
   const { user } = useUser();
   const router = useRouter();
   const { resolvedTheme } = useTheme();
+  const theme = useThemeColors();
   const isDark = resolvedTheme === "dark";
 
   const [emailAddress, setEmailAddress] = React.useState("");
@@ -101,110 +106,78 @@ export default function SignUpScreen() {
     }
   };
 
-  const inputStyle = `w-full p-4 rounded-xl border mb-4 border-gray-700 bg-dark-card text-white`;
-
-  const buttonStyle = `w-full p-4 rounded-xl items-center bg-blue-600`;
-
-  const buttonTextStyle = "text-white font-semibold";
-
   if (pendingVerification) {
     return (
-      <View
-        className="flex-1 justify-center px-6 bg-dark"
-      >
-        {/* Header */}
-        <AutoText
-          className="text-2xl font-bold mb-4 text-white"
-        >
-          Verifiera din e-post
-        </AutoText>
-        <AutoText
-          className="mb-6 text-gray-400"
-        >
-          Ange koden som skickades till din e-post
-        </AutoText>
+      <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: spacing.xl, backgroundColor: theme.canvas }}>
+        <ThemedText variant="title1" style={{ marginBottom: spacing.sm }}>Verify your email</ThemedText>
+        <ThemedText variant="bodySm" tone="secondary" style={{ marginBottom: spacing.xl }}>Enter the code sent to your email address.</ThemedText>
 
         {/* OTP Input instead of TextInput */}
         <OtpInput
           numberOfDigits={6}
           onTextChange={setCode}
-          focusColor="#60A5FA"
+          focusColor={theme.primary}
           theme={{
             pinCodeContainerStyle: {
-              borderColor: "#374151",
-              backgroundColor: "#1F2937",
-              borderRadius: 12,
+              borderColor: theme.border,
+              backgroundColor: theme.surface,
+              borderRadius: radii.md,
             },
             pinCodeTextStyle: {
               fontSize: 18,
-              color: "#F9FAFB",
+              color: theme.textPrimary,
             },
           }}
         />
 
         {/* Verify button */}
-        <TouchableOpacity
-          className={`${buttonStyle} mt-6 ${loading ? 'opacity-70' : ''}`}
-          onPress={onVerifyPress}
-          disabled={code.length < 6 || loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <AutoText className={buttonTextStyle}>Verifiera</AutoText>
-          )}
-        </TouchableOpacity>
-        <StatusBar style="light" />
+        <PrimaryButton label="Verify email" onPress={onVerifyPress} loading={loading} disabled={code.length < 6} style={{ marginTop: spacing.xl }} />
+        <StatusBar style={isDark ? "light" : "dark"} />
       </View>
     );
   }
 
   return (
-    <View className="flex-1 bg-dark">
+    <View style={{ flex: 1, backgroundColor: theme.canvas }}>
       <ScrollView
-        className={`flex-1 px-6 pt-12 `}
-        contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
+        contentContainerStyle={{ flexGrow: 1, justifyContent: "center", paddingHorizontal: spacing.xl, paddingVertical: spacing.xxxl }}
       >
-        <AutoText
-          className="text-3xl font-bold mb-6 text-center text-white"
-        >
-          Skapa konto
-        </AutoText>
+        <View style={{ alignItems: "center", marginBottom: spacing.xl }}>
+          <View style={{ width: 88, height: 88, borderRadius: radii.xl, backgroundColor: "#ffffff", alignItems: "center", justifyContent: "center", marginBottom: spacing.md }}>
+            <Image source={require("../assets/logo-transparent.png")} style={{ width: 64, height: 64 }} resizeMode="contain" accessibilityLabel="Tunisiska Mega Transport" />
+          </View>
+          <ThemedText variant="title1" style={{ textAlign: "center" }}>Create account</ThemedText>
+          <ThemedText variant="bodySm" tone="secondary" style={{ textAlign: "center", marginTop: spacing.xs }}>A few details to get started</ThemedText>
+          <ThemedText variant="caption" tone="tertiary" style={{ textAlign: "center", marginTop: spacing.xs }}>Set up your account to book transport and follow every journey.</ThemedText>
+        </View>
 
+        <ThemedText variant="caption" style={{ marginBottom: spacing.xs }}>Email address</ThemedText>
         <Input
           value={emailAddress}
           onChangeText={setEmailAddress}
-          placeholder="Ange e-postadress"
-          placeholderTextColor="#9CA3AF"
+          placeholder="name@example.com"
           autoCapitalize="none"
-          className={inputStyle}
-          style={{ color: "#FFFFFF" }}
+          style={{ height: 48, borderRadius: radii.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.surface, paddingHorizontal: spacing.md, color: theme.textPrimary, marginBottom: spacing.md }}
         />
 
+        <ThemedText variant="caption" style={{ marginBottom: spacing.xs }}>Password</ThemedText>
         <Input
           value={password}
           onChangeText={setPassword}
-          placeholder="Ange lösenord"
-          placeholderTextColor="#9CA3AF"
+          placeholder="At least 8 characters"
           isPassword={true}
-          className={inputStyle}
-          style={{ color: "#FFFFFF" }}
+          style={{ height: 48, borderRadius: radii.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.surface, paddingHorizontal: spacing.md, color: theme.textPrimary, marginBottom: spacing.md }}
         />
 
-        <TouchableOpacity
-          className={`${buttonStyle} ${loading ? 'opacity-70' : ''}`}
-          onPress={onSignUpPress}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <AutoText className={buttonTextStyle}>Fortsätt</AutoText>
-          )}
-        </TouchableOpacity>
-        <View
-          className="flex-row justify-center my-4 border border-zinc-600"
-        ></View>
+        <PrimaryButton label="Create account" onPress={onSignUpPress} loading={loading} disabled={!emailAddress.trim() || password.length < 8} />
+
+        {/* Extra breathing room for the policy note below the primary action. */}
+        <View style={{ marginTop: spacing.sm }} />
+
+        <View style={{ flexDirection: "row", justifyContent: "center", marginTop: spacing.md, marginBottom: spacing.md }}>
+          <ThemedText variant="footnote" tone="tertiary">By continuing, you agree to our Terms and Privacy Policy.</ThemedText>
+        </View>
+
         {!userProfile ? (
           <>
             <GoogleSignInButton
@@ -233,17 +206,13 @@ export default function SignUpScreen() {
           </View>
         )}
 
-        <View className="flex-row justify-center mt-4 gap-2">
-          <AutoText className="text-gray-400">
-            Har du redan ett konto ?
-          </AutoText>
+        <View style={{ flexDirection: "row", justifyContent: "center", marginTop: spacing.lg, gap: spacing.xs }}>
+          <ThemedText variant="bodySm" tone="secondary">Already have an account?</ThemedText>
           <Link href="/sign-in">
-            <AutoText className="text-blue-500 font-semibold">
-              Logga in
-            </AutoText>
+            <ThemedText variant="bodySm" style={{ color: theme.accent, fontWeight: "700" }}>Sign in</ThemedText>
           </Link>
         </View>
-        <StatusBar style="light" />
+        <StatusBar style={isDark ? "light" : "dark"} />
       </ScrollView>
     </View>
   );

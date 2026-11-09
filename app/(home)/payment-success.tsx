@@ -1,22 +1,32 @@
 import React, { useEffect } from "react";
-import { View, ActivityIndicator } from "react-native";
+import { View } from "react-native";
+import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
-import { AutoText } from "@/app/components/ui/AutoText";
+import { Ionicons } from "@expo/vector-icons";
+import AppIcon from "@/app/components/ui/AppIcon";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+import ThemedText from "@/app/components/ui/ThemedText";
+import PrimaryButton from "@/app/components/ui/PrimaryButton";
+import { useTheme } from "@/app/context/ThemeContext";
+import { useThemeColors } from "@/app/theme";
+import { radii, spacing } from "@/app/theme/spacing";
 
 export default function PaymentSuccessScreen() {
   const router = useRouter();
+  const theme = useThemeColors();
+  const { resolvedTheme } = useTheme();
 
-  useEffect(() => {
-    // This screen is just a landing spot for the deep link or redirect.
-    // The WebView in PaymentStripeJS.tsx will likely intercept the URL before 
-    // the user even sees this, but having the screen prevents "Not Found" error.
-    console.log("Payment success screen mounted");
-  }, []);
+  useEffect(() => { console.log("Payment success screen mounted"); }, []);
 
-  return (
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000" }}>
-      <ActivityIndicator size="large" color="#3b82f6" />
-      <AutoText style={{ color: "#fff", marginTop: 20 }}>Betalning bekräftad, bearbetar...</AutoText>
+  return <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1, backgroundColor: theme.canvas, justifyContent: "center", padding: spacing.xl }}>
+    <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
+    <View style={{ alignItems: "center", padding: spacing.xl, backgroundColor: theme.surface, borderRadius: radii.xl, borderWidth: 1, borderColor: theme.border }}>
+      <View style={{ width: 76, height: 76, borderRadius: 38, backgroundColor: "#E7F5EE", alignItems: "center", justifyContent: "center" }}><AppIcon name="checkmark" size={38} color="#147A48" /></View>
+      <ThemedText variant="title1" align="center" style={{ marginTop: spacing.lg }}>Payment successful</ThemedText>
+      <ThemedText variant="bodySm" tone="secondary" align="center" style={{ marginTop: spacing.sm }}>Your payment was received. You can view your shipment booking in My Shipments.</ThemedText>
+      <PrimaryButton label="View my shipments" icon="arrow-forward" onPress={() => router.replace("/bookings")} style={{ marginTop: spacing.xl }} />
+      <PrimaryButton label="Back to home" variant="ghost" onPress={() => router.replace("/")} style={{ marginTop: spacing.xs }} />
     </View>
-  );
+  </SafeAreaView>;
 }

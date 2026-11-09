@@ -1,3 +1,4 @@
+import { currentDateLocale } from "@/app/lib/time";
 import { client } from "@/sanityClient";
 import { nativeNotifyAPI } from "@/app/services/nativeNotifyApi";
 
@@ -154,7 +155,7 @@ export class ShippingOrderService {
         console.log(
           `✅ Schedule ${schedule._id} updated: ${currentCapacity} → ${newCapacity} (departure: ${new Date(
             schedule.departureTime
-          ).toLocaleTimeString("sv-SE", {
+          ).toLocaleTimeString(currentDateLocale(), {
             hour: "2-digit",
             minute: "2-digit",
           })})`
@@ -462,7 +463,7 @@ export class ShippingOrderService {
     try {
       const notificationPayload = {
         title: "Fraktbokning bekräftad! 📦",
-        message: `Din frakt från ${orderData.route.split("_")[0].replace("stockholm", "Stockholm").replace("goteborg", "Göteborg").replace("malmo", "Malmö")} till ${orderData.route.split("_")[1].replace("tunis", "Tunis").replace("sousse", "Sousse")} är bokad för ${new Date(orderData.scheduledDateTime).toLocaleString("sv-SE")}. Totalt pris: ${orderData.totalPrice} SEK.`,
+        message: `Din frakt från ${orderData.route.split("_")[0].replace("stockholm", "Stockholm").replace("goteborg", "Göteborg").replace("malmo", "Malmö")} till ${orderData.route.split("_")[1].replace("tunis", "Tunis").replace("sousse", "Sousse")} är bokad för ${new Date(orderData.scheduledDateTime).toLocaleString(currentDateLocale())}. Totalt pris: ${orderData.totalPrice} SEK.`,
         subID: userId,
         pushData: {
           orderId: "new-shipping-order", // This would be the actual order ID

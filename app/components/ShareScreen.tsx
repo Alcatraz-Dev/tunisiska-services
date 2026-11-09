@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import QRCode from "react-native-qrcode-svg";
 import { Ionicons } from "@expo/vector-icons";
+import AppIcon from "@/app/components/ui/AppIcon";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { useTheme } from "../context/ThemeContext";
@@ -108,7 +109,7 @@ export default function ShareScreen() {
       <View className={`px-6 pt-6 pb-4  ${isDark ? "bg-dark" : "bg-light"} `}>
         <View className="flex-row items-center justify-between">
           <TouchableOpacity onPress={() => router.back()} className="p-2">
-            <Ionicons
+            <AppIcon
               name="arrow-back"
               size={28}
               color={isDark ? "#fff" : "#000"}
@@ -198,7 +199,7 @@ export default function ShareScreen() {
                   source={icons.glob}
                   className="w-6 h-6"
                   resizeMode="contain"
-                  tintColor={isDark ? "#0ea5e9" : "#0ea5e9"}
+                  tintColor={isDark ? "#132B55" : "#132B55"}
                 />
               </TouchableOpacity>
             </View>
@@ -211,7 +212,7 @@ export default function ShareScreen() {
             onPress={shareAppLink}
             className="flex-row items-center justify-center bg-blue-600 px-6 py-3 rounded-xl shadow-md  w-full max-w-[190px]"
           >
-            <Ionicons name="share-social-outline" size={14} color="#fff" />
+            <AppIcon name="share-social-outline" size={14} color="#fff" />
             <AutoText className="text-white font-semibold ml-2">Dela </AutoText>
           </TouchableOpacity>
 
@@ -219,7 +220,7 @@ export default function ShareScreen() {
             onPress={updateApp}
             className="flex-row items-center justify-center bg-blue-600 px-6 py-3 rounded-xl shadow-md  w-full max-w-[190px] "
           >
-            <Ionicons name="cloud-download-outline" size={14} color="#fff" />
+            <AppIcon name="cloud-download-outline" size={14} color="#fff" />
             <AutoText className="text-white font-semibold ml-2">
               Uppdatera{" "}
             </AutoText>

@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { useUser } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
+import AppIcon from '@/app/components/ui/AppIcon';
 import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { AutoText } from './ui/AutoText';
 import { showAlert } from '@/app/utils/showAlert';
@@ -18,6 +19,7 @@ import {
   OrderStatus
 } from '@/app/schemas/serviceSchemas';
 import { OrderService } from '@/app/services/orderService';
+import { currentDateLocale } from '@/app/lib/time';
 
 interface OrderManagerProps {
   onBack: () => void;
@@ -175,7 +177,7 @@ Bokningsnummer: ${order.id?.substring(0, 8) || 'N/A'}`;
 
   const formatDateTime = (dateString: string): string => {
     const date = new Date(dateString);
-    return date.toLocaleString('sv-SE', {
+    return date.toLocaleString(currentDateLocale(), {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -206,7 +208,7 @@ Bokningsnummer: ${order.id?.substring(0, 8) || 'N/A'}`;
         <View className="flex-row items-center justify-between mb-3">
           <View className="flex-row items-center flex-1">
             <View className={`p-2 rounded-full mr-3 ${isDark ? 'bg-gray-700' : 'bg-gray-100'}`}>
-              <Ionicons
+              <AppIcon
                 name={getServiceIcon(order.serviceType)}
                 size={20}
                 color={isDark ? '#fff' : '#000'}
@@ -244,7 +246,7 @@ Bokningsnummer: ${order.id?.substring(0, 8) || 'N/A'}`;
           <AutoText className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
             📅 {formatDateTime(order.scheduledDateTime)}
           </AutoText>
-          <Ionicons
+          <AppIcon
             name={selectedOrder?.id === order.id ? 'chevron-up' : 'chevron-down'}
             size={16}
             color={isDark ? '#9ca3af' : '#6b7280'}
@@ -453,7 +455,7 @@ Bokningsnummer: ${order.id?.substring(0, 8) || 'N/A'}`;
       <View className="px-6 pt-6 pb-4">
         <View className="flex-row items-center justify-center relative mb-4">
           <TouchableOpacity onPress={onBack} className="absolute left-0 p-2">
-            <Ionicons name="arrow-back" size={24} color={isDark ? '#fff' : '#000'} />
+            <AppIcon name="arrow-back" size={24} color={isDark ? '#fff' : '#000'} />
           </TouchableOpacity>
           <AutoText className={`text-2xl font-extrabold ${isDark ? 'text-white' : 'text-gray-900'}`}>
             Mina Beställningar
@@ -478,7 +480,7 @@ Bokningsnummer: ${order.id?.substring(0, 8) || 'N/A'}`;
           </View>
         ) : orders.length === 0 ? (
           <View className="flex-1 justify-center items-center py-20">
-            <Ionicons
+            <AppIcon
               name="document-outline"
               size={48}
               color={isDark ? '#6b7280' : '#9ca3af'}

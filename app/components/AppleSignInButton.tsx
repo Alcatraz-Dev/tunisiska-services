@@ -2,7 +2,10 @@ import React from "react";
 import { TouchableOpacity, View, ActivityIndicator, Alert } from "react-native";
 import { useOAuth, useUser } from "@clerk/clerk-expo";
 import { useWarmUpBrowser } from "../hooks/useWarmUpBrowser";
+import * as Linking from "expo-linking";
+import * as WebBrowser from "expo-web-browser";
 import { Ionicons } from "@expo/vector-icons";
+import AppIcon from "@/app/components/ui/AppIcon";
 import { useTheme } from "../context/ThemeContext";
 import { AutoText } from "./ui/AutoText";
 import { showAlert } from "../utils/showAlert";
@@ -10,6 +13,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { registerForPushNotificationsAsync } from "../hooks/usePushNotifications";
 import { createNewUser } from "../hooks/useQuery";
 import { nativeNotifyAPI } from "../services/nativeNotifyApi";
+
+WebBrowser.maybeCompleteAuthSession();
 
 type Props = {
   setUserProfile: (data: any) => void;
@@ -87,9 +92,12 @@ export default function AppleSignInButton({ setUserProfile, forceDark }: Props) 
   const onPress = React.useCallback(async () => {
     if (!isLoaded) return;
 
+    WebBrowser.maybeCompleteAuthSession();
     setLoading(true);
     try {
-      const { createdSessionId, signUp, setActive } = await startOAuthFlow();
+      const { createdSessionId, signUp, setActive } = await startOAuthFlow({
+        redirectUrl: Linking.createURL("/oauth-native-callback", { scheme: "tunisiska-mega-service" }),
+      });
 
       if (createdSessionId) {
         // @ts-ignore
@@ -171,7 +179,7 @@ export default function AppleSignInButton({ setUserProfile, forceDark }: Props) 
         <ActivityIndicator size="small" color={isDark ? "black" : "white"} />
       ) : (
         <>
-          <Ionicons
+          <AppIcon
             name="logo-apple"
             size={20}
             color={isDark ? "black" : "white"}

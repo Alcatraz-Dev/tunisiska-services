@@ -26,6 +26,44 @@ export default defineType({
       type: 'string',
     }),
     defineField({
+      name: 'type',
+      title: 'Type (composer)',
+      type: 'string',
+      description: 'Notification category written by the admin composer.',
+    }),
+    defineField({
+      name: 'sentAt',
+      title: 'Sent At',
+      type: 'datetime',
+      description: 'Send time written by the admin composer.',
+    }),
+    defineField({
+      name: 'imageUrl',
+      title: 'Image URL',
+      type: 'url',
+    }),
+    defineField({
+      name: 'posterUrl',
+      title: 'Video Poster URL',
+      type: 'url',
+      description: 'Still frame of the video, used as its thumbnail and push image.',
+    }),
+    defineField({
+      name: 'videoUrl',
+      title: 'Video URL',
+      type: 'url',
+    }),
+    defineField({
+      name: 'delivered',
+      title: 'Delivered',
+      type: 'number',
+    }),
+    defineField({
+      name: 'failed',
+      title: 'Failed',
+      type: 'number',
+    }),
+    defineField({
       name: 'status',
       title: 'Status',
       type: 'string',

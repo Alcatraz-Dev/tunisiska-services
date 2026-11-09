@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Home Screen widget palette — light container.
+
+  The canvas keeps one layout and swaps the container: light hosts get a white
+  surface with navy type, dark hosts keep the brand navy field (values-night).
+  Status pills keep the app's success / warning / danger language, so state is
+  never carried by colour alone.
+-->
+<resources>
+  <color name="tunisiska_widget_surface">#FFFFFF</color>
+  <color name="tunisiska_widget_surface_alt">#F4F6FA</color>
+  <color name="tunisiska_widget_border">#E4E9F0</color>
+  <color name="tunisiska_widget_divider">#E4E9F0</color>
+
+  <color name="tunisiska_widget_text_primary">#132B55</color>
+  <color name="tunisiska_widget_text_secondary">#55627A</color>
+  <color name="tunisiska_widget_text_tertiary">#8A97AC</color>
+
+  <color name="tunisiska_widget_accent">#F2761B</color>
+  <color name="tunisiska_widget_accent_text">#C2570A</color>
+  <color name="tunisiska_widget_accent_soft">#FFF1E4</color>
+
+  <color name="tunisiska_widget_bar_track">#E4E9F0</color>
+  <color name="tunisiska_widget_ring_fill">#F4F6FA</color>
+
+  <color name="tunisiska_widget_pill_neutral_bg">#F4F6FA</color>
+  <color name="tunisiska_widget_pill_neutral_fg">#55627A</color>
+  <color name="tunisiska_widget_pill_success_bg">#E7F5EE</color>
+  <color name="tunisiska_widget_pill_success_fg">#147A48</color>
+  <color name="tunisiska_widget_pill_warning_bg">#FEF3E2</color>
+  <color name="tunisiska_widget_pill_warning_fg">#9A5B06</color>
+  <color name="tunisiska_widget_pill_danger_bg">#FDECEC</color>
+  <color name="tunisiska_widget_pill_danger_fg">#B32525</color>
+
+  <color name="tunisiska_widget_action_secondary_bg">#F4F6FA</color>
+  <color name="tunisiska_widget_action_secondary_border">#E4E9F0</color>
+</resources>

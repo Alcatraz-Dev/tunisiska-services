@@ -3,17 +3,52 @@ import { View } from 'react-native';
 import { AutoText } from './AutoText';
 
 interface RichTextRendererProps {
-  content: any[];
+  content: string | any[] | null | undefined;
   className?: string;
+}
+
+export function hasRichTextContent(content: string | any[] | null | undefined) {
+  if (typeof content === 'string') return content.trim().length > 0;
+  if (!Array.isArray(content)) return false;
+
+  return content.some((block) =>
+    Array.isArray(block?.children) &&
+    block.children.some((child: any) => typeof child?.text === 'string' && child.text.trim()),
+  );
 }
 
 export const RichTextRenderer: React.FC<RichTextRendererProps> = ({
   content,
   className = '',
 }) => {
-  if (!content || !Array.isArray(content)) {
+  if (!content) {
     return null;
   }
+
+  // The admin app historically wrote legal content as plain text, while the
+  // Sanity Studio schema stores Portable Text blocks. Render both shapes so
+  // older documents remain readable while new edits use the schema format.
+  if (typeof content === 'string') {
+    const paragraphs = content
+      .split(/\n\s*\n/)
+      .map((paragraph) => paragraph.trim())
+      .filter(Boolean);
+
+    return (
+      <View>
+        {paragraphs.map((paragraph, index) => (
+          <AutoText
+            key={`paragraph-${index}`}
+            className={className ? `${className} mb-4 leading-7` : 'mb-4 leading-7'}
+          >
+            {paragraph}
+          </AutoText>
+        ))}
+      </View>
+    );
+  }
+
+  if (!Array.isArray(content)) return null;
 
   return (
     <View>

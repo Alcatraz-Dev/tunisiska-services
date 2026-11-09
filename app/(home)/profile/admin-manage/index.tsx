@@ -1,10 +1,16 @@
-import React, { useState, useEffect } from "react";
-import { View, SafeAreaView, TouchableOpacity, Alert, ActivityIndicator, FlatList, TextInput } from "react-native";
+import React, { useState } from "react";
+import { View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import AppIcon from "@/app/components/ui/AppIcon";
+import ScreenHeader from "@/app/components/ui/ScreenHeader";
 import { client } from "@/sanityClient";
-import { useTheme } from "@/app/context/ThemeContext";
+import { useLanguage } from "@/app/hooks/useLanguage";
+import { useTranslationText } from "@/app/hooks/useTranslation";
 import { AutoText } from "@/app/components/ui/AutoText";
+import { AdminDataList } from "@/app/components/admin/AdminDataList";
+import { useThemeColors } from "@/app/theme";
+import { showAlert } from "@/app/utils/showAlert";
 
 interface Column {
   key: string;
@@ -231,217 +237,67 @@ const getEntityConfig = (entityType: string) => {
 };
 
 export default function AdminManageScreen() {
-  const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === "dark";
+  const theme = useThemeColors();
   const router = useRouter();
   const params = useLocalSearchParams();
-  const type = params.type as string || "";
-  const [data, setData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+  const type = String(params.type ?? "");
   const [refreshKey, setRefreshKey] = useState(0);
-
   const config = getEntityConfig(type);
+  const { language } = useLanguage();
+  const addRecordLabel = useTranslationText("Add record", language);
 
-  useEffect(() => {
-    console.log(`[AdminManage] Effect triggered, type: "${type}"`);
-    if (!type) {
-      console.log(`[AdminManage] No type, skipping`);
-      setLoading(false);
-      return;
-    }
-    
-    if (!config) {
-      console.log(`[AdminManage] No config found`);
-      setLoading(false);
-      return;
-    }
-    
-    let isMounted = true;
-    
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        console.log(`[AdminManage] Fetching for: ${type}`);
-        const result = await client.fetch(config.query);
-        console.log(`[AdminManage] Result: ${result?.length || 0} items`);
-        if (isMounted) {
-          setData(result || []);
-        }
-      } catch (error) {
-        console.error("[AdminManage] Error:", error);
-        if (isMounted) setData([]);
-      } finally {
-        if (isMounted) {
-          console.log(`[AdminManage] Done loading`);
-          setLoading(false);
-        }
-      }
-    };
-
-    loadData();
-    
-    return () => { isMounted = false; };
-  }, [type, refreshKey]);
-
-  const handleDelete = async (item: any) => {
-    if (!item._id) return;
-    Alert.alert("Radera", "Är du säker?", [
-      { text: "Avbryt", style: "cancel" },
+  const handleDelete = (item: any) => {
+    if (!item?._id) return;
+    void showAlert("Delete record", "Delete this record from the content collection?", [
+      { text: "Cancel", style: "cancel" },
       {
-        text: "Radera",
+        text: "Delete",
         style: "destructive",
         onPress: async () => {
           try {
             await client.delete(item._id);
-            setRefreshKey(k => k + 1);
-          } catch (error) {
-            Alert.alert("Fel", "Kunde inte radera");
+            setRefreshKey((key) => key + 1);
+          } catch {
+            void showAlert("Could not delete", "Please try again.");
           }
         },
       },
     ]);
   };
 
-  const filteredData = searchTerm && config?.searchField
-    ? data.filter(item => {
-        const val = item[config.searchField];
-        return val && String(val).toLowerCase().includes(searchTerm.toLowerCase());
-      })
-    : data;
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return "—";
-    try {
-      return new Date(dateStr).toLocaleDateString("sv-SE");
-    } catch {
-      return "—";
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    const s = String(status || "").toLowerCase();
-    if (["true", "completed", "confirmed", "active", "accepted"].includes(s)) return "bg-green-500/20 text-green-500";
-    if (["pending"].includes(s)) return "bg-yellow-500/20 text-yellow-500";
-    if (["false", "cancelled", "rejected"].includes(s)) return "bg-red-500/20 text-red-500";
-    return isDark ? "bg-blue-500/10 text-blue-400" : "bg-blue-500/10 text-blue-600";
-  };
-
-  const renderItem = ({ item }: { item: any }) => (
-    <TouchableOpacity
-      onPress={() => {
-        const url = `/profile/admin-form?type=${encodeURIComponent(type)}&id=${encodeURIComponent(item._id)}`;
-        console.log(`[AdminManage] Navigating to EDIT form: ${url}`);
-        router.push(url as any);
-      }}
-      className={`mb-3 p-5 rounded-[24px] ${isDark ? "bg-dark-card border border-white/5" : "bg-white border border-gray-100"}`}
-    >
-      <View className="flex-row items-start justify-between mb-2">
-        <AutoText className={`text-sm font-black flex-1 mr-4 ${isDark ? "text-white" : "text-gray-900"}`} numberOfLines={1}>
-          {item[config?.columns[0]?.key] || item._id?.slice(0, 8) || "—"}
-        </AutoText>
-        <View className="flex-row">
-          <TouchableOpacity onPress={() => handleDelete(item)} className={`w-8 h-8 rounded-full items-center justify-center mr-2 ${isDark ? "bg-red-500/10" : "bg-red-50"}`}>
-            <Ionicons name="trash-outline" size={16} color="#ef4444" />
-          </TouchableOpacity>
-          <View className={`w-8 h-8 rounded-full items-center justify-center ${isDark ? "bg-white/5" : "bg-gray-50"}`}>
-            <Ionicons name="chevron-forward" size={16} color={isDark ? "#3b82f6" : "#2563eb"} />
-          </View>
-        </View>
-      </View>
-      <View className="flex-row flex-wrap">
-        {config?.columns.slice(1, 4).map(col => (
-          <View key={col.key} className="flex-row items-center mr-4 mt-1">
-            <AutoText className={`${isDark ? "text-gray-500" : "text-gray-400"} text-[9px] uppercase font-bold mr-1`}>
-              {col.label}:
-            </AutoText>
-            {col.type === "status" ? (
-              <View className={`px-2 py-0.5 rounded-full ${getStatusColor(item[col.key])}`}>
-                <AutoText className="text-[9px] font-black uppercase">{String(item[col.key] || "—")}</AutoText>
-              </View>
-            ) : col.type === "currency" ? (
-              <AutoText className={`text-[10px] font-bold ${isDark ? "text-gray-400" : "text-gray-600"}`}>{item[col.key] || 0} SEK</AutoText>
-            ) : col.type === "date" ? (
-              <AutoText className={`text-[10px] font-bold ${isDark ? "text-gray-400" : "text-gray-600"}`}>{formatDate(item[col.key])}</AutoText>
-            ) : (
-              <AutoText className={`text-[10px] font-bold ${isDark ? "text-gray-400" : "text-gray-600"}`} numberOfLines={1}>{String(item[col.key] || "—")}</AutoText>
-            )}
-          </View>
-        ))}
-      </View>
-    </TouchableOpacity>
-  );
-
   if (!config) {
     return (
-      <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-white"}`}>
-        <View className="flex-1 justify-center items-center">
-          <Ionicons name="alert-circle" size={48} color={isDark ? "#374151" : "#d1d5db"} />
-          <AutoText className={`mt-4 ${isDark ? "text-white" : "text-gray-900"}`}>Ogiltig kategori</AutoText>
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.canvas }}>
+        <ScreenHeader title="Manage content" subtitle="Choose a collection to continue" showBack />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 28 }}>
+          <AppIcon name="alert-circle-outline" size={34} color={theme.textTertiary} />
+          <AutoText className="mt-4 text-center font-semibold text-gray-700 dark:text-zinc-200">This collection is unavailable.</AutoText>
+          <AutoText className="mt-2 text-center text-sm text-gray-500 dark:text-zinc-400">Return to Operations and choose one of the listed collections.</AutoText>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-white"}`}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.canvas }}>
       <Stack.Screen options={{ headerShown: false }} />
-      
-      <View className="px-6 pt-6 pb-2 flex-row items-center justify-between">
-        <TouchableOpacity onPress={() => router.back()} className={`p-2 rounded-2xl ${isDark ? "bg-white/5" : "bg-gray-100"}`}>
-          <Ionicons name="arrow-back" size={20} color={isDark ? "#fff" : "#000"} />
-        </TouchableOpacity>
-        <AutoText className={`text-xl font-black ${isDark ? "text-white" : "text-gray-900"}`}>{config.title}</AutoText>
-        {config.canAdd ? (
-          <TouchableOpacity 
-            onPress={() => {
-              const url = `/profile/admin-form?type=${encodeURIComponent(type)}&id=new`;
-              console.log(`[AdminManage] Navigating to ADD form: ${url}`);
-              router.push(url as any);
-            }} 
-            className="p-2 rounded-2xl bg-primary/10"
-          >
-            <Ionicons name="add" size={24} color="#3b82f6" />
-          </TouchableOpacity>
-        ) : <View className="w-10" />}
-      </View>
-
-      <View className="px-6 mb-4">
-        <AutoText className="text-gray-500 text-xs font-bold uppercase tracking-widest">{config.subtitle}</AutoText>
-      </View>
-
-      <View className={`mx-6 mb-4 flex-row items-center px-5 h-12 rounded-[24px] ${isDark ? "bg-dark-card border border-white/5" : "bg-white border border-gray-100"}`}>
-        <Ionicons name="search-outline" size={18} color={isDark ? "#3b82f6" : "#2563eb"} />
-        <TextInput
-          placeholder={`Sök ${config.title.toLowerCase()}...`}
-          placeholderTextColor={isDark ? "#4b5563" : "#94a3b8"}
-          value={searchTerm}
-          onChangeText={setSearchTerm}
-          className={`flex-1 ml-3 text-sm font-bold ${isDark ? "text-white" : "text-gray-900"}`}
-        />
-      </View>
-
-      {loading ? (
-        <View className="flex-1 justify-center items-center">
-          <ActivityIndicator color="#3b82f6" />
-          <AutoText className="text-gray-500 mt-4">Laddar...</AutoText>
-        </View>
-      ) : filteredData.length === 0 ? (
-        <View className="flex-1 justify-center items-center">
-          <Ionicons name="folder-open-outline" size={48} color={isDark ? "#1e293b" : "#cbd5e1"} />
-          <AutoText className="text-gray-500 mt-4">Inga {config.title.toLowerCase()} hittades</AutoText>
-          {config.canAdd && <AutoText className="text-gray-400 mt-2 text-xs">Tryck + för att lägga till</AutoText>}
-        </View>
-      ) : (
-        <FlatList
-          data={filteredData}
-          keyExtractor={(item) => item._id || Math.random().toString()}
-          renderItem={renderItem}
-          contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 100 }}
-          refreshing={loading}
-          onRefresh={() => setRefreshKey(k => k + 1)}
-        />
-      )}
+      <ScreenHeader
+        title={config.title}
+        subtitle={config.subtitle}
+        showBack
+        rightIcon={config.canAdd ? "add" : undefined}
+        onRightPress={config.canAdd ? () => router.push(`/profile/admin-form?type=${encodeURIComponent(type)}&id=new` as any) : undefined}
+        rightAccessibilityLabel={addRecordLabel || "Add record"}
+      />
+      <AdminDataList
+        title={config.title}
+        query={config.query}
+        columns={config.columns}
+        searchField={config.searchField}
+        refreshKey={refreshKey}
+        onItemPress={(item) => router.push(`/profile/admin-form?type=${encodeURIComponent(type)}&id=${encodeURIComponent(item._id)}` as any)}
+        onDelete={handleDelete}
+      />
     </SafeAreaView>
   );
 }

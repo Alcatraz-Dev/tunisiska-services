@@ -1,10 +1,23 @@
 import React, { useState, useEffect } from "react";
-import { View, SafeAreaView, TouchableOpacity, Alert, ScrollView, TextInput, ActivityIndicator, Switch, Text, Modal, Platform, Pressable } from "react-native";
+import { View, SafeAreaView, TouchableOpacity, ScrollView, ActivityIndicator, Switch, Modal, Platform, Pressable } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import AppIcon from "@/app/components/ui/AppIcon";
+import PrimaryButton from "@/app/components/ui/PrimaryButton";
+import ScreenHeader from "@/app/components/ui/ScreenHeader";
 import { client } from "@/sanityClient";
 import { useTheme } from "@/app/context/ThemeContext";
+import { useThemeColors } from "@/app/theme";
+import ThemedText from "@/app/components/ui/ThemedText";
+import Input from "@/app/components/ui/Input";
+import { showAlert } from "@/app/utils/showAlert";
+import { useLanguage } from "@/app/hooks/useLanguage";
+import { currentDateLocale } from "@/app/lib/time";
+import {
+  broadcastAnnouncement,
+  broadcastToAllUsers,
+} from "@/app/lib/broadcastNotification";
 
 const getDocType = (t: string) => {
   switch (t) {
@@ -27,7 +40,7 @@ const getDocType = (t: string) => {
   }
 };
 
-type FieldType = "text" | "number" | "boolean" | "select" | "datetime" | "array" | "object" | "reference" | "footer-links" | "social-media";
+type FieldType = "text" | "portable-text" | "number" | "boolean" | "select" | "datetime" | "array" | "object" | "reference" | "footer-links" | "social-media";
 
 interface FieldDef {
   name: string;
@@ -197,12 +210,12 @@ const fieldDefinitions: Record<string, FieldDef[]> = {
   ],
   terms: [
     { name: "title", label: "Title", type: "text", required: true },
-    { name: "content", label: "Content", type: "text" },
+    { name: "content", label: "Content", type: "portable-text" },
     { name: "lastUpdated", label: "Last Updated", type: "datetime", required: true },
   ],
   privacy: [
     { name: "title", label: "Title", type: "text", required: true },
-    { name: "content", label: "Content", type: "text" },
+    { name: "content", label: "Content", type: "portable-text" },
     { name: "lastUpdated", label: "Last Updated", type: "datetime", required: true },
   ],
   "notification-history": [
@@ -226,11 +239,26 @@ const ROUTE_LABELS: Record<string, string> = {
   air_freight: "Air Freight",
 };
 
+/**
+ * A stable, unique slug for an announcement created in the admin form.
+ * Arabic titles slugify to an empty string, so those fall back to "nyhet".
+ */
+function announcementSlug(title: string): string {
+  const base = title
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+  return `${base || "nyhet"}-${Date.now().toString(36)}`;
+}
+
 function formatDateTime(val: any): string {
   if (!val) return "";
   try {
     const d = new Date(val);
-    return d.toLocaleString("sv-SE", {
+    return d.toLocaleString(currentDateLocale(), {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
@@ -242,8 +270,32 @@ function formatDateTime(val: any): string {
   }
 }
 
+function plainTextToPortableText(value: unknown) {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== "string") return value;
+
+  return value
+    .split(/\n\s*\n/)
+    .map((text) => text.trim())
+    .filter(Boolean)
+    .map((text, index) => ({
+      _type: "block",
+      _key: `legal-block-${index}`,
+      style: "normal",
+      markDefs: [],
+      children: [{
+        _type: "span",
+        _key: `legal-span-${index}`,
+        marks: [],
+        text,
+      }],
+    }));
+}
+
 export default function AdminAddScreen() {
   const { resolvedTheme } = useTheme();
+  const theme = useThemeColors();
+  const { language } = useLanguage();
   const isDark = resolvedTheme === "dark";
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -305,7 +357,7 @@ export default function AdminAddScreen() {
 
   const handleSave = async () => {
     if (fields.length === 0) {
-      Alert.alert("Error", "No fields defined for this type");
+      void showAlert("Error", "No fields defined for this type");
       return;
     }
 
@@ -318,21 +370,76 @@ export default function AdminAddScreen() {
         if (field.readOnly) continue;
         const val = formData[field.name];
         if (val !== undefined) {
-          dataToSave[field.name] = val;
+          dataToSave[field.name] = field.type === "portable-text"
+            ? plainTextToPortableText(val)
+            : val;
+        }
+      }
+
+      // The admin form only collects title, message and date, but the News tab
+      // orders by date and opens the detail screen by slug — without these a
+      // record created here would never be readable in the app.
+      if (docType === "announcement") {
+        const now = new Date().toISOString();
+        if (isNew) {
+          dataToSave.slug = {
+            _type: "slug",
+            current: announcementSlug(String(dataToSave.title ?? "")),
+          };
+          dataToSave.date = dataToSave.date || now;
+          dataToSave.publishedAt = now;
+          dataToSave.status = "published";
+          dataToSave.source = "manual";
+        } else if (dataToSave.date) {
+          dataToSave.publishedAt = dataToSave.date;
         }
       }
 
       if (isNew) {
         const result = await client.create({ _type: docType, ...dataToSave });
         console.log(`[AdminForm] Created doc:`, result);
+        if (docType === "announcement") {
+          // Best effort: the announcement is saved already, so a push failure
+          // must not turn a successful publish into an error dialog.
+          void broadcastAnnouncement({
+            title: String(dataToSave.title ?? ""),
+            message: String(dataToSave.message ?? dataToSave.description ?? ""),
+          }).catch((error) =>
+            console.warn("[AdminForm] Announcement notification failed:", error),
+          );
+        } else if (
+          docType === "shippingSchedule" ||
+          docType === "containerShippingSchedule"
+        ) {
+          // A published departure is news the customer can act on, so it goes
+          // to every registered device with the route and time.
+          const routeLabel =
+            ROUTE_LABELS[String(dataToSave.route ?? "")] ??
+            String(dataToSave.route ?? "").replace(/_/g, " ");
+          const vehicleLabel = ROUTE_LABELS[String(dataToSave.vehicle ?? "")] ?? "";
+          const when = dataToSave.departureTime
+            ? formatDateTime(dataToSave.departureTime)
+            : "";
+
+          void broadcastToAllUsers({
+            type: "update",
+            title: routeLabel
+              ? `New departure: ${routeLabel}`
+              : "New departure added",
+            message: [when, vehicleLabel].filter(Boolean).join(" · ") ||
+              "A new departure has been added. Check the trips screen for details.",
+          }).catch((error) =>
+            console.warn("[AdminForm] Departure notification failed:", error),
+          );
+        }
       } else {
         await client.patch(id).set(dataToSave).commit();
       }
-      Alert.alert("Success", isNew ? "Created successfully" : "Updated successfully");
+      void showAlert("Success", isNew ? "Created successfully" : "Updated successfully");
       router.back();
     } catch (error: any) {
       console.error(`[AdminForm] Save error:`, error);
-      Alert.alert("Error", error.message || "Failed to save");
+      void showAlert("Error", error.message || "Failed to save");
     } finally {
       setSaving(false);
     }
@@ -343,12 +450,12 @@ export default function AdminAddScreen() {
 
     if (field.type === "boolean") {
       return (
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, borderRadius: 16, backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "#f3f4f6" }}>
-          <Text style={{ color: isDark ? "#fff" : "#000", flex: 1 }}>{field.label}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, borderRadius: 16, backgroundColor: theme.surfaceAlt }}>
+          <ThemedText style={{ color: theme.textPrimary, flex: 1 }}>{field.label}</ThemedText>
           <Switch
             value={value || false}
             onValueChange={v => updateField(field.name, v)}
-            trackColor={{ false: "#767577", true: "#3b82f6" }}
+            trackColor={{ false: theme.borderStrong, true: theme.primary }}
           />
         </View>
       );
@@ -357,9 +464,9 @@ export default function AdminAddScreen() {
     if (field.type === "select") {
       return (
         <View>
-          <Text style={{ fontSize: 12, fontWeight: "bold", marginBottom: 8, color: isDark ? "#999" : "#666" }}>
+          <ThemedText style={{ fontSize: 12, fontWeight: "bold", marginBottom: 8, color: theme.textTertiary }}>
             {field.label}
-          </Text>
+          </ThemedText>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
             {(field.options || []).map(opt => (
               <TouchableOpacity
@@ -369,14 +476,14 @@ export default function AdminAddScreen() {
                   paddingHorizontal: 16,
                   paddingVertical: 10,
                   borderRadius: 999,
-                  backgroundColor: value === opt ? "#3b82f6" : (isDark ? "rgba(255,255,255,0.08)" : "#f3f4f6"),
+                  backgroundColor: value === opt ? theme.primary : theme.surfaceAlt,
                   borderWidth: 1,
-                  borderColor: value === opt ? "#3b82f6" : (isDark ? "rgba(255,255,255,0.1)" : "#e5e7eb"),
+                  borderColor: value === opt ? theme.primary : theme.border,
                 }}
               >
-                <Text style={{ fontSize: 12, fontWeight: "bold", color: value === opt ? "#fff" : (isDark ? "#ccc" : "#333") }}>
+                <ThemedText style={{ fontSize: 12, fontWeight: "bold", color: value === opt ? theme.textOnAccent : theme.textPrimary }}>
                   {ROUTE_LABELS[opt] || opt}
-                </Text>
+                </ThemedText>
               </TouchableOpacity>
             ))}
           </View>
@@ -387,9 +494,9 @@ export default function AdminAddScreen() {
     if (field.type === "datetime") {
       return (
         <View>
-          <Text style={{ fontSize: 12, fontWeight: "bold", marginBottom: 8, color: isDark ? "#999" : "#666" }}>
+          <ThemedText style={{ fontSize: 12, fontWeight: "bold", marginBottom: 8, color: theme.textTertiary }}>
             {field.label}
-          </Text>
+          </ThemedText>
           <TouchableOpacity
             onPress={() => !field.readOnly && handleDatePress(field.name)}
             style={{
@@ -397,16 +504,16 @@ export default function AdminAddScreen() {
               alignItems: "center",
               padding: 16,
               borderRadius: 16,
-              backgroundColor: field.readOnly ? (isDark ? "rgba(255,255,255,0.02)" : "#f9f9f9") : (isDark ? "rgba(255,255,255,0.05)" : "#f3f4f6"),
+              backgroundColor: field.readOnly ? theme.surfaceSunken : theme.surfaceAlt,
               borderWidth: 1,
-              borderColor: isDark ? "rgba(255,255,255,0.1)" : "#e5e7eb",
+              borderColor: theme.border,
               opacity: field.readOnly ? 0.6 : 1,
             }}
           >
-            <Ionicons name="calendar-outline" size={18} color={isDark ? "#888" : "#666"} style={{ marginRight: 10 }} />
-            <Text style={{ fontSize: 15, color: value ? (isDark ? "#fff" : "#111") : (isDark ? "#555" : "#999") }}>
+            <AppIcon name="calendar-outline" size={18} color={theme.textTertiary} style={{ marginRight: 10 }} />
+            <ThemedText style={{ fontSize: 15, color: value ? (theme.textPrimary) : (theme.textQuaternary) }}>
               {value ? formatDateTime(value) : `Select ${field.label}`}
-            </Text>
+            </ThemedText>
           </TouchableOpacity>
         </View>
       );
@@ -416,14 +523,14 @@ export default function AdminAddScreen() {
       const refValue = value?._ref || value || "—";
       return (
         <View>
-          <Text style={{ fontSize: 12, fontWeight: "bold", marginBottom: 8, color: isDark ? "#999" : "#666" }}>
+          <ThemedText style={{ fontSize: 12, fontWeight: "bold", marginBottom: 8, color: theme.textTertiary }}>
             {field.label}
-          </Text>
-          <View style={{ flexDirection: "row", alignItems: "center", padding: 16, borderRadius: 16, backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "#f3f4f6", borderWidth: 1, borderColor: isDark ? "rgba(255,255,255,0.1)" : "#e5e7eb" }}>
-            <Ionicons name="person-outline" size={18} color={isDark ? "#888" : "#666"} style={{ marginRight: 10 }} />
-            <Text style={{ fontSize: 15, color: isDark ? "#ccc" : "#666" }}>
+          </ThemedText>
+          <View style={{ flexDirection: "row", alignItems: "center", padding: 16, borderRadius: 16, backgroundColor: theme.surfaceAlt, borderWidth: 1, borderColor: theme.border }}>
+            <AppIcon name="person-outline" size={18} color={theme.textTertiary} style={{ marginRight: 10 }} />
+            <ThemedText style={{ fontSize: 15, color: theme.textSecondary }}>
               {String(refValue).slice(0, 20)}{String(refValue).length > 20 ? "..." : ""}
-            </Text>
+            </ThemedText>
           </View>
         </View>
       );
@@ -433,18 +540,18 @@ export default function AdminAddScreen() {
       const linksValue = Array.isArray(value) ? value : [];
       return (
         <View>
-          <Text style={{ fontSize: 12, fontWeight: "bold", marginBottom: 8, color: isDark ? "#999" : "#666" }}>
+          <ThemedText style={{ fontSize: 12, fontWeight: "bold", marginBottom: 8, color: theme.textTertiary }}>
             {field.label}
-          </Text>
-          <View style={{ borderRadius: 16, backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "#f3f4f6", borderWidth: 1, borderColor: isDark ? "rgba(255,255,255,0.1)" : "#e5e7eb", overflow: "hidden" }}>
+          </ThemedText>
+          <View style={{ borderRadius: 16, backgroundColor: theme.surfaceAlt, borderWidth: 1, borderColor: theme.border, overflow: "hidden" }}>
             {linksValue.map((link: any, i: number) => (
-              <View key={i} style={{ borderBottomWidth: i < linksValue.length - 1 ? 1 : 0, borderBottomColor: isDark ? "rgba(255,255,255,0.05)" : "#e5e7eb", padding: 16 }}>
-                <Text style={{ fontSize: 14, fontWeight: "bold", color: isDark ? "#fff" : "#333", marginBottom: 4 }}>{link.label || "—"}</Text>
-                <Text style={{ fontSize: 12, color: isDark ? "#888" : "#999" }}>{link.url || "—"}</Text>
+              <View key={i} style={{ borderBottomWidth: i < linksValue.length - 1 ? 1 : 0, borderBottomColor: theme.separator, padding: 16 }}>
+                <ThemedText style={{ fontSize: 14, fontWeight: "bold", color: theme.textPrimary, marginBottom: 4 }}>{link.label || "—"}</ThemedText>
+                <ThemedText style={{ fontSize: 12, color: theme.textQuaternary }}>{link.url || "—"}</ThemedText>
               </View>
             ))}
             {linksValue.length === 0 && (
-              <Text style={{ padding: 16, color: isDark ? "#555" : "#ccc", fontSize: 13 }}>Inga länkar</Text>
+              <ThemedText style={{ padding: 16, color: theme.textQuaternary, fontSize: 13 }}>No links</ThemedText>
             )}
           </View>
         </View>
@@ -455,18 +562,18 @@ export default function AdminAddScreen() {
       const socialValue = Array.isArray(value) ? value : [];
       return (
         <View>
-          <Text style={{ fontSize: 12, fontWeight: "bold", marginBottom: 8, color: isDark ? "#999" : "#666" }}>
+          <ThemedText style={{ fontSize: 12, fontWeight: "bold", marginBottom: 8, color: theme.textTertiary }}>
             {field.label}
-          </Text>
-          <View style={{ borderRadius: 16, backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "#f3f4f6", borderWidth: 1, borderColor: isDark ? "rgba(255,255,255,0.1)" : "#e5e7eb", overflow: "hidden" }}>
+          </ThemedText>
+          <View style={{ borderRadius: 16, backgroundColor: theme.surfaceAlt, borderWidth: 1, borderColor: theme.border, overflow: "hidden" }}>
             {socialValue.map((item: any, i: number) => (
-              <View key={i} style={{ borderBottomWidth: i < socialValue.length - 1 ? 1 : 0, borderBottomColor: isDark ? "rgba(255,255,255,0.05)" : "#e5e7eb", padding: 16 }}>
-                <Text style={{ fontSize: 14, fontWeight: "bold", color: isDark ? "#fff" : "#333", marginBottom: 4, textTransform: "capitalize" }}>{item.platform || "—"}</Text>
-                <Text style={{ fontSize: 12, color: isDark ? "#888" : "#999" }}>{item.url || "—"}</Text>
+              <View key={i} style={{ borderBottomWidth: i < socialValue.length - 1 ? 1 : 0, borderBottomColor: theme.separator, padding: 16 }}>
+                <ThemedText style={{ fontSize: 14, fontWeight: "bold", color: theme.textPrimary, marginBottom: 4, textTransform: "capitalize" }}>{item.platform || "—"}</ThemedText>
+                <ThemedText style={{ fontSize: 12, color: theme.textQuaternary }}>{item.url || "—"}</ThemedText>
               </View>
             ))}
             {socialValue.length === 0 && (
-              <Text style={{ padding: 16, color: isDark ? "#555" : "#ccc", fontSize: 13 }}>Inga sociala medier</Text>
+              <ThemedText style={{ padding: 16, color: theme.textQuaternary, fontSize: 13 }}>No social media</ThemedText>
             )}
           </View>
         </View>
@@ -477,10 +584,10 @@ export default function AdminAddScreen() {
       const arrValue = Array.isArray(value) ? value : [];
       return (
         <View>
-          <Text style={{ fontSize: 12, fontWeight: "bold", marginBottom: 8, color: isDark ? "#999" : "#666" }}>
+          <ThemedText style={{ fontSize: 12, fontWeight: "bold", marginBottom: 8, color: theme.textTertiary }}>
             {field.label}
-          </Text>
-          <View style={{ borderRadius: 16, backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "#f3f4f6", borderWidth: 1, borderColor: isDark ? "rgba(255,255,255,0.1)" : "#e5e7eb", overflow: "hidden" }}>
+          </ThemedText>
+          <View style={{ borderRadius: 16, backgroundColor: theme.surfaceAlt, borderWidth: 1, borderColor: theme.border, overflow: "hidden" }}>
             {(field.arrayItems || []).map(item => {
               const isSelected = arrValue.includes(item);
               return (
@@ -496,15 +603,15 @@ export default function AdminAddScreen() {
                     paddingHorizontal: 16,
                     paddingVertical: 14,
                     borderBottomWidth: 1,
-                    borderBottomColor: isDark ? "rgba(255,255,255,0.05)" : "#e5e7eb",
+                    borderBottomColor: theme.separator,
                   }}
                 >
-                  <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: isSelected ? "#3b82f6" : (isDark ? "#555" : "#ccc"), backgroundColor: isSelected ? "#3b82f6" : "transparent", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
-                    {isSelected && <Ionicons name="checkmark" size={14} color="#fff" />}
+                  <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: isSelected ? theme.primary : theme.borderStrong, backgroundColor: isSelected ? theme.primary : "transparent", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
+                    {isSelected && <AppIcon name="checkmark" size={14} color="#fff" />}
                   </View>
-                  <Text style={{ fontSize: 14, color: isDark ? "#fff" : "#333" }}>
+                  <ThemedText style={{ fontSize: 14, color: theme.textPrimary }}>
                     {item.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
-                  </Text>
+                  </ThemedText>
                 </TouchableOpacity>
               );
             })}
@@ -513,8 +620,8 @@ export default function AdminAddScreen() {
                 ? (v.label || v.title || v.name || v.text || JSON.stringify(v))
                 : String(v);
               return (
-                <View key={i} style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: isDark ? "rgba(255,255,255,0.05)" : "#e5e7eb" }}>
-                  <Text style={{ fontSize: 14, color: isDark ? "#ccc" : "#666" }}>{displayText}</Text>
+                <View key={i} style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: theme.separator }}>
+                  <ThemedText style={{ fontSize: 14, color: theme.textSecondary }}>{displayText}</ThemedText>
                 </View>
               );
             })}
@@ -532,21 +639,21 @@ export default function AdminAddScreen() {
       const subs = subFields[field.name] || Object.keys(objValue);
       return (
         <View>
-          <Text style={{ fontSize: 12, fontWeight: "bold", marginBottom: 8, color: isDark ? "#999" : "#666" }}>
+          <ThemedText style={{ fontSize: 12, fontWeight: "bold", marginBottom: 8, color: theme.textTertiary }}>
             {field.label}
-          </Text>
-          <View style={{ borderRadius: 16, backgroundColor: isDark ? "rgba(255,255,255,0.03)" : "#fafafa", borderWidth: 1, borderColor: isDark ? "rgba(255,255,255,0.08)" : "#e5e7eb", overflow: "hidden" }}>
+          </ThemedText>
+          <View style={{ borderRadius: 16, backgroundColor: theme.surfaceAlt, borderWidth: 1, borderColor: theme.border, overflow: "hidden" }}>
             {subs.map((sub, i) => (
               <View key={sub} style={{ borderBottomWidth: i < subs.length - 1 ? 1 : 0, borderBottomColor: isDark ? "rgba(255,255,255,0.05)" : "#eee", paddingHorizontal: 16, paddingVertical: 12 }}>
-                <Text style={{ fontSize: 11, fontWeight: "bold", color: isDark ? "#666" : "#999", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                <ThemedText style={{ fontSize: 11, fontWeight: "bold", color: theme.textTertiary, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 }}>
                   {sub.replace(/([A-Z])/g, " $1").trim()}
-                </Text>
-                <TextInput
-                  style={{ fontSize: 14, color: isDark ? "#fff" : "#333", padding: 0 }}
+                </ThemedText>
+                <Input
+                  style={{ fontSize: 14, color: theme.textPrimary, padding: 0 }}
                   value={objValue[sub] !== undefined ? String(objValue[sub]) : ""}
                   onChangeText={v => updateField(field.name, { ...objValue, [sub]: v })}
                   placeholder={`Enter ${sub}`}
-                  placeholderTextColor={isDark ? "#444" : "#ccc"}
+                  placeholderTextColor={theme.textQuaternary}
                 />
               </View>
             ))}
@@ -568,27 +675,27 @@ export default function AdminAddScreen() {
             return v.text || v.label || v.name || JSON.stringify(v);
           }
           return String(v);
-        }).join("\n");
+        }).join("\n\n");
       }
       return String(val);
     };
 
     return (
       <View>
-        <Text style={{ fontSize: 12, fontWeight: "bold", marginBottom: 8, color: isDark ? "#999" : "#666" }}>
+        <ThemedText style={{ fontSize: 12, fontWeight: "bold", marginBottom: 8, color: theme.textTertiary }}>
           {field.label}
-        </Text>
-        <View style={{ backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "#f3f4f6", borderRadius: 16, padding: 16, borderWidth: 1, borderColor: isDark ? "rgba(255,255,255,0.1)" : "#e5e7eb" }}>
-          <TextInput
+        </ThemedText>
+        <View style={{ backgroundColor: theme.surfaceAlt, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: theme.border }}>
+          <Input
             style={{
-              color: isDark ? "#fff" : "#111827",
+              color: theme.textPrimary,
               fontSize: 15,
               padding: 0,
             }}
             value={getDisplayValue(value)}
             onChangeText={v => updateField(field.name, field.type === "number" ? parseFloat(v) || 0 : v)}
             placeholder={`Enter ${field.label.toLowerCase()}`}
-            placeholderTextColor={isDark ? "#555" : "#999"}
+            placeholderTextColor={theme.textQuaternary}
             keyboardType={field.type === "number" ? "numeric" : "default"}
             editable={!field.readOnly}
             multiline={field.name.toLowerCase().includes("note") || field.name.toLowerCase().includes("content") || field.name.toLowerCase().includes("requirement")}
@@ -600,25 +707,20 @@ export default function AdminAddScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: isDark ? "#111" : "#fff" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.canvas }}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* Header */}
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 24, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: isDark ? "#222" : "#eee" }}>
-        <TouchableOpacity onPress={() => router.back()} style={{ padding: 8, borderRadius: 12, backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "#f3f4f6" }}>
-          <Ionicons name="arrow-back" size={20} color={isDark ? "#fff" : "#000"} />
-        </TouchableOpacity>
-        <Text style={{ fontSize: 18, fontWeight: "bold", color: isDark ? "#fff" : "#000" }}>
-          {isNew ? "Lägg till" : "Redigera"}
-        </Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <ScreenHeader
+        title={isNew ? "Create record" : "Edit record"}
+        subtitle={isNew ? "Add operational information" : "Update operational information"}
+        showBack
+      />
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 24, paddingBottom: 120 }}>
         {fields.length === 0 ? (
           <View style={{ alignItems: "center", marginTop: 60 }}>
-            <Ionicons name="alert-circle-outline" size={48} color={isDark ? "#333" : "#ccc"} />
-            <Text style={{ marginTop: 16, color: isDark ? "#555" : "#999", fontSize: 16 }}>Inga fält för denna typ</Text>
+            <AppIcon name="alert-circle-outline" size={48} color={theme.textQuaternary} />
+            <ThemedText style={{ marginTop: 16, color: theme.textQuaternary, fontSize: 16 }}>No fields for this type</ThemedText>
           </View>
         ) : fields.map(field => (
           <View key={field.name} style={{ marginBottom: 24 }}>
@@ -628,56 +730,34 @@ export default function AdminAddScreen() {
       </ScrollView>
 
       {/* Bottom Save Button */}
-      <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: 24, paddingBottom: 40, backgroundColor: isDark ? "#111" : "#fff", borderTopWidth: 1, borderTopColor: isDark ? "#222" : "#eee" }}>
-        <TouchableOpacity
-          onPress={handleSave}
-          disabled={saving}
-          style={{
-            paddingVertical: 18,
-            borderRadius: 32,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: saving ? "#6b7280" : "#3b82f6",
-            shadowColor: "#3b82f6",
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.3,
-            shadowRadius: 8,
-            elevation: 4,
-          }}
-        >
-          {saving ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}>
-              {isNew ? "SKAPA" : "SPARA ÄNDRINGAR"}
-            </Text>
-          )}
-        </TouchableOpacity>
+      <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, paddingHorizontal: 24, paddingTop: 16, paddingBottom: 32, backgroundColor: theme.surface, borderTopWidth: 1, borderTopColor: theme.borderSubtle }}>
+        <PrimaryButton label={isNew ? "Create" : "Save changes"} onPress={handleSave} loading={saving} />
       </View>
 
       {/* Date/Time Picker Modal */}
       {showPicker && (
         <Modal transparent visible={showPicker} animationType="slide">
           <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" }}>
-            <View style={{ backgroundColor: isDark ? "#1a1a1a" : "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 40 }}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 20, borderBottomWidth: 1, borderBottomColor: isDark ? "#333" : "#eee" }}>
+            <View style={{ backgroundColor: theme.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 40 }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 20, borderBottomWidth: 1, borderBottomColor: theme.border }}>
                 <TouchableOpacity onPress={() => setShowPicker(false)}>
-                  <Text style={{ color: "#ef4444", fontSize: 16, fontWeight: "600" }}>Avbryt</Text>
+                  <ThemedText style={{ color: "#ef4444", fontSize: 16, fontWeight: "600" }}>Cancel</ThemedText>
                 </TouchableOpacity>
-                <Text style={{ color: isDark ? "#fff" : "#000", fontSize: 16, fontWeight: "bold" }}>
+                <ThemedText style={{ color: theme.textPrimary, fontSize: 16, fontWeight: "bold" }}>
                   {pickerField ? fields.find(f => f.name === pickerField)?.label : ""}
-                </Text>
+                </ThemedText>
                 <TouchableOpacity onPress={handleDateDone}>
-                  <Text style={{ color: "#3b82f6", fontSize: 16, fontWeight: "600" }}>Klar</Text>
+                  <ThemedText style={{ color: theme.primary, fontSize: 16, fontWeight: "600" }}>Done</ThemedText>
                 </TouchableOpacity>
               </View>
               <DateTimePicker
                 value={pickerDate}
                 mode="datetime"
                 display="spinner"
+                locale={currentDateLocale(language).replace("-", "_")}
                 onChange={handleDateChange}
                 style={{ height: 220 }}
-                textColor={isDark ? "#fff" : "#000"}
+                textColor={theme.textPrimary}
               />
             </View>
           </View>

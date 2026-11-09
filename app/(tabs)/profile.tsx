@@ -1,11 +1,7 @@
-import { View, Text } from 'react-native'
-import React from 'react'
-import { AutoText } from '../components/ui/AutoText'
-
-export default function profile() {
-  return (
-    <View>
-      <AutoText>profile</AutoText>
-    </View>
-  )
-}
+/**
+ * The Profile tab.
+ *
+ * The implementation lives in `app/components/profile/ProfileScreen.tsx` so the
+ * same screen can be presented from any entry point.
+ */
+export { default } from "@/app/components/profile/ProfileScreen";

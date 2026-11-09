@@ -1,9 +1,11 @@
 import React, { useState } from "react";
-import { TextInput, View, TextInputProps, TouchableOpacity, StyleSheet } from "react-native";
+import { TextInput, View, TextInputProps, StyleSheet } from "react-native";
 import { useLanguage } from "@/app/hooks/useLanguage";
 import { useTranslationText } from "@/app/hooks/useTranslation";
-import { useTheme } from "@/app/context/ThemeContext";
-import { Ionicons } from "@expo/vector-icons";
+import PressableScale from "./PressableScale";
+import { useThemeColors } from "@/app/theme";
+import { minTouchTarget, spacing } from "@/app/theme/spacing";
+import AppIcon from "@/app/components/ui/AppIcon";
 
 const rtlLanguages = ["ar"];
 
@@ -20,43 +22,46 @@ export default function Input(props: InputProps) {
   const isPasswordField = props.isPassword || props.secureTextEntry;
   const shouldBeSecure = isPasswordField && !isPasswordVisible;
 
-  // Extract margin classes to apply to container instead of TextInput
+  // Keep margins on the wrapper so they don't alter the native field's frame.
   const className = props.className || "";
-  const containerClasses = className.split(" ").filter(c => c.startsWith("m") || c.startsWith("p-")).join(" ");
+  const containerClasses = className.split(" ").filter(c => c.startsWith("m")).join(" ");
   const inputClasses = className.split(" ").filter(c => !c.startsWith("m")).join(" ");
 
-  const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === "dark";
+  const theme = useThemeColors();
 
   return (
     <View className={containerClasses} style={styles.container}>
       <TextInput
         {...props}
         placeholder={placeholder}
-        placeholderTextColor={props.placeholderTextColor || (isDark ? "#9CA3AF" : "#6B7280")}
+        placeholderTextColor={props.placeholderTextColor || theme.textQuaternary}
         secureTextEntry={shouldBeSecure}
         style={[
           {
             textAlign: isRTL ? "right" : "left",
             paddingRight: isPasswordField ? 45 : undefined,
             marginBottom: 0,
-            color: isDark ? "#FFFFFF" : "#111827",
+            color: theme.textPrimary,
           },
           props.style,
         ]}
         className={inputClasses}
       />
       {isPasswordField && (
-        <TouchableOpacity
+        <PressableScale
           style={styles.iconContainer}
           onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+          accessibilityRole="button"
+          accessibilityLabel={isPasswordVisible ? "Hide password" : "Show password"}
+          accessibilityState={{ selected: isPasswordVisible }}
+          haptic="selection"
         >
-          <Ionicons
+          <AppIcon
             name={isPasswordVisible ? "eye-off-outline" : "eye-outline"}
             size={22}
-            color="#9CA3AF"
+            color={theme.textTertiary}
           />
-        </TouchableOpacity>
+        </PressableScale>
       )}
     </View>
   );
@@ -69,7 +74,10 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     position: "absolute",
-    right: 25,
+    right: spacing.xs,
+    width: minTouchTarget,
+    height: minTouchTarget,
+    borderRadius: minTouchTarget / 2,
     top: 0,
     bottom: 0,
     justifyContent: "center",

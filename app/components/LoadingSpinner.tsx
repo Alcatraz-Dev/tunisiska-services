@@ -18,7 +18,7 @@ const LoadingSpinner: React.FC<{
       <ActivityIndicator
         //@ts-ignore
         size={size}
-        color={isDark ? "#0ea5e9" : "#0369a1"}
+        color={isDark ? "#132B55" : "#0B1B33"}
       />
       {/* <Text className={`mt-4 ${isDark ? "text-white" : "text-gray-800"}`}>
         Loading...

@@ -1,94 +1,157 @@
-import { View, Text, TouchableOpacity, ScrollView } from "react-native";
+import { ScrollView, View } from "react-native";
 import React, { useState } from "react";
-import { Ionicons } from "@expo/vector-icons";
-import { AutoText } from "./ui/AutoText";
+import AppIcon from "@/app/components/ui/AppIcon";
+import PressableScale from "@/app/components/ui/PressableScale";
+import ThemedText from "@/app/components/ui/ThemedText";
+import { useLanguage } from "@/app/hooks/useLanguage";
+import { translateNow } from "@/app/hooks/useTranslation";
+import { useThemeColors } from "@/app/theme";
+import { radii, spacing } from "@/app/theme/spacing";
 
+/**
+ * `value` is the stored category — it stays Swedish so existing orders keep
+ * matching. `label` is the English source string that `ThemedText` translates at
+ * render time.
+ */
 const categories = [
-  "Mobiltelefoner",
-  "Elektronik",
-  "Kläder",
-  "Mat & Torrvaror",
-  "Hushållsartiklar",
-  "Böcker & Dokument",
-  "Accessoarer & Smycken",
-  "Skönhet & Hälsa",
-  "Barnartiklar",
-  "Bil & Reservdelar",
-  "Möbler (små)",
-  "Annat",
+  { value: "Mobiltelefoner", label: "Mobile phones" },
+  { value: "Elektronik", label: "Electronics" },
+  { value: "Kläder", label: "Clothing" },
+  { value: "Mat & Torrvaror", label: "Food & dry goods" },
+  { value: "Hushållsartiklar", label: "Household items" },
+  { value: "Böcker & Dokument", label: "Books & documents" },
+  { value: "Accessoarer & Smycken", label: "Accessories & jewellery" },
+  { value: "Skönhet & Hälsa", label: "Beauty & health" },
+  { value: "Barnartiklar", label: "Baby items" },
+  { value: "Bil & Reservdelar", label: "Car & spare parts" },
+  { value: "Möbler (små)", label: "Furniture (small)" },
+  { value: "Annat", label: "Other" },
 ];
 
+function labelFor(value: string) {
+  return categories.find((item) => item.value === value)?.label ?? value;
+}
+
 export default function ShippingCategoryCheckbox({
-  isDark,
   selectedCategories,
   setSelectedCategories,
 }: {
-  isDark: boolean;
+  isDark?: boolean;
   selectedCategories: string[];
   setSelectedCategories: (categories: string[]) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const { language } = useLanguage();
+  const theme = useThemeColors();
 
-  const toggleCategory = (category: string) => {
-    if (selectedCategories.includes(category)) {
-      setSelectedCategories(selectedCategories.filter((c) => c !== category));
+  const toggleCategory = (value: string) => {
+    if (selectedCategories.includes(value)) {
+      setSelectedCategories(selectedCategories.filter((c) => c !== value));
     } else {
-      setSelectedCategories([...selectedCategories, category]);
+      setSelectedCategories([...selectedCategories, value]);
     }
   };
 
   return (
-    <View className="mb-4">
-      <AutoText className={`my-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-        Kategori
-      </AutoText>
+    <View style={{ marginBottom: spacing.md }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 3, marginBottom: 6 }}>
+        <ThemedText variant="footnote" tone="secondary">
+          Category
+        </ThemedText>
+        <ThemedText variant="footnote" color={theme.accent}>
+          *
+        </ThemedText>
+      </View>
 
-      <TouchableOpacity
+      <PressableScale
         onPress={() => setOpen(!open)}
-        className={`border rounded-lg p-4 flex-row justify-between items-center ${
-          isDark ? "bg-dark-card" : "bg-light-card"
-        }`}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        haptic="selection"
+        pressedScale={0.99}
       >
-        <AutoText className={`${isDark ? "text-white" : "text-black"}`}>
-          {selectedCategories.length > 0
-            ? selectedCategories.join(", ")
-            : "Välj kategori"}
-        </AutoText>
-        <Ionicons
-          name={open ? "chevron-up" : "chevron-down"}
-          size={20}
-          color={isDark ? "white" : "black"}
-        />
-      </TouchableOpacity>
+        <View
+          style={{
+            minHeight: 50,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing.sm,
+            borderRadius: radii.md,
+            borderWidth: 1,
+            borderColor: open ? theme.primary : theme.borderSubtle,
+            backgroundColor: theme.surface,
+            paddingHorizontal: spacing.md,
+            paddingVertical: spacing.sm,
+          }}
+        >
+          <AppIcon name="pricetag-outline" size={18} color={theme.textTertiary} />
+          <ThemedText
+            variant="body"
+            tone={selectedCategories.length > 0 ? "primary" : "tertiary"}
+            numberOfLines={1}
+            style={{ flex: 1 }}
+          >
+            {selectedCategories.length > 0
+              ? selectedCategories
+                  .map((value) => translateNow(labelFor(value), language))
+                  .join(", ")
+              : "Select category"}
+          </ThemedText>
+          <AppIcon
+            name={open ? "chevron-up" : "chevron-down"}
+            size={16}
+            color={theme.textQuaternary}
+          />
+        </View>
+      </PressableScale>
 
       {open && (
-        <ScrollView
-          className={`border rounded-lg mt-1 max-h-60 ${
-            isDark
-              ? "bg-dark-card border-gray-700"
-              : "bg-light-card border-gray-300"
-          }`}
+        <View
+          style={{
+            marginTop: spacing.sm,
+            borderRadius: radii.md,
+            borderWidth: 1,
+            borderColor: theme.borderSubtle,
+            backgroundColor: theme.surface,
+            overflow: "hidden",
+          }}
         >
-          {categories.map((item) => (
-            <TouchableOpacity
-              key={item}
-              onPress={() => toggleCategory(item)}
-            
-              className="p-4 flex-row items-center justify-between border-b border-gray-200"
-            >
-              <AutoText className={`${isDark ? "text-white" : "text-black"}`}>
-                {item}
-              </AutoText>
-              {selectedCategories.includes(item) && (
-                <Ionicons
-                  name="checkmark"
-                  size={20}
-                  color={isDark ? "white" : "black"}
-                />
-              )}
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+          <ScrollView style={{ maxHeight: 320 }} nestedScrollEnabled>
+            {categories.map((item, index) => {
+              const selected = selectedCategories.includes(item.value);
+              return (
+                <PressableScale
+                  key={item.value}
+                  onPress={() => toggleCategory(item.value)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: selected }}
+                  haptic="selection"
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: spacing.sm,
+                      paddingHorizontal: spacing.md,
+                      paddingVertical: 13,
+                      borderTopWidth: index === 0 ? 0 : 1,
+                      borderTopColor: theme.separator,
+                    }}
+                  >
+                    <AppIcon
+                      name={selected ? "checkbox" : "square-outline"}
+                      size={18}
+                      color={selected ? theme.primary : theme.textQuaternary}
+                    />
+                    <ThemedText variant="body" style={{ flex: 1 }}>
+                      {item.label}
+                    </ThemedText>
+                  </View>
+                </PressableScale>
+              );
+            })}
+          </ScrollView>
+        </View>
       )}
     </View>
   );

@@ -1,3 +1,17 @@
+import { currentDateLocale } from "@/app/lib/time";
+import {
+  BookingScreen,
+  BookingScroll,
+  BookingSection,
+  BookingChoice,
+  BookingInput,
+  BookingPickerField,
+  BookingToggle,
+  PaymentMethodPicker,
+  BookingSummary,
+  BookingFooter,
+  BookingFooterNote,
+} from "@/app/components/booking/BookingKit";
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -8,10 +22,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import AppIcon from "@/app/components/ui/AppIcon";
+import PrimaryButton from "@/app/components/ui/PrimaryButton";
 import { Calendar } from "react-native-calendars";
 import { useTheme } from "../../../context/ThemeContext";
 import { useRouter } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import ShippingCategoryCheckbox from "@/app/components/ShippingCategoryDropdown";
 import { useUser } from "@clerk/clerk-expo";
 import { AutoText } from "@/app/components/ui/AutoText";
@@ -19,6 +34,11 @@ import Input from "@/app/components/ui/Input";
 import { showAlert } from "@/app/utils/showAlert";
 import { ShippingOrderService } from "@/app/services/shippingOrderService";
 import PaymentStripeJS from "@/app/components/PaymentStripeJS";
+import CapacityCard from "@/app/components/trips/CapacityCard";
+import { useThemeColors } from "@/app/theme";
+import { shadows, spacing } from "@/app/theme/spacing";
+import { useLanguage } from "@/app/hooks/useLanguage";
+import { translateNow } from "@/app/hooks/useTranslation";
 
 // 🔹 Fetch shipping schedules from Sanity
 const fetchShippingSchedules = async () => {
@@ -45,8 +65,10 @@ const fetchShippingSchedules = async () => {
 export default function ShippingPage() {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
+  const theme = useThemeColors();
   const router = useRouter();
   const { user } = useUser();
+  const { language } = useLanguage();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [availableTrips, setAvailableTrips] = useState<any[]>([]);
   const [selectedTrip, setSelectedTrip] = useState<any>(null);
@@ -113,7 +135,7 @@ export default function ShippingPage() {
     }
   };
 
-  // 🔹 När datum väljs → filtrera trips för det datumet
+  // 🔹 When a date is selected → filter trips for that date
   const handleDateSelect = (day: any) => {
     // Prevent selection of past dates
     const today = new Date();
@@ -122,8 +144,8 @@ export default function ShippingPage() {
 
     if (selectedDate < today) {
       showAlert(
-        "Ogiltigt datum",
-        "Du kan inte välja ett datum som redan har passerat."
+        "Invalid date",
+        "You cannot select a date in the past."
       );
       return;
     }
@@ -144,14 +166,14 @@ export default function ShippingPage() {
     const scheduleDate = new Date(s.departureTime).toISOString().split("T")[0];
     acc[scheduleDate] = {
       marked: true,
-      dotColor: "#0ea5e9",
+      dotColor: "#F2761B",
       selected: selectedDate === scheduleDate,
-      selectedColor: "#0ea5e9",
+      selectedColor: "#F2761B",
     };
     return acc;
   }, {});
 
-  // 🔹 Beräkna pris
+  // 🔹 Calculate price
   const calculateTotal = () => {
     const weight = parseFloat(kg) || 0;
     let total = ShippingOrderService.calculateShippingPrice(weight, 'standard', false, undefined, undefined);
@@ -178,7 +200,7 @@ export default function ShippingPage() {
       !recipientName ||
       !recipientPhone
     ) {
-      return showAlert("Fel", "Vänligen fyll i alla obligatoriska fält");
+      return showAlert("Error", "Please fill in all required fields");
     }
 
     const totalCost = calculateTotal();
@@ -234,14 +256,14 @@ export default function ShippingPage() {
 
     if (result.success) {
       showAlert(
-        "Bokning bekräftad",
-        `Din fraktbeställning har skapats! Order ID: ${result.order?._id?.substring(0, 8)}`
+        "Booking confirmed",
+        `Your shipping order has been created! Order ID: ${result.order?._id?.substring(0, 8)}`
       );
       // Refresh schedules to update available capacity
       await refreshSchedules();
       router.back();
     } else {
-      showAlert("Fel", "Kunde inte skapa bokning: " + result.error);
+      showAlert("Error", "Could not create booking: " + result.error);
     }
   };
 
@@ -258,7 +280,7 @@ export default function ShippingPage() {
 
     if (method === "points") {
       if (!user) {
-        showAlert("Fel", "Du måste vara inloggad");
+        showAlert("Error", "You must be signed in");
         return false;
       }
 
@@ -267,8 +289,8 @@ export default function ShippingPage() {
 
       if (currentPoints < pointsNeeded) {
         showAlert(
-          "Otillräckliga poäng",
-          `Du har ${currentPoints} poäng men behöver ${pointsNeeded} poäng för denna betalning.`
+          "Not enough points",
+          `You have ${currentPoints} points but need ${pointsNeeded} points for this payment.`
         );
         return false;
       }
@@ -293,7 +315,7 @@ export default function ShippingPage() {
 
     if (method === "combined") {
       if (!user) {
-        showAlert("Fel", "Du måste vara inloggad");
+        showAlert("Error", "You must be signed in");
         return false;
       }
 
@@ -306,8 +328,8 @@ export default function ShippingPage() {
 
       if (currentPoints < pointsToUseValue) {
         showAlert(
-          "Otillräckliga poäng",
-          `Du har ${currentPoints} poäng men behöver ${pointsToUseValue} poäng för denna kombinerade betalning.`
+          "Not enough points",
+          `You have ${currentPoints} points but need ${pointsToUseValue} points for this combined payment.`
         );
         return false;
       }
@@ -358,143 +380,81 @@ export default function ShippingPage() {
   };
 
   return (
-    <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
-      {/* Header */}
-      <View className="p-6">
-        <View className="flex-row items-center justify-center mb-6 relative">
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="absolute left-0 p-2"
-          >
-            <Ionicons
-              name="arrow-back"
-              size={24}
-              color={isDark ? "#fff" : "#000"}
-            />
-          </TouchableOpacity>
-          <AutoText
-            className={`text-2xl font-extrabold ${
-              isDark ? "text-white" : "text-gray-900"
-            }`}
-          >
-            Shipping
-          </AutoText>
-        </View>
-        <AutoText
-          className={`text-sm text-center ${
-            isDark ? "text-gray-400" : "text-gray-600"
-          }`}
-        >
-          Book your shipping between Sweden and Tunisia
-        </AutoText>
-      </View>
+    <BookingScreen title="Shipping" subtitle="Book between Sweden and Tunisia">
 
-      <ScrollView className="flex-1 p-6">
+      <BookingScroll>
         {/* Kalender */}
-        <AutoText
-          className={`mb-2 font-semibold ${
-            isDark ? "text-gray-200" : "text-gray-800"
-          }`}
-        >
-          Välj datum
-        </AutoText>
-        <Calendar
-          key={isDark ? "dark" : "light"} // Tvinga omrendering vid temabyte
-          markedDates={markedDates}
-          onDayPress={handleDateSelect}
-          theme={{
-            calendarBackground: isDark ? "#1c1c1e" : "#fff",
-            textSectionTitleColor: isDark ? "#fff" : "#000",
-            dayTextColor: isDark ? "#fff" : "#000",
-            monthTextColor: isDark ? "#fff" : "#000",
-            arrowColor: "#0ea5e9",
-            todayTextColor: "#0ea5e9",
-            selectedDayBackgroundColor: "#0ea5e9",
-            selectedDayTextColor: "#fff",
-            textDisabledColor: "#555",
+        <BookingSection title="Select a departure date" subtitle="Dates with a scheduled departure are marked" icon="calendar-outline" />
+        <View
+          style={{
+            borderRadius: 20,
+            borderWidth: 1,
+            borderColor: theme.borderSubtle,
+            backgroundColor: theme.surface,
+            padding: 16,
+            overflow: "hidden",
+            ...shadows.md,
           }}
-        />
+        >
+          <Calendar
+            key={isDark ? "dark" : "light"} // Force re-render on theme change
+            markedDates={markedDates}
+            onDayPress={handleDateSelect}
+            style={{ borderRadius: 12 }}
+            theme={{
+              calendarBackground: theme.surface,
+              textSectionTitleColor: theme.textTertiary,
+              dayTextColor: theme.textPrimary,
+              monthTextColor: theme.textPrimary,
+              arrowColor: theme.textSecondary,
+              todayTextColor: theme.accent,
+              selectedDayBackgroundColor: theme.accent,
+              selectedDayTextColor: "#fff",
+              textDisabledColor: theme.textQuaternary,
+              dotColor: theme.accent,
+              selectedDotColor: "#fff",
+              textMonthFontSize: 17,
+              textMonthFontWeight: "700",
+              textDayFontSize: 15,
+              textDayHeaderFontSize: 11,
+              textDayHeaderFontWeight: "600",
+            }}
+          />
+        </View>
 
-        {/* Trips för valt datum */}
+        {/* Trips for the selected date */}
         {availableTrips.length > 0 && (
           <View className="mt-6">
-            <AutoText
-              className={`text-lg font-semibold mb-4 ${
-                isDark ? "text-white" : "text-gray-900"
-              }`}
-            >
-              Tillgängliga fraktavgångar
-            </AutoText>
-            {availableTrips.map((trip, index) => (
-              <TouchableOpacity
-                key={index}
-                onPress={() => setSelectedTrip(trip)}
-                onPressIn={() => setSelectedTrip(trip)}
-                className={`p-4 rounded-xl mb-3 ${
-                  selectedTrip === trip
-                    ? "bg-blue-500"
-                    : isDark
-                      ? "bg-dark-card"
-                      : "bg-gray-100"
-                }`}
-              >
-                <AutoText
-                  className={`font-bold text-base ${
-                    selectedTrip === trip
-                      ? "text-white"
-                      : isDark
-                        ? "text-white"
-                        : "text-gray-900"
-                  }`}
-                >
-                  {trip.route
-                    ?.replace("_", " → ")
-                    .replace("stockholm", "Stockholm")
-                    .replace("goteborg", "Göteborg")
-                    .replace("malmo", "Malmö")
-                    .replace("tunis", "Tunis") || "Unknown Route"}
-                </AutoText>
-                <AutoText
-                  className={`text-sm mt-1 ${
-                    selectedTrip === trip
-                      ? "text-white"
-                      : isDark
-                        ? "text-gray-400"
-                        : "text-gray-600"
-                  }`}
-                >
-                  {new Date(trip.departureTime).toLocaleTimeString("sv-SE", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}{" "}
-                  ({trip.vehicle?.replace("_", " ") || "Unknown"})
-                </AutoText>
-                <AutoText
-                  className={`text-xs mt-1 ${
-                    selectedTrip === trip
-                      ? "text-white/80"
-                      : isDark
-                        ? "text-gray-500"
-                        : "text-gray-500"
-                  }`}
-                >
-                  Kapacitet: {trip.capacity }kg
-                  tillgänglig
-                </AutoText>
-                   <AutoText
-                  className={`text-xs mt-1 ${
-                    selectedTrip === trip
-                      ? "text-white/80"
-                      : isDark
-                        ? "text-gray-500"
-                        : "text-gray-500"
-                  }`}
-                >
-                  Tillgänglig kapacitet: {trip.availableCapacity}kg
-                  tillgänglig
-                </AutoText>
-              </TouchableOpacity>
-            ))}
+            <BookingSection title="Available departures" icon="time-outline" />
+            {availableTrips.map((trip, index) => {
+              const route = trip.route
+                ?.replace("_", " → ")
+                .replace("stockholm", "Stockholm")
+                .replace("goteborg", "Göteborg")
+                .replace("malmo", "Malmö")
+                .replace("tunis", "Tunis");
+              const departure = new Date(trip.departureTime).toLocaleTimeString(currentDateLocale(), {
+                hour: "2-digit",
+                minute: "2-digit",
+              });
+              return (
+                <View key={index} style={{ marginBottom: spacing.sm }}>
+                  <BookingChoice
+                    selected={selectedTrip === trip}
+                    onPress={() => setSelectedTrip(trip)}
+                    title={route || "Unknown route"}
+                    subtitle={`${departure} · ${trip.vehicle?.replace("_", " ") || "Unknown"}`}
+                  >
+                    <CapacityCard
+                      capacity={trip.capacity}
+                      available={trip.availableCapacity}
+                      tone={isDark ? "dark" : "light"}
+                      compact
+                    />
+                  </BookingChoice>
+                </View>
+              );
+            })}
           </View>
         )}
 
@@ -502,394 +462,94 @@ export default function ShippingPage() {
         {/* Customer Information */}
         {selectedTrip && (
           <>
-            <AutoText
-              className={`text-lg font-bold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}
-            >
-              Avsändarinformation
-            </AutoText>
+            <BookingSection title="Sender information" />
 
-            <AutoText
-              className={`my-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}
-            >
-              Namn *
-            </AutoText>
-            <Input
-              placeholder="Ditt namn"
+            <BookingInput
+              label="Full name"
+              required
+              placeholder="Your name"
               value={customerName}
               onChangeText={setCustomerName}
-              className={`border rounded-lg p-4 mb-4 ${
-                isDark ? "bg-dark-card text-white" : "bg-light-card text-black"
-              }`}
-              placeholderTextColor={isDark ? "gray" : "gray"}
             />
 
-            <AutoText
-              className={`my-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}
-            >
-              Telefonnummer *
-            </AutoText>
-            <Input
+            <BookingInput
+              label="Phone number"
+              required
               placeholder="070-123 45 67"
               keyboardType="phone-pad"
               value={customerPhone}
               onChangeText={setCustomerPhone}
-              className={`border rounded-lg p-4 mb-4 ${
-                isDark ? "bg-dark-card text-white" : "bg-light-card text-black"
-              }`}
-              placeholderTextColor={isDark ? "gray" : "gray"}
             />
 
-            <AutoText
-              className={`my-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}
-            >
-              E-post (valfritt)
-            </AutoText>
-            <Input
-              placeholder="din@email.com"
+            <BookingInput
+              label="Email"
+              hint="Optional"
+              placeholder="your@email.com"
               keyboardType="email-address"
               value={customerEmail}
               onChangeText={setCustomerEmail}
-              className={`border rounded-lg p-4 mb-4 ${
-                isDark ? "bg-dark-card text-white" : "bg-light-card text-black"
-              }`}
-              placeholderTextColor={isDark ? "gray" : "gray"}
             />
 
             {/* Recipient Information */}
-            <AutoText
-              className={`text-lg font-bold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}
-            >
-              Mottagarinformation
-            </AutoText>
+            <BookingSection title="Recipient information" />
 
-            <AutoText
-              className={`my-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}
-            >
-              Mottagarens namn *
-            </AutoText>
-            <Input
-              placeholder="Mottagarens namn"
+            <BookingInput
+              label="Recipient name"
+              required
+              placeholder="Recipient name"
               value={recipientName}
               onChangeText={setRecipientName}
-              className={`border rounded-lg p-4 mb-4 ${
-                isDark ? "bg-dark-card text-white" : "bg-light-card text-black"
-              }`}
-              placeholderTextColor={isDark ? "gray" : "gray"}
             />
 
-            <AutoText
-              className={`my-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}
-            >
-              Mottagarens telefonnummer *
-            </AutoText>
-            <Input
+            <BookingInput
+              label="Recipient phone"
+              required
               placeholder="070-123 45 67"
               keyboardType="phone-pad"
               value={recipientPhone}
               onChangeText={setRecipientPhone}
-              className={`border rounded-lg p-4 mb-4 ${
-                isDark ? "bg-dark-card text-white" : "bg-light-card text-black"
-              }`}
-              placeholderTextColor={isDark ? "gray" : "gray"}
             />
+
+            <BookingSection title="Shipment details" subtitle="Category and weight" icon="cube-outline" />
 
             <ShippingCategoryCheckbox
               isDark={isDark}
               selectedCategories={selectedCategories}
               setSelectedCategories={setSelectedCategories}
             />
-            <AutoText
-              className={`mb-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}
-            >
-              Vikt (kg) *
-            </AutoText>
-            <Input
-              placeholder="Ex: 10"
+            <BookingInput
+              label="Weight (kg)"
+              required
+              placeholder="E.g. 10"
               value={kg}
               onChangeText={setKg}
               keyboardType="numeric"
-              className={`border rounded-lg p-4 mb-4 ${
-                isDark ? "bg-dark-card text-white" : "bg-light-card text-black"
-              }`}
-              placeholderTextColor={isDark ? "gray" : "gray"}
             />
 
-            {/* Payment Method Selection */}
-            <AutoText
-              className={`my-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}
-            >
-              Betalningsmetod *
-            </AutoText>
-            <View className="mb-4">
-              <TouchableOpacity
-                className={`p-4 rounded-lg border mb-2 ${
-                  paymentMethod === "cash"
-                    ? "bg-blue-500 border-blue-500"
-                    : isDark
-                      ? "bg-dark-card border-gray-600"
-                      : "bg-light-card border-gray-300"
-                }`}
-                onPress={() => setPaymentMethod("cash")}
-                activeOpacity={0.8}
-              >
-                <View className="flex-row items-center">
-                  <View
-                    className={`w-4 h-4 rounded border-2 mr-3 ${
-                      paymentMethod === "cash"
-                        ? "bg-white border-white"
-                        : isDark
-                          ? "border-gray-400"
-                          : "border-gray-500"
-                    }`}
-                  >
-                    {paymentMethod === "cash" && (
-                      <View className="w-2 h-2 bg-blue-500 rounded-sm m-0.5" />
-                    )}
-                  </View>
-                  <AutoText
-                    className={
-                      paymentMethod === "cash"
-                        ? "text-white font-semibold"
-                        : isDark
-                          ? "text-white"
-                          : "text-black"
-                    }
-                  >
-                    Kontant betalning (vid leverans)
-                  </AutoText>
-                </View>
-              </TouchableOpacity>
+            <BookingSection title="Payment method" icon="wallet-outline" />
+                  <PaymentMethodPicker
+                    value={paymentMethod}
+                    onChange={setPaymentMethod}
+                    points={userPoints}
+                    pointsUsed={pointsToUse}
+                    onPointsChange={(value: number) => setPointsToUse(value)}
+                    cashLabel="Cash on delivery"
+                    cashHint="Pay when your parcel is delivered"
+                    cardHint="Pay securely by card now"
+                  />
 
-              <TouchableOpacity
-                className={`p-4 rounded-lg border mb-2 ${
-                  paymentMethod === "stripe"
-                    ? "bg-blue-500 border-blue-500"
-                    : isDark
-                      ? "bg-dark-card border-gray-600"
-                      : "bg-light-card border-gray-300"
-                }`}
-                onPress={() => setPaymentMethod("stripe")}
-                activeOpacity={0.8}
-              >
-                <View className="flex-row items-center">
-                  <View
-                    className={`w-4 h-4 rounded border-2 mr-3 ${
-                      paymentMethod === "stripe"
-                        ? "bg-white border-white"
-                        : isDark
-                          ? "border-gray-400"
-                          : "border-gray-500"
-                    }`}
-                  >
-                    {paymentMethod === "stripe" && (
-                      <View className="w-2 h-2 bg-blue-500 rounded-sm m-0.5" />
-                    )}
-                  </View>
-                  <AutoText
-                    className={
-                      paymentMethod === "stripe"
-                        ? "text-white font-semibold"
-                        : isDark
-                          ? "text-white"
-                          : "text-black"
-                    }
-                  >
-                    Kortbetalning (förbetald)
-                  </AutoText>
-                </View>
-              </TouchableOpacity>
+            <BookingSummary
+              rows={[{ label: "Base price", value: (kg ? calculateTotal() : 0) + " SEK" }]}
+              total={(kg ? calculateTotal() : 0) + " SEK"}
+            />
 
-              <TouchableOpacity
-                className={`p-4 rounded-lg border mb-2 ${
-                  paymentMethod === "points"
-                    ? "bg-blue-500 border-blue-500"
-                    : isDark
-                      ? "bg-dark-card border-gray-600"
-                      : "bg-light-card border-gray-300"
-                }`}
-                onPress={() => setPaymentMethod("points")}
-                activeOpacity={0.8}
-              >
-                <View className="flex-row items-center justify-between">
-                  <View className="flex-row items-center">
-                    <View
-                      className={`w-4 h-4 rounded border-2 mr-3 ${
-                        paymentMethod === "points"
-                          ? "bg-white border-white"
-                          : isDark
-                            ? "border-gray-400"
-                            : "border-gray-500"
-                      }`}
-                    >
-                      {paymentMethod === "points" && (
-                        <View className="w-2 h-2 bg-blue-500 rounded-sm m-0.5" />
-                      )}
-                    </View>
-                    <AutoText
-                      className={
-                        paymentMethod === "points"
-                          ? "text-white font-semibold"
-                          : isDark
-                            ? "text-white"
-                            : "text-black"
-                      }
-                    >
-                      Poäng (förbetald)
-                    </AutoText>
-                  </View>
-                  <AutoText
-                    className={`text-sm ${
-                      paymentMethod === "points"
-                        ? "text-white"
-                        : isDark
-                          ? "text-gray-400"
-                          : "text-gray-600"
-                    }`}
-                  >
-                    {userPoints} poäng
-                  </AutoText>
-                </View>
-                {paymentMethod === "points" && (
-                  <View className="mt-3 pt-3 border-t border-white/20">
-                    <View className="flex-row items-center justify-between">
-                      <AutoText className="text-white text-sm">
-                        Använd poäng:
-                      </AutoText>
-                      <Input
-                        placeholder="0"
-                        keyboardType="numeric"
-                        value={pointsToUse.toString()}
-                        onChangeText={(value) =>
-                          setPointsToUse(parseInt(value) || 0)
-                        }
-                        className={`border rounded p-2 w-20 text-center ${
-                          isDark
-                            ? "bg-gray-700 text-white"
-                            : "bg-white text-black"
-                        }`}
-                      />
-                    </View>
-                    <AutoText className="text-white/80 text-xs mt-1">
-                      Du har {userPoints} poäng tillgängliga
-                    </AutoText>
-                  </View>
-                )}
-              </TouchableOpacity>
+          </>
+        )}
+      </BookingScroll>
 
-              <TouchableOpacity
-                className={`p-4 rounded-lg border ${
-                  paymentMethod === "combined"
-                    ? "bg-blue-500 border-blue-500"
-                    : isDark
-                      ? "bg-dark-card border-gray-600"
-                      : "bg-light-card border-gray-300"
-                }`}
-                onPress={() => setPaymentMethod("combined")}
-                activeOpacity={0.8}
-              >
-                <View className="flex-row items-center justify-between">
-                  <View className="flex-row items-center">
-                    <View
-                      className={`w-4 h-4 rounded border-2 mr-3 ${
-                        paymentMethod === "combined"
-                          ? "bg-white border-white"
-                          : isDark
-                            ? "border-gray-400"
-                            : "border-gray-500"
-                      }`}
-                    >
-                      {paymentMethod === "combined" && (
-                        <View className="w-2 h-2 bg-blue-500 rounded-sm m-0.5" />
-                      )}
-                    </View>
-                    <AutoText
-                      className={
-                        paymentMethod === "combined"
-                          ? "text-white font-semibold"
-                          : isDark
-                            ? "text-white"
-                            : "text-black"
-                      }
-                    >
-                      Kombinerat (kort + poäng)
-                    </AutoText>
-                  </View>
-                  <AutoText
-                    className={`text-sm ${
-                      paymentMethod === "combined"
-                        ? "text-white"
-                        : isDark
-                          ? "text-gray-400"
-                          : "text-gray-600"
-                    }`}
-                  >
-                    {userPoints} poäng
-                  </AutoText>
-                </View>
-                {paymentMethod === "combined" && (
-                  <View className="mt-3 pt-3 border-t border-white/20">
-                    <View className="flex-row items-center justify-between">
-                      <AutoText className="text-white text-sm">
-                        Använd poäng:
-                      </AutoText>
-                      <Input
-                        placeholder="0"
-                        keyboardType="numeric"
-                        value={pointsToUse.toString()}
-                        onChangeText={(value) =>
-                          setPointsToUse(parseInt(value) || 0)
-                        }
-                        className={`border rounded p-2 w-20 text-center ${
-                          isDark
-                            ? "bg-gray-700 text-white"
-                            : "bg-white text-black"
-                        }`}
-                      />
-                    </View>
-                    <AutoText className="text-white/80 text-xs mt-1">
-                      Du har {userPoints} poäng tillgängliga
-                    </AutoText>
-                  </View>
-                )}
-              </TouchableOpacity>
-            </View>
-
-            {/* Price Summary */}
-            <View
-              className={`border rounded-lg p-4 mb-6 ${isDark ? "bg-dark-card" : "bg-light-card"}`}
-            >
-              <AutoText
-                className={`text-lg font-bold mb-2 ${isDark ? "text-white" : "text-gray-900"}`}
-              >
-                Prissammanfattning
-              </AutoText>
-              <View className="flex-row justify-between mb-2">
-                <AutoText
-                  className={isDark ? "text-gray-400" : "text-gray-600"}
-                >
-                  Grundpris:
-                </AutoText>
-                <AutoText className={isDark ? "text-white" : "text-black"}>
-                  {kg ? calculateTotal() : 0} SEK
-                </AutoText>
-              </View>
-              <View className="border-t border-gray-300 pt-2 mt-2">
-                <View className="flex-row justify-between">
-                  <AutoText
-                    className={`font-bold ${isDark ? "text-white" : "text-black"}`}
-                  >
-                    Att betala:
-                  </AutoText>
-                  <AutoText
-                    className={`font-bold ${isDark ? "text-white" : "text-black"}`}
-                  >
-                    {kg ? calculateTotal() : 0} SEK
-                  </AutoText>
-                </View>
-              </View>
-            </View>
-
-            {/* Bokningsknapp */}
+      {selectedTrip && (
+        <BookingFooter total={(kg ? calculateTotal() : 0) + " SEK"}>
+            {/* Booking button */}
             {paymentMethod === "stripe" ||
             (paymentMethod === "combined" && calculateTotal() > 0) ? (
               <PaymentStripeJS
@@ -897,7 +557,7 @@ export default function ShippingPage() {
                 points={calculateTotal() * 10}
                 isDark={isDark}
                 service="Shipping"
-                customText={`Betala ${calculateTotal()} SEK för Shipping`}
+                customText={`${translateNow("Pay", language)} ${calculateTotal()} SEK ${translateNow("for", language)} ${translateNow("Shipping", language)}`}
                 customStyle={{
                   backgroundColor: isDark ? "#1e1e1e" : "#ffffff",
                   borderWidth: 1,
@@ -920,9 +580,9 @@ export default function ShippingPage() {
                 }}
               />
             ) : (
-              <TouchableOpacity
+              <PrimaryButton
+                label="Confirm booking"
                 onPress={handleBooking}
-                className="bg-blue-500 rounded-xl p-4 items-center"
                 disabled={
                   !selectedTrip ||
                   selectedCategories.length === 0 ||
@@ -932,29 +592,11 @@ export default function ShippingPage() {
                   !recipientName.trim() ||
                   !recipientPhone.trim()
                 }
-              >
-                <AutoText className="text-center mt-2  text-white font-semibold text-base">
-                  Bekräfta bokning
-                </AutoText>
-              </TouchableOpacity>
+              />
             )}
-          </>
-        )}
-        <View className="flex-row items-center justify-center mb-4 mt-4">
-          <Ionicons
-            name="shield-checkmark-outline"
-            size={16}
-            color={isDark ? "#9CA3AF" : "#6B7280"}
-          />
-          <AutoText
-            className={`text-xs text-center ml-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}
-          >
-            Säker betalning • 24/7 support • Professionella tjänster
-          </AutoText>
-        </View>
-      </ScrollView>
-
-      <StatusBar style={isDark ? "light" : "dark"} />
-    </SafeAreaView>
+          <BookingFooterNote text="Secure payment • 24/7 support • Professional service" />
+        </BookingFooter>
+      )}
+    </BookingScreen>
   );
 }
