@@ -6,11 +6,14 @@ web-build/
 npm-debug.*
 
 # Native build folders (Managed workflow handles these via prebuild)
-/ios
-/android
+ios/
+android/
+ios
+android
 android_backup/
+android_backup
 
-# Assets & non-app content not needed for build
+# Non-app directories and assets
 studio-tunisiska-services/
 video-production/
 .pandaos/
@@ -24,6 +27,8 @@ docs/
 workplans/
 *.md
 find_text.py
+
+# Sensitive / Native Keys
 *.jks
 *.p8
 *.p12
@@ -31,16 +36,15 @@ find_text.py
 *.mobileprovision
 *.orig.*
 
-# Git folder (don't upload to EAS - slows down build)
+# Git
+.git/
 .git
 
 # Vercel
+.vercel/
 .vercel
 
 # Environment variables
-# We explicitly allow .env.production so EAS Build sees your config variables.
-# For maximum security, use EAS Secrets (eas secret:create) instead.
 .env
 .env.local
 .env.production
-# .env.preview (Add if you use it)
