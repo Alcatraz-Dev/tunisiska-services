@@ -187,9 +187,9 @@ module.exports = {
       // Makes a clean prebuild produce a buildable Podfile (modular headers
       // for the Google Sign-in pods, and pod deployment targets Xcode accepts).
       "./plugins/withPodfileFixes",
-      // Adds the WidgetKit extension that renders the next-departure Live
-      // Activity in the Dynamic Island and on the Lock Screen.
-      "./plugins/withLiveActivities",
+      // Live Activities Widget extension requires manual provisioning profile and App Group
+      // setup in developer.apple.com before it can be signed for App Store distribution.
+      // "./plugins/withLiveActivities",
     ],
 
     experiments: {
