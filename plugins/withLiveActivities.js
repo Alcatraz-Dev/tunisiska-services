@@ -146,8 +146,24 @@ function addWidgetTarget(projectRoot, project) {
       if (buildConfiguration?.buildSettings) {
         buildConfiguration.buildSettings.CODE_SIGN_ENTITLEMENTS = `"${TARGET_NAME}/${TARGET_NAME}.entitlements"`;
         buildConfiguration.buildSettings.CODE_SIGN_STYLE = "Automatic";
+        buildConfiguration.buildSettings.DEVELOPMENT_TEAM = '"8436MWNDM3"';
         delete buildConfiguration.buildSettings.CODE_SIGNING_ALLOWED;
         delete buildConfiguration.buildSettings.CODE_SIGNING_REQUIRED;
+      }
+    }
+    const projectSection = project.pbxProjectSection();
+    const firstProject = project.getFirstProject().uuid;
+    if (projectSection?.[firstProject]) {
+      if (!projectSection[firstProject].attributes) projectSection[firstProject].attributes = {};
+      if (!projectSection[firstProject].attributes.TargetAttributes) projectSection[firstProject].attributes.TargetAttributes = {};
+      const targetUuidKey = target?.uuid || targetKey;
+      if (targetUuidKey) {
+        projectSection[firstProject].attributes.TargetAttributes[targetUuidKey] = {
+          CreatedOnToolsVersion: "15.0",
+          LastSwiftMigration: 1500,
+          DevelopmentTeam: "8436MWNDM3",
+          ProvisioningStyle: "Automatic",
+        };
       }
     }
     const groups = project.hash.project.objects.PBXGroup ?? {};
@@ -230,6 +246,7 @@ function addWidgetTarget(projectRoot, project) {
     TARGETED_DEVICE_FAMILY: '"1,2"',
     SKIP_INSTALL: "YES",
     CODE_SIGN_STYLE: "Automatic",
+    DEVELOPMENT_TEAM: '"8436MWNDM3"',
     CURRENT_PROJECT_VERSION: "1",
     MARKETING_VERSION: "1.0",
     GENERATE_INFOPLIST_FILE: "NO",
@@ -336,6 +353,8 @@ function addWidgetTarget(projectRoot, project) {
   projectSection[firstProject].attributes.TargetAttributes[targetUuid] = {
     CreatedOnToolsVersion: "15.0",
     LastSwiftMigration: 1500,
+    DevelopmentTeam: "8436MWNDM3",
+    ProvisioningStyle: "Automatic",
   };
 
   // ── App depends on the extension ───────────────────────────────────
