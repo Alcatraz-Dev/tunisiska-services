@@ -58,6 +58,15 @@ send. Photos and videos sent as documents publish too.
 Numbers listed in `WHATSAPP_ADMIN_NUMBERS` are allowed without using the panel,
 and `*` there turns on "any number" mode from the environment.
 
+## Ports
+
+The gateway listens on its **own port, 4100 by default** (`WHATSAPP_GATEWAY_PORT`)
+and the rest of the API keeps `PORT` (3000). They are separate on purpose: a dev
+server or another project holding 3000 no longer stops WhatsApp from linking.
+
+The app looks for the gateway on 4100 of the machine running Expo; from a phone
+on the same Wi-Fi that is the computer's IP with `:4100`.
+
 ## Where the gateway runs
 
 The session needs a process that **stays up**: your computer (`npm run server`),

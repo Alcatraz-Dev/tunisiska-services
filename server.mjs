@@ -12,6 +12,9 @@ dotenv.config();
 const app = express();
 app.use(cors({ origin: "*" })); // You can restrict to your app domain in production
 const PORT = process.env.PORT || 3000;
+// The WhatsApp gateway gets its own port: a dev server, another project or a
+// Next app holding 3000 must not be able to take the session down with it.
+const GATEWAY_PORT = Number(process.env.WHATSAPP_GATEWAY_PORT || 4100);
 
 // --- Sanity export route (single copy only)
 app.get("/sanity/export", async (req, res) => {
@@ -698,31 +701,60 @@ export default app;
 // Start server for local development. Vercel imports this module instead of
 // running it, so keying off VERCEL (not NODE_ENV) keeps `npm run server`
 // listening even when the environment is marked as production.
-if (!process.env.VERCEL) {
-  const server = app.listen(PORT, "0.0.0.0", () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`📍 Local: http://localhost:${PORT}`);
-    startWhatsappBridge();
-  });
+function startBridgeOnce() {
+  if (globalThis.__whatsappBridgeStarted) return;
+  globalThis.__whatsappBridgeStarted = true;
+  startWhatsappBridge();
+}
 
-  // Handle server errors
-  server.on('error', (err) => {
-    if (err?.code === 'EADDRINUSE') {
-      console.error(`\n❌ Port ${PORT} is already in use — an older server is still running there.`);
-      console.error('   The app talks to that process, so this one can never link WhatsApp.');
-      console.error(`   Fix it:  lsof -ti:${PORT} | xargs kill`);
-      console.error('   Then:    npm run server\n');
+if (!process.env.VERCEL) {
+  const servers = [];
+  let gatewayUp = false;
+
+  // 1. The WhatsApp gateway, always on its own port.
+  const gatewayServer = app.listen(GATEWAY_PORT, "0.0.0.0", () => {
+    gatewayUp = true;
+    console.log(`🔌 WhatsApp gateway: http://localhost:${GATEWAY_PORT}`);
+    console.log(`   (from a phone on the same Wi-Fi use your computer's IP with :${GATEWAY_PORT})`);
+    startBridgeOnce();
+  });
+  servers.push(gatewayServer);
+  gatewayServer.on("error", (err) => {
+    if (err?.code === "EADDRINUSE") {
+      console.error(`\n❌ WhatsApp gateway port ${GATEWAY_PORT} is already in use — another gateway is probably running.`);
+      console.error(`   Stop it:  lsof -ti:${GATEWAY_PORT} | xargs kill`);
+      console.error("   Or set WHATSAPP_GATEWAY_PORT to a free port.\n");
       process.exit(1);
     }
-    console.error('❌ Server error:', err);
+    console.error("❌ Gateway error:", err);
   });
 
+  // 2. The rest of the API (payments, orders) keeps its usual port when free.
+  if (GATEWAY_PORT !== PORT) {
+    const apiServer = app.listen(PORT, "0.0.0.0", () => {
+      console.log(`🚀 API on port ${PORT}`);
+      console.log(`📍 Local: http://localhost:${PORT}`);
+      startBridgeOnce();
+    });
+    apiServer.on("error", (err) => {
+      if (err?.code === "EADDRINUSE") {
+        console.warn(`⚠️  Port ${PORT} is used by another app (not this one) — payments/orders won't be served there.`);
+        console.warn(`   The WhatsApp gateway keeps running on ${GATEWAY_PORT}.`);
+        return;
+      }
+      console.error("❌ Server error:", err);
+    });
+    servers.push(apiServer);
+  }
 
-  // Keep server alive
-  process.on('SIGINT', () => {
-    console.log('🛑 Shutting down server...');
-    server.close(() => {
-      console.log('✅ Server closed');
+  setTimeout(() => {
+    if (!gatewayUp) console.error(`❌ The WhatsApp gateway never started on ${GATEWAY_PORT}.`);
+  }, 5000).unref?.();
+
+  process.on("SIGINT", () => {
+    console.log("🛑 Shutting down server...");
+    Promise.all(servers.map((server) => new Promise((resolve) => server.close(resolve)))).then(() => {
+      console.log("✅ Server closed");
       process.exit(0);
     });
   });

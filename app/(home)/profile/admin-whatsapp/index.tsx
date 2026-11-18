@@ -55,10 +55,13 @@ const NEWS_QUERY = `*[_type == "announcement" && source == "whatsapp"] | order(d
 }`;
 
 /** The admin server running beside the app, as seen from a simulator or phone. */
-function localServerUrl() {
+function localServerUrl(port: number = 3000) {
   const host = Constants.expoConfig?.hostUri?.split(":")[0];
-  return host ? `http://${host}:3000` : "http://localhost:3000";
+  return host ? `http://${host}:${port}` : `http://localhost:${port}`;
 }
+
+/** The gateway's dedicated port (server default 4100), separate from the API. */
+const GATEWAY_PORT = Number(process.env.EXPO_PUBLIC_WHATSAPP_GATEWAY_PORT || 4100);
 
 /**
  * Candidate admin servers, most likely first: the local one in development,
@@ -67,7 +70,8 @@ function localServerUrl() {
 function serverCandidates(): string[] {
   const extra = Constants.expoConfig?.extra as { serverUrl?: string } | undefined;
   const configured = (process.env.EXPO_PUBLIC_SERVER_URL || extra?.serverUrl || "").replace(/\/$/, "");
-  const order = __DEV__ ? [localServerUrl(), configured] : [configured, localServerUrl()];
+  const gateway = localServerUrl(GATEWAY_PORT);
+  const order = __DEV__ ? [gateway, localServerUrl(), configured] : [configured, gateway, localServerUrl()];
   return Array.from(new Set(order.filter(Boolean)));
 }
 

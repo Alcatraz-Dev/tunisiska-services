@@ -56,6 +56,7 @@ const server = spawn(process.execPath, ["server.mjs"], {
   env: {
     ...baseEnv,
     PORT: String(APP_PORT),
+    WHATSAPP_GATEWAY_PORT: String(APP_PORT + 1),
     WHATSAPP_BRIDGE_ENABLED: "false",
   },
   stdio: ["ignore", "pipe", "pipe"],
@@ -116,26 +117,30 @@ try {
   });
   record("short numbers are rejected", invalid.status === 400);
 
-  record("any-number mode starts off", status.allowAll === false);
+  // Read the current setting instead of assuming a default, then put it back.
+  const allowAllInitial = status.allowAll === true;
+  const toggle = (value) =>
+    fetch(`${BASE}/api/whatsapp/settings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ allowAll: value }),
+    });
 
-  const allowAllOn = await fetch(`${BASE}/api/whatsapp/settings`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ allowAll: true }),
-  });
+  const allowAllOn = await toggle(!allowAllInitial);
   const statusAllowAll = await fetch(`${BASE}/api/whatsapp/status`).then((r) => r.json());
   record(
-    "the panel can let any number publish",
-    allowAllOn.status === 200 && statusAllowAll.allowAll === true,
+    "the panel can switch any-number mode on or off",
+    allowAllOn.status === 200 && statusAllowAll.allowAll === !allowAllInitial,
+    `now ${statusAllowAll.allowAll}`,
   );
 
-  await fetch(`${BASE}/api/whatsapp/settings`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ allowAll: false }),
-  });
-  const statusAllowAllOff = await fetch(`${BASE}/api/whatsapp/status`).then((r) => r.json());
-  record("any-number mode can be turned off again", statusAllowAllOff.allowAll === false);
+  await toggle(allowAllInitial);
+  const statusAllowAllRestored = await fetch(`${BASE}/api/whatsapp/status`).then((r) => r.json());
+  record(
+    "the previous setting is restored",
+    statusAllowAllRestored.allowAll === allowAllInitial,
+    `back to ${allowAllInitial}`,
+  );
 
   const add = await fetch(`${BASE}/api/whatsapp/numbers`, {
     method: "POST",
