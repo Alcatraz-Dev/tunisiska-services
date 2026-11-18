@@ -1,6 +1,6 @@
 ---
 name: pandaos-video
-description: "Create a real rendered video (MP4) with HyperFrames: an animated intro, logo sting, product reel or kinetic-type piece, a product launch or promo video of the user's app ('a 30 second video of my app'), an explainer, a captioned clip, or any other video deliverable built from the user's repo, a URL, a brief, or footage. Use for any request to make, edit, preview, or render a video file, INCLUDING when the user names a HyperFrames workflow or skill directly (pr-to-video, product-launch-video, faceless-explainer, music-to-video, talking-head-recut, embedded-captions, motion-graphics, general-video): these are installed on demand by this flow, never listed as PandaOS skills, so never report them as unavailable. NOT for a 'Look what I made' video of an app the user built with PandaOS (always pandaos-design-motion's look-what-i-made template, never built here), and NOT for screen recordings (use the product demo flow)."
+description: "Create a real rendered video (MP4) with HyperFrames: an animated intro, logo sting, product reel or kinetic-type piece, a product launch or promo video of the user's app ('a 30 second video of my app'), an explainer, a captioned clip, a video of one of the user's PandaOS dashboards, or any other video deliverable built from the user's repo, a URL, a brief, or footage. Use for any request to make, edit, preview, or render a video file, INCLUDING when the user names a HyperFrames workflow or skill directly (pr-to-video, product-launch-video, faceless-explainer, music-to-video, talking-head-recut, embedded-captions, motion-graphics, general-video): these are installed on demand by this flow, never listed as PandaOS skills, so never report them as unavailable. NOT for a 'Look what I made' video of an app the user built with PandaOS (always pandaos-design-motion's look-what-i-made template, never built here), and NOT for screen recordings (use the product demo flow)."
 user-invocable: true
 disable-model-invocation: false
 source: pandaos
@@ -12,6 +12,13 @@ You produce a rendered video file with **HyperFrames**, an open-source framework
 renders video from HTML compositions via its CLI (`npx hyperframes ...`). PandaOS does
 not bundle HyperFrames; this skill bootstraps it, then hands off to the HyperFrames
 skill set, which the CLI installs and keeps fresh on this machine.
+
+## Dashboard videos
+
+When the request is a video of one of the user's PandaOS dashboards (the Animate
+action sends it), read `references/dashboard-video.md` next to this file before
+anything else and follow it on top of this flow. Its numbers come from
+`dashboard_bind_video`, never from you.
 
 ## Boundary: which flow owns the request
 
@@ -138,3 +145,8 @@ reading the file.
   the user's project is a git repo and `videos/` is not ignored, add
   `videos/*/node_modules/` and `videos/*/*.mp4` to `.gitignore` (create it if absent)
   before the first install, and say so.
+
+
+## Reference Files
+This skill includes reference documents. Read them when you need supporting context:
+- `.claude/skills/pandaos-video/references/dashboard-video.md`

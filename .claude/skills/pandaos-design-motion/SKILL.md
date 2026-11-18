@@ -1,6 +1,6 @@
 ---
 name: pandaos-design-motion
-description: "The ONLY way to make a 'Look what I made' video of an app the user built with PandaOS: always from its look-what-i-made template, never from scratch, built on the Design canvas with design_create and design_animate. Not for any other animated intro, reel, kinetic type or video: those use pandaos-video."
+description: "The ONLY way to make a 'Look what I made' video of an app the user built with PandaOS: always from that template, never from scratch, built on the Design canvas with design_create and design_animate. Not for a video of a PandaOS dashboard, or any other animated intro, reel, kinetic type or video: those use pandaos-video."
 user-invocable: false
 disable-model-invocation: false
 source: pandaos
@@ -34,6 +34,8 @@ tools check its fixed frames for you. Available kits:
 
 - `references/templates/look-what-i-made.md`: a launch video of the app the user built
   with PandaOS, reconstructed from their codebase, never screen-recorded.
+- `references/templates/animated-dashboard.md`: retired. A video of a PandaOS dashboard is a
+  HyperFrames video now: use `pandaos-video` and its dashboard video guide, never this kit.
 
 **A "Look what I made" video is ALWAYS built from its kit, never from scratch.** That covers any
 wording of it: "look what I made", a showcase, launch or brag video of the app the user built with
@@ -148,7 +150,20 @@ The result also carries rendered review frames of the key moments: judging them 
 report anything (see "See it before you ship it" at the end).
 
 ## Motion contract (MUST follow exactly)
-- **DETERMINISTIC ONLY:** never use `Date.now()`, `performance.now()`, `Math.random()`, or CSS transition/animation running on wall-clock time. All motion must be a pure function of the timeline, or scrubbing and MP4 export will not match. The runtime drives every frame; you only supply the manifest + the static HTML.
+- **DETERMINISTIC ONLY:** never use `Date.now()`, `performance.now()`, `Math.random()`, `requestAnimationFrame`, timers, a tweening library's own clock, or CSS transition/animation running on wall-clock time. All motion must be a pure function of the timeline, or scrubbing and MP4 export will not match. The runtime drives every frame; you supply the manifest, the static HTML, and optionally scene hooks (next rule).
+- **Scene hooks for anything the manifest cannot express** (a chart drawing in, a canvas of particles, a 3D scene): register a hook and draw ONLY from the stage time `t` it hands you. The runtime calls it on every playback frame, scrub, seek and exported frame, waits for `prepare` before frame 0 and for a returned promise before each export capture:
+
+  ```html
+  <canvas data-eid="particles" width="1920" height="1080"></canvas>
+  <script>
+    (window.__motionHooks = window.__motionHooks || []).push({
+      prepare: async (info) => { /* build once: geometry, textures, scales */ },
+      frame: (t, info) => { /* draw the whole scene at time t, no state carried from the last call */ },
+    })
+  </script>
+  ```
+
+  Rules: draw the full state for `t` every call (a scrub can jump backwards); no `requestAnimationFrame` loop of your own; for randomness use `const rand = window.__motionRandom(seed)` once and call `rand()`; keep the element a sprite in the manifest if it should also fade or move. design_create and design_animate warn when a script still runs on its own clock.
 - **Transitions:** fade, slide-up, slide-down, slide-left, slide-right, scale, rise.
 - **Easings:** linear, inQuad, outQuad, inOutQuad, inCubic, outCubic, inOutCubic, inQuart, outQuart, inOutQuart, outQuint, inExpo, outExpo, inOutExpo, outCirc, inOutCirc, inBack, outBack, inOutBack, inOutSine, spring. Pick by role (per the Hyperframes house style): **outQuart** = snappy, **outExpo** = dramatic, **outBack** = bouncy overshoot, **outCubic/spring** = considered default. Prefer these over linear, which reads as cheap. `spring` takes a per-sprite `springBounce` (0..1, default 0.5): `0` = smooth premium settle, `0.3` subtle, `1` full elastic. Use low bounce (0–0.3) for anything corporate/repeated; save high bounce for playful hero pops.
 - **Motion blur is on by default** and derived from each sprite's per-frame travel — fast moves get blurred automatically, which is the single biggest cheap→premium lever. Tune with `motionBlur` at the manifest level (global multiplier, `0` disables) or per sprite (`0` to keep a specific element razor-sharp, `>1` to exaggerate a whip). Do NOT hand-keyframe blur to fake this; let the runtime do it. The runtime never blurs a sprite that is or contains a `backdrop-filter` surface (the filter would strip the glass blur and flicker), and ignores travel under 1px of blur.
@@ -156,6 +171,8 @@ report anything (see "See it before you ship it" at the end).
 - **Per-keyframe easing:** each keyframe may carry `ease` — the curve travelled INTO that keyframe. So one sprite can spring the entrance segment and glide the settle. Omit it to inherit the sprite `easing`. Baked effects already do this; use it for hand-authored kinetic type.
 - **Easing by ROLE, not one-for-everything:** pick one ease per role and hold it — hero entrances (spring or outCubic), secondary entrances (outQuad, faster), ambient motion (inOutSine, slow). Using a single ease everywhere reads as flat; using random eases reads as undirected.
 - **Exits ACCELERATE.** Entrances decelerate (`out*` eases), exits accelerate away (`inQuad`/`inCubic`/`inExpo`), moves between positions use `inOut*`. Make an exit roughly 30% faster than the matching entrance: a card that takes 0.4s to appear leaves in about 0.25s. A slow fade-out reads as a mistake, not a choice.
+- **Charts from data: use a chart sprite, not hand-drawn bars.** Put `chart: { type: 'bar'|'line'|'area'|'donut', columns: ['day','signups'], rows: [['Mon',42], ...] }` on a sprite whose element is an empty, sized box (`<div data-eid="chart" style="width:1200px"></div>`, at least 900px wide or the axis labels get too small to read in a video). PandaOS draws it like a dashboard tile and reveals it on the timeline: bars grow in a wave, lines trace, donuts sweep. Tune with `delay` and `duration` (seconds), `theme` (midnight on dark stages, paper or ocean on light) and `accent`. Keep the title and the headline number as separate sprites (a counter for the number), so the beat reads title, number, chart.
+- **Three.js and d3 ship with PandaOS.** Load them as `pandaos-lib://three` (ES module import) and `pandaos-lib://d3` (script src), never from a CDN, and drive them only from a scene hook. Read `references/libraries.md` in this skill's directory before using either; it has a growing d3 chart and an orbiting Three.js scene to start from. For a scene shaped by real numbers, start from `references/scenes/data-skyline.js`: a scene hook can read any bound sprite's figures with `window.__motionData('<eid>')` (`{ value, chart: { columns, rows } }`).
 - Inline CSS or an allowlisted CDN — NOT cdn.tailwindcss.com.
 
 ## Rhythm and pacing (video is its own medium, not an animated web page)
@@ -338,3 +355,9 @@ letter, the wrapper carries the ambient breathe, which is how a thing pops in AN
 
 ## See it before you ship it (mandatory frame review)
 The manifest is not the render. Every `design_animate` call returns rendered frames of the key moments (opening, each beat after its entrance settles, midpoint, settled ending) plus a checklist. Judging those frames is NOT optional: before telling the user the piece is done, verify that the hero is visible and readable where it should be, no frame is dead air, text that must be read is fully on stage in at least one frame, and the ending frame is the settled composition you intended. Also hold them against the cinematic floor: the background is alive (not a flat fill), the headline is staggered (not a single block), entrances overshoot or settle (not a bare fade), and each beat has one focal point with readable contrast. If any check fails, fix the manifest and call `design_animate` again. Use `design_screenshot({ id, at })` to inspect any moment the review frames did not cover, for example the middle of an entrance. Only hand off once the frames actually look premium.
+
+
+## Reference Files
+This skill includes reference documents. Read them when you need supporting context:
+- `.claude/skills/pandaos-design-motion/references/city-flight.js`
+- `.claude/skills/pandaos-design-motion/references/libraries.md`
