@@ -495,7 +495,7 @@ export async function publishWhatsappMedia({ from, messageId, kind, buffer, cont
   });
 
   console.log(`✅ [WHATSAPP] Published ${kind} from ${from} as ${docId}`);
-  return { docId };
+  return { docId, title };
 }
 
 function normalizePhone(value) {
@@ -530,21 +530,26 @@ async function handleBridgeMessage({ from, messageId, kind, text, ...media }) {
   const config = whatsappConfig();
 
   if (!(await isAuthorizedSender(from, config, client))) {
-    // Anyone can find the business number; only allowed numbers publish.
+    console.log(`⚠️ [WHATSAPP] Blocked: +${from} is not in the allowlist`);
     return { skipped: "sender is not allowed", from: maskPhone(from) };
   }
 
   // Plain texts never publish. The sender gets a hint back so they know
   // what to do; anything else is ignored quietly.
   if (kind === "text") {
-    await sendBridgeText(from, "Send a photo or video here and it will be published in the app's News.");
+    await sendBridgeText(from, "Skicka ett foto eller en video här så publiceras det direkt som en nyhet i appen.");
     return { noted: "replied with a publishing hint" };
   }
 
   try {
-    return await publishWhatsappMedia({ from, messageId, kind, ...media }, client);
+    const result = await publishWhatsappMedia({ from, messageId, kind, ...media }, client);
+    if (result?.docId) {
+      await sendBridgeText(from, `✅ Publicerat som nyhet i appen!\n\n"${result.title || 'Nyhet'}"`);
+    }
+    return result;
   } catch (error) {
     console.error("❌ [WHATSAPP] Could not publish message:", error);
+    await sendBridgeText(from, `❌ Kunde inte publicera: ${error?.message || error}`);
     return { error: error.message, from: maskPhone(from) };
   }
 }

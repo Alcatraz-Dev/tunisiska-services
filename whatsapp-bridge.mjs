@@ -45,18 +45,45 @@ function senderOf(msg) {
     const digits = digitsOf(jid.split("@")[0].split(":")[0]);
     return digits.length >= 8 ? digits : null;
   }
+  // Check participant (for forwarded messages or LID contexts)
+  const participant = String(msg?.key?.participant || "");
+  if (participant.endsWith("@s.whatsapp.net")) {
+    const digits = digitsOf(participant.split("@")[0].split(":")[0]);
+    if (digits.length >= 8) return digits;
+  }
   // Privacy-numbered chats expose the real number on the key.
   const fallback = digitsOf(msg?.key?.senderPn || "");
-  return fallback.length >= 8 ? fallback : null;
+  if (fallback.length >= 8) return fallback;
+
+  // If sent from the linked device itself
+  if (msg?.key?.fromMe) {
+    return ownNumber() || null;
+  }
+  return null;
+}
+
+/** Check if this message was sent to the self-chat ("Message yourself" / Note to self). */
+function isSelfMessage(msg) {
+  if (!msg?.key?.fromMe) return false;
+  const own = ownNumber();
+  const remote = String(msg?.key?.remoteJid || "");
+  const remoteDigits = digitsOf(remote.split("@")[0].split(":")[0]);
+  if (own && remoteDigits === own) return true;
+  if (remote === "status@broadcast" || remote.endsWith("@g.us")) return false;
+  const sockJid = String(sock?.user?.id || "");
+  if (sockJid && remote.split(":")[0] === sockJid.split(":")[0]) return true;
+  return false;
 }
 
 /** Unwrap ephemeral / view-once containers to the real payload. */
 function unwrap(message) {
   let inner = message;
-  for (let depth = 0; depth < 3 && inner; depth += 1) {
+  for (let depth = 0; depth < 5 && inner; depth += 1) {
     if (inner.ephemeralMessage?.message) inner = inner.ephemeralMessage.message;
     else if (inner.viewOnceMessage?.message) inner = inner.viewOnceMessage.message;
     else if (inner.viewOnceMessageV2?.message) inner = inner.viewOnceMessageV2.message;
+    else if (inner.viewOnceMessageV2Extension?.message) inner = inner.viewOnceMessageV2Extension.message;
+    else if (inner.documentWithCaptionMessage?.message) inner = inner.documentWithCaptionMessage.message;
     else break;
   }
   return inner;
@@ -163,19 +190,49 @@ async function connect(onMessage) {
   });
 
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
-    if (type !== "notify") return;
+    // Process both notify and append (notes to self / sync are often append)
+    if (type !== "notify" && type !== "append") return;
     for (const msg of messages || []) {
       try {
-        if (!msg?.message || msg.key?.fromMe) continue;
-        const from = senderOf(msg);
+        if (!msg?.message) continue;
+
+        const fromMe = Boolean(msg.key?.fromMe);
+        const toSelf = isSelfMessage(msg);
+
+        // If fromMe and NOT sent to self, only allow if explicitly marked with #news
+        if (fromMe && !toSelf) {
+          const captionOrText = msg.message?.imageMessage?.caption
+            || msg.message?.videoMessage?.caption
+            || unwrap(msg.message)?.conversation
+            || "";
+          if (!captionOrText.toLowerCase().includes("#news")) {
+            continue;
+          }
+        }
+
+        const from = senderOf(msg) || (fromMe ? ownNumber() : null);
         if (!from) continue;
+
         const attached = mediaOf(msg);
         const text = unwrap(msg.message)?.conversation
           || unwrap(msg.message)?.extendedTextMessage?.text
           || "";
         const messageId = String(msg.key?.id || `${Date.now()}`);
+
+        console.log(`📩 [WHATSAPP] Inbound ${attached ? attached.kind : text ? 'text' : 'event'} from +${from} (fromMe: ${fromMe}, toSelf: ${toSelf})`);
+
         if (attached) {
-          const buffer = await downloadMediaMessage(msg, "buffer", {});
+          let buffer;
+          try {
+            buffer = await downloadMediaMessage(
+              { key: msg.key, message: unwrap(msg.message) },
+              "buffer",
+              {}
+            );
+          } catch {
+            buffer = await downloadMediaMessage(msg, "buffer", {});
+          }
+
           await onMessage({
             from,
             messageId,
