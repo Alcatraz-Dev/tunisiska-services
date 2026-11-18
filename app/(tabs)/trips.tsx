@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { RefreshControl, ScrollView, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -48,7 +48,12 @@ export default function TripsScreen() {
   const theme = useThemeColors();
   const { resolvedTheme } = useTheme();
   const router = useRouter();
-  const params = useLocalSearchParams<{ direction?: string; scope?: string }>();
+  const params = useLocalSearchParams<{
+    direction?: string;
+    scope?: string;
+    tripId?: string;
+    t?: string;
+  }>();
   const { language } = useLanguage();
   const departureSingular = useTranslationText("departure", language);
   const departurePlural = useTranslationText("departures", language);
@@ -61,12 +66,34 @@ export default function TripsScreen() {
     params.direction === "tn_to_se" ? "tn_to_se" : "se_to_tn",
   );
 
+  const [selectedTripId, setSelectedTripId] = useState<string | undefined>(
+    params.tripId || undefined,
+  );
+
+  // Synchronize direction and scope when navigated from Home cards
+  useEffect(() => {
+    if (params.direction === "tn_to_se" || params.direction === "se_to_tn") {
+      setDirection(params.direction);
+    }
+    if (params.scope === "upcoming" || params.scope === "past" || params.scope === "all") {
+      setScope(params.scope);
+    }
+    if (params.tripId) {
+      setSelectedTripId(params.tripId);
+    }
+  }, [params.direction, params.scope, params.tripId, params.t]);
+
   const { data: trips, loading, refresh } = useTrips(scope);
 
-  const directionTrips = useMemo(
-    () => trips.filter((trip) => trip.route.direction === direction),
-    [trips, direction],
-  );
+  const directionTrips = useMemo(() => {
+    const list = trips.filter((trip) => trip.route.direction === direction);
+    if (!selectedTripId) return list;
+    const matchIndex = list.findIndex((t) => t.id === selectedTripId);
+    if (matchIndex <= 0) return list;
+    // Bring the card user clicked on Home to the top so it is featured
+    const selected = list[matchIndex];
+    return [selected, ...list.slice(0, matchIndex), ...list.slice(matchIndex + 1)];
+  }, [trips, direction, selectedTripId]);
 
   const activeDirection = DIRECTIONS.find((d) => d.key === direction)!;
 
@@ -78,7 +105,13 @@ export default function TripsScreen() {
   );
 
   const onSwap = useCallback(() => {
+    setSelectedTripId(undefined);
     setDirection((current) => (current === "se_to_tn" ? "tn_to_se" : "se_to_tn"));
+  }, []);
+
+  const onScopeChange = useCallback((newScope: TripScope) => {
+    setSelectedTripId(undefined);
+    setScope(newScope);
   }, []);
 
   const onRefresh = useCallback(() => {
@@ -127,17 +160,17 @@ export default function TripsScreen() {
       <View style={{ paddingHorizontal: spacing.gutter, marginTop: spacing.xs }}>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs, padding: 4, borderRadius: radii.pill, backgroundColor: theme.surfaceAlt }}>
-            <PressableScale onPress={() => setScope("upcoming")} haptic="selection">
+            <PressableScale onPress={() => onScopeChange("upcoming")} haptic="selection">
               <View style={{ minHeight: 36, paddingHorizontal: spacing.md, borderRadius: radii.pill, justifyContent: "center", backgroundColor: scope === "upcoming" ? theme.primary : "transparent" }}>
                 <ThemedText variant="caption" style={{ fontWeight: scope === "upcoming" ? "700" : "500", color: scope === "upcoming" ? theme.textInverse : theme.textSecondary }}>Upcoming</ThemedText>
               </View>
             </PressableScale>
-            <PressableScale onPress={() => setScope("past")} haptic="selection">
+            <PressableScale onPress={() => onScopeChange("past")} haptic="selection">
               <View style={{ minHeight: 36, paddingHorizontal: spacing.md, borderRadius: radii.pill, justifyContent: "center", backgroundColor: scope === "past" ? theme.primary : "transparent" }}>
                 <ThemedText variant="caption" style={{ fontWeight: scope === "past" ? "700" : "500", color: scope === "past" ? theme.textInverse : theme.textSecondary }}>Past</ThemedText>
               </View>
             </PressableScale>
-            <PressableScale onPress={() => setScope("all")} haptic="selection">
+            <PressableScale onPress={() => onScopeChange("all")} haptic="selection">
               <View style={{ minHeight: 36, paddingHorizontal: spacing.md, borderRadius: radii.pill, justifyContent: "center", backgroundColor: scope === "all" ? theme.primary : "transparent" }}>
                 <ThemedText variant="caption" style={{ fontWeight: scope === "all" ? "700" : "500", color: scope === "all" ? theme.textInverse : theme.textSecondary }}>All</ThemedText>
               </View>

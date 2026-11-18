@@ -146,23 +146,50 @@ export default function HomeScreen() {
 
         <View style={{ paddingHorizontal: 20, marginTop: -26, zIndex: 2 }}>
           <View style={{ flexDirection: "row", gap: 10 }}>
-            {DIRECTION_CARDS.map((card) => (
-              <View key={card.key} style={{ flex: 1 }}>
-                <DirectionCard
-                  title={card.title}
-                  target={card.target}
-                  country={card.country}
-                  nextTrip={directionTrips[card.key]}
-                  onPress={() => router.push({ pathname: "/(tabs)/trips", params: { direction: card.key } })}
-                />
-              </View>
-            ))}
+            {DIRECTION_CARDS.map((card) => {
+              const trip = directionTrips[card.key];
+              return (
+                <View key={card.key} style={{ flex: 1 }}>
+                  <DirectionCard
+                    title={card.title}
+                    target={card.target}
+                    country={card.country}
+                    nextTrip={trip}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/(tabs)/trips",
+                        params: {
+                          direction: card.key,
+                          scope: "upcoming",
+                          tripId: trip?.id || "",
+                          t: String(Date.now()),
+                        },
+                      })
+                    }
+                  />
+                </View>
+              );
+            })}
           </View>
           <View style={{ marginTop: 12 }}>
             <NextDepartureCard
               trip={nextTrip}
               loading={nextTripLoading}
-              onPress={() => router.push(nextTrip ? `/(home)/trips/${nextTrip.id}` : "/(home)/trips/calendar")}
+              onPress={() => {
+                if (nextTrip) {
+                  router.push({
+                    pathname: "/(tabs)/trips",
+                    params: {
+                      direction: nextTrip.route.direction,
+                      scope: "upcoming",
+                      tripId: nextTrip.id,
+                      t: String(Date.now()),
+                    },
+                  });
+                } else {
+                  router.push("/(home)/trips/calendar");
+                }
+              }}
             />
           </View>
         </View>
