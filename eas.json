@@ -19,6 +19,7 @@
     },
     "production": {
       "autoIncrement": true,
+      "autoSubmit": true,
       "channel": "production",
       "distribution": "store",
       "env": {

@@ -1,5 +1,5 @@
 import user from "./user";
-import liveStatus from "./liveStatus";
+import { liveStatus } from "./liveStatus";
 import announcement from "./announcement";
 import footer from "./footer";
 import terms from "./terms";

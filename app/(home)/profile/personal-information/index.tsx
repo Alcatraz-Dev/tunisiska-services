@@ -96,6 +96,9 @@ export default function PersonalInformation() {
 
     setSaving(true);
     try {
+      // Always store profile data in unsafeMetadata — avoids Clerk "first_name
+      // is not a valid parameter" error when the Name attribute is disabled in
+      // the Clerk dashboard.
       const updatedMetadata: Record<string, unknown> = {
         ...((user.unsafeMetadata as Record<string, unknown>) || {}),
         ...next,
