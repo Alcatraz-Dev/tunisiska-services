@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ActivityIndicator, Image, RefreshControl, ScrollView, Switch, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -63,6 +64,29 @@ function localServerUrl(port: number = 3000) {
 /** The gateway's dedicated port (server default 4100), separate from the API. */
 const GATEWAY_PORT = Number(process.env.EXPO_PUBLIC_WHATSAPP_GATEWAY_PORT || 4100);
 
+/** Where the admin typed the gateway address, if the auto-detection missed. */
+const GATEWAY_ADDRESS_KEY = "whatsappGatewayAddress";
+
+/**
+ * fetch that always settles. An unreachable IP can hang for minutes, which is
+ * exactly what left the panel spinning with no QR and no error.
+ */
+async function fetchJson<T>(url: string, init?: RequestInit, timeoutMs = 6000): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...init, signal: controller.signal });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) throw new Error((payload as { error?: string })?.error || `answered ${response.status}`);
+    return payload as T;
+  } catch (error: any) {
+    if (error?.name === "AbortError") throw new Error(`no answer in ${Math.round(timeoutMs / 1000)}s`);
+    throw new Error(error?.message || "unreachable");
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Candidate admin servers, most likely first: the local one in development,
  * then the deployed host from `EXPO_PUBLIC_SERVER_URL`.
@@ -108,31 +132,40 @@ export default function AdminWhatsappScreen() {
   const [busy, setBusy] = useState(false);
   const [settingsBusy, setSettingsBusy] = useState(false);
 
+  const [manualAddress, setManualAddress] = useState("");
+  const [addressDraft, setAddressDraft] = useState("");
+  const [attempts, setAttempts] = useState<{ base: string; ok: boolean; error?: string }[]>([]);
+
   const probe = useCallback(async (): Promise<{ status: GatewayStatus; base: string }> => {
-    let lastError: unknown = new Error("No admin server is configured");
+    const bases = Array.from(new Set([manualAddress, ...serverCandidates()].filter(Boolean)));
     const answered: { status: GatewayStatus; base: string }[] = [];
-    for (const base of serverCandidates()) {
+    const tried: { base: string; ok: boolean; error?: string }[] = [];
+
+    for (const base of bases) {
       try {
-        const response = await fetch(`${base}/api/whatsapp/status`);
-        if (!response.ok) throw new Error(`${base} answered ${response.status}`);
-        answered.push({ status: (await response.json()) as GatewayStatus, base });
-      } catch (error) {
-        lastError = error;
+        const status = await fetchJson<GatewayStatus>(`${base}/api/whatsapp/status`, undefined, 5000);
+        answered.push({ status, base });
+        tried.push({ base, ok: true });
+      } catch (error: any) {
+        tried.push({ base, ok: false, error: error?.message || "unreachable" });
       }
     }
+    setAttempts(tried);
+
     // Prefer the server that actually holds the session: a deployed API can
     // answer this call while having no WhatsApp bridge at all.
-    return answered.find((item) => item.status.bridgeActive) ?? answered[0] ?? (() => { throw lastError; })();
-  }, []);
+    const withBridge = answered.find((item) => item.status.bridgeActive);
+    if (withBridge) return withBridge;
+    if (answered.length) return answered[0];
+    throw new Error(tried.map((item) => `${item.base}: ${item.error}`).join(" · "));
+  }, [manualAddress]);
 
   const loadQr = useCallback(async () => {
     try {
-      const response = await fetch(`${serverBase}/api/whatsapp/qr`);
-      if (!response.ok) return;
-      const payload = await response.json().catch(() => null);
+      const payload = await fetchJson<{ qr?: string | null }>(`${serverBase}/api/whatsapp/qr`, undefined, 5000);
       setQr(payload?.qr ?? null);
     } catch {
-      /* keep the previous QR */
+      /* keep the previous QR — the address section shows why it failed */
     }
   }, [serverBase]);
 
@@ -166,12 +199,37 @@ export default function AdminWhatsappScreen() {
     void load();
   }, [load]);
 
+  // Restore a gateway address typed earlier (phones cannot always guess it).
+  useEffect(() => {
+    AsyncStorage.getItem(GATEWAY_ADDRESS_KEY)
+      .then((saved) => {
+        if (saved) {
+          setManualAddress(saved);
+          setAddressDraft(saved);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const saveAddress = async () => {
+    const raw = addressDraft.trim().replace(/\/$/, "");
+    const value = raw && !/^https?:\/\//i.test(raw) ? `http://${raw}` : raw;
+    setManualAddress(value);
+    setAddressDraft(value);
+    setQr(null);
+    try {
+      if (value) await AsyncStorage.setItem(GATEWAY_ADDRESS_KEY, value);
+      else await AsyncStorage.removeItem(GATEWAY_ADDRESS_KEY);
+    } catch {
+      /* storage is best-effort */
+    }
+    // Changing the address re-creates `probe`, which re-runs `load`.
+  };
+
   // A light status check that does not touch the news list.
   const refreshStatus = useCallback(async () => {
     try {
-      const response = await fetch(`${serverBase}/api/whatsapp/status`);
-      if (!response.ok) return;
-      setStatus((await response.json()) as GatewayStatus);
+      setStatus(await fetchJson<GatewayStatus>(`${serverBase}/api/whatsapp/status`, undefined, 5000));
     } catch {
       /* keep the previous state */
     }
@@ -180,14 +238,14 @@ export default function AdminWhatsappScreen() {
   // While the session is not linked, keep the QR fresh (codes rotate) and
   // watch for the moment pairing succeeds, so the panel flips on its own.
   useEffect(() => {
-    if (!status || status.connected || statusError) return;
+    if (status?.connected || statusError) return;
     void loadQr();
     const timer = setInterval(() => {
       void loadQr();
       void refreshStatus();
     }, 8000);
     return () => clearInterval(timer);
-  }, [status, statusError, loadQr, refreshStatus]);
+  }, [status?.connected, statusError, loadQr, refreshStatus]);
 
   // The QR is single-use: once linked, stop showing the old one.
   useEffect(() => {
@@ -205,13 +263,11 @@ export default function AdminWhatsappScreen() {
     }
     setPairBusy(true);
     try {
-      const response = await fetch(`${serverBase}/api/whatsapp/pair`, {
+      const payload = await fetchJson<{ code: string }>(`${serverBase}/api/whatsapp/pair`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: trimmed }),
-      });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(payload?.error || `Server answered ${response.status}`);
+      }, 20000);
       setPairCode(String(payload.code));
     } catch (error: any) {
       showAlert("Could not get a code", error?.message || "The admin server did not respond.");
@@ -228,7 +284,7 @@ export default function AdminWhatsappScreen() {
         style: "destructive",
         onPress: async () => {
           try {
-            await fetch(`${serverBase}/api/whatsapp/logout`, { method: "POST" });
+            await fetchJson(`${serverBase}/api/whatsapp/logout`, { method: "POST" });
             setPairCode(null);
             await load();
           } catch {
@@ -248,13 +304,11 @@ export default function AdminWhatsappScreen() {
 
     setBusy(true);
     try {
-      const response = await fetch(`${serverBase}/api/whatsapp/numbers`, {
+      const payload = await fetchJson<{ phone: string }>(`${serverBase}/api/whatsapp/numbers`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: trimmed }),
       });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(payload?.error || `Server answered ${response.status}`);
 
       setPhone("");
       showAlert(
@@ -273,12 +327,11 @@ export default function AdminWhatsappScreen() {
     setSettingsBusy(true);
     setStatus((current) => (current ? { ...current, allowAll: value } : current)); // optimistic
     try {
-      const response = await fetch(`${serverBase}/api/whatsapp/settings`, {
+      await fetchJson(`${serverBase}/api/whatsapp/settings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ allowAll: value }),
       });
-      if (!response.ok) throw new Error(`Server answered ${response.status}`);
     } catch (error: any) {
       setStatus((current) => (current ? { ...current, allowAll: !value } : current));
       showAlert("Could not save", error?.message || "The admin server did not respond.");
@@ -298,7 +351,7 @@ export default function AdminWhatsappScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              await fetch(`${serverBase}/api/whatsapp/numbers/${number.phone}`, { method: "DELETE" });
+              await fetchJson(`${serverBase}/api/whatsapp/numbers/${number.phone}`, { method: "DELETE" });
               await load();
             } catch {
               showAlert("Could not remove", "The admin server did not respond.");
@@ -536,6 +589,41 @@ export default function AdminWhatsappScreen() {
               </PressableScale>
             ) : null}
           </View>
+        </View>
+
+        {/* Gateway address: for when the phone cannot guess the computer's IP. */}
+        <View style={{ marginTop: spacing.xl }}>
+          <SectionHeader
+            title="Gateway address"
+            subtitle={serverBase ? `Using ${serverBase}` : "Not set"}
+          />
+          <Input
+            placeholder="http://192.168.8.44:4100"
+            value={addressDraft}
+            onChangeText={setAddressDraft}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+          />
+          <PrimaryButton
+            label="Use this address"
+            onPress={saveAddress}
+            style={{ marginTop: spacing.md }}
+          />
+          {attempts.length ? (
+            <View style={{ marginTop: spacing.sm, gap: 2 }}>
+              {attempts.map((item) => (
+                <ThemedText
+                  key={item.base}
+                  variant="caption"
+                  tone="tertiary"
+                  translate={false}
+                >
+                  {`${item.ok ? "OK" : "X"}  ${item.base}${item.ok ? "" : ` — ${item.error}`}`}
+                </ThemedText>
+              ))}
+            </View>
+          ) : null}
         </View>
 
         {/* Allowed numbers */}
