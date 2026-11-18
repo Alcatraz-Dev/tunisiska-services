@@ -666,15 +666,21 @@ app.delete("/api/whatsapp/numbers/:phone", async (req, res) => {
 // The bridge holds a live WhatsApp Web session, so it only starts where the
 // process stays up (local `npm run server`, a VPS, …). Vercel serverless
 // cannot keep the socket, so it skips the bridge and only serves the API.
-if (process.env.VERCEL) {
-  console.log("ℹ️  [WHATSAPP] Vercel cannot hold a WhatsApp session — the bridge is skipped here. Run `npm run server` on an always-on host to link and publish.");
-} else if (process.env.WHATSAPP_BRIDGE_ENABLED === "false") {
-  console.log("ℹ️  [WHATSAPP] Bridge disabled by WHATSAPP_BRIDGE_ENABLED=false.");
-} else {
+/**
+ * Start the session only once this process owns the port. If another server is
+ * already listening, that one answers the app — starting a second session here
+ * would just fight it for the same stored credentials.
+ */
+function startWhatsappBridge() {
+  if (process.env.VERCEL) {
+    console.log("ℹ️  [WHATSAPP] Vercel cannot hold a WhatsApp session — the bridge is skipped here. Run `npm run server` on an always-on host to link and publish.");
+    return;
+  }
+  if (process.env.WHATSAPP_BRIDGE_ENABLED === "false") {
+    console.log("ℹ️  [WHATSAPP] Bridge disabled by WHATSAPP_BRIDGE_ENABLED=false.");
+    return;
+  }
   console.log("🔌 [WHATSAPP] Starting the WhatsApp session (scan the QR in the admin panel)…");
-}
-
-if (!process.env.VERCEL && process.env.WHATSAPP_BRIDGE_ENABLED !== "false") {
   startBridge({
     onMessage: async (payload) => {
       try {
@@ -696,10 +702,18 @@ if (!process.env.VERCEL) {
   const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📍 Local: http://localhost:${PORT}`);
+    startWhatsappBridge();
   });
 
   // Handle server errors
   server.on('error', (err) => {
+    if (err?.code === 'EADDRINUSE') {
+      console.error(`\n❌ Port ${PORT} is already in use — an older server is still running there.`);
+      console.error('   The app talks to that process, so this one can never link WhatsApp.');
+      console.error(`   Fix it:  lsof -ti:${PORT} | xargs kill`);
+      console.error('   Then:    npm run server\n');
+      process.exit(1);
+    }
     console.error('❌ Server error:', err);
   });
 
