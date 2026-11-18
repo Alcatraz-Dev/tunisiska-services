@@ -85,3 +85,11 @@ export const policyQuery = `*[_type == "policy" && !(_id in path("drafts.**"))][
   content,
   lastUpdated
 }`;
+
+export const supportQuery = `*[_type == "support" && !(_id in path("drafts.**"))][0]{
+  ...,
+  email,
+  phone,
+  whatsapp,
+  faqs
+}`;

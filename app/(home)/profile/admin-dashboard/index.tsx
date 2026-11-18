@@ -45,6 +45,7 @@ const ADMIN_SCREENS = [
   { title: "Taxi orders", subtitle: "Airport transfer requests", icon: "car-outline" as const, route: "/(home)/profile/admin-taxi-orders" },
   { title: "Customers", subtitle: "Accounts and access", icon: "people-outline" as const, route: "/(home)/profile/admin-users" },
   { title: "Announcements", subtitle: "Published company news", icon: "megaphone-outline" as const, route: "/(home)/profile/admin-announcements" },
+  { title: "Help & support", subtitle: "Contact details and answers", icon: "headset-outline" as const, route: "/(home)/profile/admin-support" },
   { title: "Notification history", subtitle: "Everything that was sent", icon: "time-outline" as const, route: "/(home)/profile/admin-history" },
   { title: "Data backup", subtitle: "Export the Sanity dataset", icon: "cloud-download-outline" as const, route: "/(home)/profile/admin-backup" },
 ];

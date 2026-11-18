@@ -23,6 +23,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useTheme } from "@/app/context/ThemeContext";
 import { spacing } from "@/app/theme/spacing";
+import { getClerkProfileFields } from "@/app/utils/clerkUser";
 import MoveCategoryCheckbox from "@/app/components/MoveCategoryCheckbox";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -83,8 +84,7 @@ export default function MoveCleaning() {
   // Pre-fill user information from Clerk
   useEffect(() => {
     if (user) {
-      const fullName = user.fullName || user.firstName || "";
-      const phoneNumber = user.phoneNumbers?.[0]?.phoneNumber || "";
+      const { fullName, phoneNumber } = getClerkProfileFields(user);
       const emailAddress = user.primaryEmailAddress?.emailAddress || "";
       const userPoints = (user.unsafeMetadata as any)?.points || 0;
 

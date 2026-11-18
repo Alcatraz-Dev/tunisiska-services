@@ -30,6 +30,7 @@ import { useEffect, useState } from "react";
 import { currentDateLocale } from "@/app/lib/time";
 import { useLanguage } from "@/app/hooks/useLanguage";
 import { translateNow } from "@/app/hooks/useTranslation";
+import { getClerkProfileFields } from "@/app/utils/clerkUser";
 import {
   Platform,
   SafeAreaView,
@@ -73,8 +74,7 @@ export default function Taxi() {
   // Pre-fill user information from Clerk
   useEffect(() => {
     if (user) {
-      const fullName = user.fullName || user.firstName || "";
-      const phoneNumber = user.phoneNumbers?.[0]?.phoneNumber || "";
+      const { fullName, phoneNumber } = getClerkProfileFields(user);
       const emailAddress = user.primaryEmailAddress?.emailAddress || "";
       const userPoints = (user.unsafeMetadata as any)?.points || 0;
 

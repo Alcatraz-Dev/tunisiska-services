@@ -21,6 +21,7 @@ import { showAlert } from "@/app/utils/showAlert";
 import * as Clipboard from "expo-clipboard";
 import { useLanguage } from "@/app/hooks/useLanguage";
 import { useAdminAccess } from "@/app/hooks/useAdminAccess";
+import { getClerkProfileFields } from "@/app/utils/clerkUser";
 
 type ProfileData = {
   firstName: string;
@@ -67,15 +68,13 @@ export default function ProfileScreen() {
   const load = useCallback(() => {
     if (!isLoaded || !user) return;
     const points = (user.unsafeMetadata?.points as number) || 0;
-    const firstName = (user.unsafeMetadata?.firstName as string) || "";
-    const lastName = (user.unsafeMetadata?.lastName as string) || "";
+    const { firstName, lastName, imageUrl } = getClerkProfileFields(user);
 
     setData({
       firstName,
       lastName,
       email: user.emailAddresses[0]?.emailAddress ?? "",
-      imageUrl:
-        (user.unsafeMetadata?.imageUrl as string) || user.imageUrl || undefined,
+      imageUrl: imageUrl || undefined,
       points,
       membershipTier: getMembershipTier(points, language),
     });

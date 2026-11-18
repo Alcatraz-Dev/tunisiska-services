@@ -28,6 +28,7 @@ import { Calendar } from "react-native-calendars";
 import { useTheme } from "../../../context/ThemeContext";
 import { useRouter } from "expo-router";
 import { useUser } from "@clerk/clerk-expo";
+import { getClerkProfileFields } from "@/app/utils/clerkUser";
 import { AutoText } from "@/app/components/ui/AutoText";
 import Input from "@/app/components/ui/Input";
 import { showAlert } from "@/app/utils/showAlert";
@@ -96,8 +97,7 @@ export default function ShippingPage() {
   // Pre-fill user information from Clerk
   useEffect(() => {
     if (user) {
-      const fullName = user.fullName || user.firstName || "";
-      const phoneNumber = user.phoneNumbers?.[0]?.phoneNumber || "";
+      const { fullName, phoneNumber } = getClerkProfileFields(user);
       const emailAddress = user.primaryEmailAddress?.emailAddress || "";
       const userPoints = (user.unsafeMetadata as any)?.points || 0;
 

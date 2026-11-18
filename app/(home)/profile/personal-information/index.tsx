@@ -16,6 +16,7 @@ import { useTheme } from "@/app/context/ThemeContext";
 import { useThemeColors } from "@/app/theme";
 import { radii, spacing } from "@/app/theme/spacing";
 import { showAlert } from "@/app/utils/showAlert";
+import { getClerkProfileFields } from "@/app/utils/clerkUser";
 
 type Fields = {
   firstName: string;
@@ -49,22 +50,23 @@ export default function PersonalInformation() {
 
   useEffect(() => {
     if (!isLoaded || !user) return;
-    const metadata = user.unsafeMetadata as Record<string, unknown>;
+    const { firstName, lastName, phoneNumber, address, city, postalCode, country } =
+      getClerkProfileFields(user);
     const profile: Fields = {
-      firstName: String(metadata.firstName ?? user.firstName ?? ""),
-      lastName: String(metadata.lastName ?? user.lastName ?? ""),
-      phoneNumber: String(metadata.phoneNumber ?? ""),
-      address: String(metadata.address ?? ""),
-      city: String(metadata.city ?? ""),
-      postalCode: String(metadata.postalCode ?? ""),
-      country: String(metadata.country ?? ""),
+      firstName,
+      lastName,
+      phoneNumber,
+      address,
+      city,
+      postalCode,
+      country,
     };
     setFields(profile);
     setSavedFields(profile);
   }, [isLoaded, user]);
 
   const email = user?.primaryEmailAddress?.emailAddress ?? user?.emailAddresses[0]?.emailAddress ?? "";
-  const avatarUri = String((user?.unsafeMetadata as Record<string, unknown> | undefined)?.imageUrl ?? user?.imageUrl ?? "");
+  const avatarUri = getClerkProfileFields(user).imageUrl;
   const initials = useMemo(() => {
     const name = `${fields.firstName.slice(0, 1)}${fields.lastName.slice(0, 1)}`.trim();
     return name ? name.toLocaleUpperCase() : (email.slice(0, 1).toLocaleUpperCase() || "T");
@@ -94,19 +96,28 @@ export default function PersonalInformation() {
 
     setSaving(true);
     try {
+      // Clerk's PATCH /v1/me only accepts first_name/last_name when the "First and
+      // last name" attribute is enabled in the Dashboard; otherwise it fails with
+      // 422 form_param_unknown and the whole update is rejected. Names are stored in
+      // unsafeMetadata instead, which this screen and ProfileScreen read first.
       await user.update({
-        firstName: next.firstName,
-        lastName: next.lastName,
         unsafeMetadata: { ...user.unsafeMetadata, ...next },
       });
-      await user.reload();
       setFields(next);
       setSavedFields(next);
       setEditing(false);
       showAlert("Saved", "Your account details have been updated.");
+      // Refresh Clerk in the background; a failed reload must not report the save as failed.
+      user.reload().catch((reloadError) => {
+        console.warn("Profile saved, but refreshing the Clerk user failed:", reloadError);
+      });
     } catch (error) {
       console.error("Could not update profile information:", error);
-      showAlert("Could not save changes", "Please check your connection and try again.");
+      const clerkError = (error as any)?.errors?.[0];
+      showAlert(
+        "Could not save changes",
+        clerkError?.longMessage || clerkError?.message || "Please check your connection and try again.",
+      );
     } finally {
       setSaving(false);
     }

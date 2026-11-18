@@ -18,5 +18,6 @@ import containerShippingSchedule from "./containerShippingSchedule";
 import friendRequest from "./friendRequest";
 import notificationHistory from "./notificationHistory";
 import whatsappAdmin from "./whatsappAdmin";
+import support from "./support";
 
-export const schemaTypes = [user , liveStatus, announcement, friendRequest, footer, terms, policy, taxiOrder, moveOrder, moveCleaningOrder, shippingOrder, shippingSchedule, containerShippingOrder, containerShippingSchedule, notificationHistory, whatsappAdmin ];
+export const schemaTypes = [user , liveStatus, announcement, friendRequest, footer, terms, policy, taxiOrder, moveOrder, moveCleaningOrder, shippingOrder, shippingSchedule, containerShippingOrder, containerShippingSchedule, notificationHistory, whatsappAdmin, support ];

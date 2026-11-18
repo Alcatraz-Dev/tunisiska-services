@@ -16,6 +16,7 @@ const ADMIN_ROUTES = new Set([
   "admin-taxi-orders",
   "admin-announcements",
   "admin-whatsapp",
+  "admin-support",
 ]);
 
 export default function ProfileLayout() {
@@ -52,6 +53,7 @@ export default function ProfileLayout() {
       <Stack.Screen name="admin-notifications/index" />
       <Stack.Screen name="admin-backup/index" />
       <Stack.Screen name="admin-whatsapp/index" />
+      <Stack.Screen name="admin-support/index" />
     </Stack>
   );
 }
