@@ -23,6 +23,8 @@ type VerifiedNumber = { phone: string; verifiedAt?: string };
 
 type GatewayStatus = {
   connected: boolean;
+  bridgeActive?: boolean;
+  bridgeNote?: string | null;
   businessNumber?: string | null;
   lastError?: string | null;
   sanityWritable: boolean;
@@ -104,16 +106,19 @@ export default function AdminWhatsappScreen() {
 
   const probe = useCallback(async (): Promise<{ status: GatewayStatus; base: string }> => {
     let lastError: unknown = new Error("No admin server is configured");
+    const answered: { status: GatewayStatus; base: string }[] = [];
     for (const base of serverCandidates()) {
       try {
         const response = await fetch(`${base}/api/whatsapp/status`);
         if (!response.ok) throw new Error(`${base} answered ${response.status}`);
-        return { status: (await response.json()) as GatewayStatus, base };
+        answered.push({ status: (await response.json()) as GatewayStatus, base });
       } catch (error) {
         lastError = error;
       }
     }
-    throw lastError;
+    // Prefer the server that actually holds the session: a deployed API can
+    // answer this call while having no WhatsApp bridge at all.
+    return answered.find((item) => item.status.bridgeActive) ?? answered[0] ?? (() => { throw lastError; })();
   }, []);
 
   const loadQr = useCallback(async () => {
@@ -302,6 +307,8 @@ export default function AdminWhatsappScreen() {
 
   const numbers = status?.numbers ?? [];
   const connected = Boolean(status?.connected);
+  // The server answered but has no WhatsApp session (e.g. the Vercel API).
+  const bridgeDown = Boolean(!connected && status && status.bridgeActive === false);
   const stateLabel = loading
     ? "Checking"
     : connected
@@ -367,7 +374,31 @@ export default function AdminWhatsappScreen() {
             </ThemedText>
           ) : null}
 
-          {!connected && !statusError ? (
+          {bridgeDown ? (
+            <View
+              style={{
+                marginTop: spacing.md,
+                padding: spacing.md,
+                borderRadius: radii.md,
+                borderWidth: 1,
+                borderColor: theme.borderSubtle,
+                gap: 4,
+              }}
+            >
+              <ThemedText variant="bodySm" style={{ fontWeight: "700" }}>
+                The gateway isn't running on this server
+              </ThemedText>
+              <ThemedText variant="caption" tone="secondary">
+                {status?.bridgeNote
+                  || `Start it with npm run server on the machine that should hold the WhatsApp session, then pull to refresh. This screen is talking to ${serverBase}.`}
+              </ThemedText>
+              {status?.lastError ? (
+                <ThemedText variant="caption" tone="tertiary">{`Last error: ${status.lastError}`}</ThemedText>
+              ) : null}
+            </View>
+          ) : null}
+
+          {!connected && !statusError && !bridgeDown ? (
             <View style={{ marginTop: spacing.lg, alignItems: "center", gap: spacing.md }}>
               {qr ? (
                 <Image
@@ -375,8 +406,13 @@ export default function AdminWhatsappScreen() {
                   style={{ width: 220, height: 220, borderRadius: radii.md, backgroundColor: "#fff" }}
                 />
               ) : (
-                <View style={{ paddingVertical: spacing.xl }}>
+                <View style={{ paddingVertical: spacing.xl, alignItems: "center", gap: spacing.sm }}>
                   <ActivityIndicator size="large" color={theme.primary} />
+                  <ThemedText variant="caption" tone="tertiary" align="center">
+                    {status?.lastError
+                      ? `Retrying after: ${status.lastError}`
+                      : "Starting the WhatsApp session…"}
+                  </ThemedText>
                 </View>
               )}
               <ThemedText variant="bodySm" tone="secondary" align="center">

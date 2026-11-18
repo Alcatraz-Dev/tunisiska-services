@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 import os from "os";
 import crypto from "node:crypto";
 import { createClient } from "@sanity/client";
-import { startBridge, bridgeStatus, requestPairingCode, sendBridgeText, logoutBridge } from "./whatsapp-bridge.mjs";
+import { startBridge, bridgeInfo, bridgeStatus, requestPairingCode, sendBridgeText, logoutBridge } from "./whatsapp-bridge.mjs";
 
 dotenv.config();
 
@@ -584,8 +584,21 @@ app.get("/api/whatsapp/status", async (req, res) => {
         .catch(() => null)
     : null;
 
+  // A deployment can answer this endpoint while having no session at all;
+  // say so explicitly instead of letting the panel spin forever.
+  const bridgeActive = bridgeInfo().active;
+  const bridgeNote = bridgeActive
+    ? null
+    : process.env.VERCEL
+      ? `This server is a Vercel deployment, which cannot hold a WhatsApp session. Run the gateway with npm run server on your computer or an always-on host, and open this screen from there.`
+      : process.env.WHATSAPP_BRIDGE_ENABLED === "false"
+        ? "The WhatsApp session is disabled here (WHATSAPP_BRIDGE_ENABLED=false)."
+        : "The WhatsApp session did not start — check the server log.";
+
   res.json({
     connected: bridge.connected,
+    bridgeActive,
+    bridgeNote,
     businessNumber: bridge.businessNumber || process.env.WHATSAPP_BUSINESS_NUMBER || null,
     lastError: bridge.lastError,
     sanityWritable: Boolean(client),
@@ -653,6 +666,14 @@ app.delete("/api/whatsapp/numbers/:phone", async (req, res) => {
 // The bridge holds a live WhatsApp Web session, so it only starts where the
 // process stays up (local `npm run server`, a VPS, …). Vercel serverless
 // cannot keep the socket, so it skips the bridge and only serves the API.
+if (process.env.VERCEL) {
+  console.log("ℹ️  [WHATSAPP] Vercel cannot hold a WhatsApp session — the bridge is skipped here. Run `npm run server` on an always-on host to link and publish.");
+} else if (process.env.WHATSAPP_BRIDGE_ENABLED === "false") {
+  console.log("ℹ️  [WHATSAPP] Bridge disabled by WHATSAPP_BRIDGE_ENABLED=false.");
+} else {
+  console.log("🔌 [WHATSAPP] Starting the WhatsApp session (scan the QR in the admin panel)…");
+}
+
 if (!process.env.VERCEL && process.env.WHATSAPP_BRIDGE_ENABLED !== "false") {
   startBridge({
     onMessage: async (payload) => {

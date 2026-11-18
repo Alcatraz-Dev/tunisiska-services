@@ -101,6 +101,11 @@ try {
     `connected=${status.connected}`,
   );
 
+  record(
+    "status explains a server with no session",
+    status.bridgeActive === false && Boolean(status.bridgeNote),
+  );
+
   const qr = await fetch(`${BASE}/api/whatsapp/qr`).then((r) => r.json());
   record("qr endpoint answers while unlinked", qr.connected === false && qr.qr === null);
 

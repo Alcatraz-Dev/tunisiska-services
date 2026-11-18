@@ -25,6 +25,7 @@ const AUTH_DIR = process.env.WHATSAPP_AUTH_DIR || "./baileys-auth";
 
 let sock = null;
 let starting = null;
+let sessionStarted = false;
 let connected = false;
 let businessNumber = "";
 let qrDataUrl = "";
@@ -95,6 +96,7 @@ function ownNumber() {
 }
 
 async function connect(onMessage) {
+  sessionStarted = true;
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
   const { version } = await fetchLatestBaileysVersion().catch(() => ({ version: undefined }));
 
@@ -187,6 +189,11 @@ export function startBridge({ onMessage }) {
     console.error("❌ [WHATSAPP] Could not start:", lastError);
   });
   return starting;
+}
+
+/** Whether a WhatsApp session exists in this process at all. */
+export function bridgeInfo() {
+  return { active: sessionStarted };
 }
 
 export function bridgeStatus() {
