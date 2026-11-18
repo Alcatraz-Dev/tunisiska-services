@@ -277,6 +277,29 @@ export interface Footer {
   copyright: string;
 }
 
+// Help & Support Schema
+export interface FaqItem {
+  _key?: string;
+  question: string;
+  answer: string;
+  category?: string;
+}
+
+export interface HelpSupportData {
+  _id?: string;
+  _type?: 'helpSupport';
+  title?: string;
+  heroTitle?: string;
+  heroSubtitle?: string;
+  email?: string;
+  phone?: string;
+  whatsapp?: string;
+  supportHours?: string;
+  responseNotice?: string;
+  faqs?: FaqItem[];
+  updatedAt?: string;
+}
+
 export default {
   ServiceType,
   OrderStatus,

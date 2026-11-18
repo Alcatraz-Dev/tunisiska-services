@@ -1,74 +1,78 @@
-import { client } from "@/sanityClient";
-
-export const useQuery = async (query: string) => {
-  const data = await client.fetch(query);
-  return data;
-};
-
-export const createNewUser = async ({
-  name,
-  email,
-  clerkId,
-  pushToken,
-}: {
-  name: string;
-  email: string;
-  clerkId: string;
-  pushToken: any;
-}) => {
-  const user = await client.create({
-    _type: "users",
-    name,
-    email,
-    clerkId,
-    pushToken,
-  });
-  return user;
-};
-export const liveStatusQuery = `*[_type == "liveStatus" && isActive == true][0]{
-  ...,
-  title,
-  statuses
+export const liveStatusQuery = `*[_type == "liveStatus" && !(_id in path("drafts.**"))][0]{
+  _id,
+  type,
+  departureTime,
+  estimatedArrival,
+  origin,
+  destination,
+  currentLocation,
+  speed,
+  progress,
+  status,
+  stops,
+  trackingNumber,
+  driverName,
+  vehiclePlate,
+  updatedAt
 }`;
 
-export const announcementQuery = `*[_type == "announcement" && !(_id in path("drafts.**"))] | order(date desc)[0...10]{
-  ...,
+export const announcementsQuery = `*[_type == "announcement" && !(_id in path("drafts.**")) && isActive == true] | order(publishedAt desc) {
+  _id,
   title,
   message,
-  description,
-  date,
-  icon,
-  color,
-  media {
-    type,
-    "imageUrl": image.asset->url,
-    "videoUrl": video.asset->url
-  },
+  type,
   link,
-  "slug": slug.current
+  linkText,
+  publishedAt
 }`;
 
-export const singleAnnouncementQuery = `*[_type == "announcement" && slug.current == $slug && !(_id in path("drafts.**"))][0]{
-  ...,
-  title,
-  message,
-  description,
-  date,
-  icon,
-  color,
-  media {
-    type,
-    "imageUrl": image.asset->url,
-    "videoUrl": video.asset->url
+export const taxiQuery = `*[_type == "taxiOrder" && !(_id in path("drafts.**"))]{
+  ...
+}`;
+
+export const shippingQuery = `*[_type == "shippingOrder" && !(_id in path("drafts.**"))]{
+  ...
+}`;
+
+export const containerShippingQuery = `*[_type == "containerShippingOrder" && !(_id in path("drafts.**"))]{
+  ...
+}`;
+
+export const moveCleaningQuery = `*[_type == "moveCleaningOrder" && !(_id in path("drafts.**"))]{
+  ...
+}`;
+
+export const allBookingsQuery = `{
+  "taxiOrders": *[_type == "taxiOrder" && !(_id in path("drafts.**"))]{
+    ...,
+    "serviceType": "taxi"
   },
-  link,
-  "slug": slug.current
+  "shippingOrders": *[_type == "shippingOrder" && !(_id in path("drafts.**"))]{
+    ...,
+    "serviceType": "shipping"
+  },
+  "containerShippingOrders": *[_type == "containerShippingOrder" && !(_id in path("drafts.**"))]{
+    ...,
+    "serviceType": "containerShipping"
+  },
+  "moveCleaningOrders": *[_type == "moveCleaningOrder" && !(_id in path("drafts.**"))]{
+    ...,
+    "serviceType": "moveCleaning"
+  }
 }`;
 
 export const footerQuery = `*[_type == "footer" && !(_id in path("drafts.**"))][0]{
   ...,
-  links,
-  socialMedia,
+  "links": links[]{
+    ...,
+    name,
+    url
+  },
+  "socialMedia": socialMedia[]{
+    ...,
+    platform,
+    url
+  },
   copyright
 }`;
 
@@ -86,10 +90,18 @@ export const policyQuery = `*[_type == "policy" && !(_id in path("drafts.**"))][
   lastUpdated
 }`;
 
-export const supportQuery = `*[_type == "support" && !(_id in path("drafts.**"))][0]{
+export const supportQuery = `*[_type in ["helpSupport", "support"] && !(_id in path("drafts.**"))][0]{
   ...,
+  title,
+  heroTitle,
+  heroSubtitle,
   email,
   phone,
   whatsapp,
-  faqs
+  supportHours,
+  responseNotice,
+  faqs,
+  updatedAt
 }`;
+
+export const helpSupportQuery = supportQuery;

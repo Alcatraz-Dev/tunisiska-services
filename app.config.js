@@ -64,6 +64,7 @@ module.exports = {
             CFBundleURLSchemes: ["tunisiska-mega-service"],
           },
         ],
+        LSApplicationQueriesSchemes: ["tel", "mailto", "whatsapp", "https"],
       },
       config: {
         googleMaps: {

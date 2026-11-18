@@ -217,6 +217,21 @@ const getEntityConfig = (entityType: string) => {
         canAdd: true,
         docType: "policy",
       };
+    case "help-support":
+      return {
+        title: "Hjälp & Support",
+        subtitle: "Kontaktinfo och supportinställningar",
+        query: '*[_type == "helpSupport"] | order(_createdAt desc)',
+        columns: [
+          { key: "title", label: "Titel" },
+          { key: "email", label: "Email" },
+          { key: "phone", label: "Telefon" },
+          { key: "whatsapp", label: "WhatsApp" },
+        ],
+        searchField: "title",
+        canAdd: true,
+        docType: "helpSupport",
+      };
     case "notification-history":
       return {
         title: "Notifikationer",

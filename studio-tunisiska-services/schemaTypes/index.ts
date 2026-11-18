@@ -1,7 +1,6 @@
-
-import announcement from "./announcement";
-import { liveStatus } from "./liveStatus";
 import user from "./user";
+import liveStatus from "./liveStatus";
+import announcement from "./announcement";
 import footer from "./footer";
 import terms from "./terms";
 import policy from "./policy";
@@ -12,12 +11,10 @@ import shippingOrder from "./shippingOrder";
 import shippingSchedule from "./shippingSchedule";
 import containerShippingOrder from "./containerShippingOrder";
 import containerShippingSchedule from "./containerShippingSchedule";
-
-
-
 import friendRequest from "./friendRequest";
 import notificationHistory from "./notificationHistory";
 import whatsappAdmin from "./whatsappAdmin";
 import support from "./support";
+import helpSupport from "./helpSupport";
 
-export const schemaTypes = [user , liveStatus, announcement, friendRequest, footer, terms, policy, taxiOrder, moveOrder, moveCleaningOrder, shippingOrder, shippingSchedule, containerShippingOrder, containerShippingSchedule, notificationHistory, whatsappAdmin, support ];
+export const schemaTypes = [user , liveStatus, announcement, friendRequest, footer, terms, policy, taxiOrder, moveOrder, moveCleaningOrder, shippingOrder, shippingSchedule, containerShippingOrder, containerShippingSchedule, notificationHistory, whatsappAdmin, support, helpSupport ];

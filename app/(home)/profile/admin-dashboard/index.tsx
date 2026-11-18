@@ -41,6 +41,7 @@ const COLLECTIONS = [
 // be reachable at all; the quick access list above only opens the generic
 // collection editor.
 const ADMIN_SCREENS = [
+  { title: "Help & Support", subtitle: "Contact channels, hours & FAQs", icon: "headset-outline" as const, route: "/(home)/profile/admin-help-support" },
   { title: "Shipping orders", subtitle: "Every shipment booking", icon: "cube-outline" as const, route: "/(home)/profile/admin-shipping-orders" },
   { title: "Taxi orders", subtitle: "Airport transfer requests", icon: "car-outline" as const, route: "/(home)/profile/admin-taxi-orders" },
   { title: "Customers", subtitle: "Accounts and access", icon: "people-outline" as const, route: "/(home)/profile/admin-users" },

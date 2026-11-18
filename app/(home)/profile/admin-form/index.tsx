@@ -33,6 +33,7 @@ const getDocType = (t: string) => {
     case "terms": return "terms";
     case "privacy": return "policy";
     case "users": return "users";
+    case "help-support": return "helpSupport";
     case "announcements": return "announcement";
     case "friend-requests": return "friendRequest";
     case "notification-history": return "notificationHistory";
@@ -217,6 +218,16 @@ const fieldDefinitions: Record<string, FieldDef[]> = {
     { name: "title", label: "Title", type: "text", required: true },
     { name: "content", label: "Content", type: "portable-text" },
     { name: "lastUpdated", label: "Last Updated", type: "datetime", required: true },
+  ],
+  "help-support": [
+    { name: "title", label: "Title", type: "text" },
+    { name: "heroTitle", label: "Hero Title", type: "text" },
+    { name: "heroSubtitle", label: "Hero Subtitle", type: "text" },
+    { name: "email", label: "Support Email", type: "text" },
+    { name: "phone", label: "Support Phone", type: "text" },
+    { name: "whatsapp", label: "WhatsApp Number", type: "text" },
+    { name: "supportHours", label: "Working Hours", type: "text" },
+    { name: "responseNotice", label: "Response Notice", type: "text" },
   ],
   "notification-history": [
     { name: "title", label: "Title", type: "text" },

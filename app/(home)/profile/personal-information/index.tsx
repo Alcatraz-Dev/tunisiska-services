@@ -17,6 +17,7 @@ import { useThemeColors } from "@/app/theme";
 import { radii, spacing } from "@/app/theme/spacing";
 import { showAlert } from "@/app/utils/showAlert";
 import { getClerkProfileFields } from "@/app/utils/clerkUser";
+import { client } from "@/sanityClient";
 
 type Fields = {
   firstName: string;
@@ -83,8 +84,7 @@ export default function PersonalInformation() {
 
   const handleSave = async () => {
     if (!user) return;
-    const next = {
-      ...fields,
+    const next: Fields = {
       firstName: fields.firstName.trim(),
       lastName: fields.lastName.trim(),
       phoneNumber: fields.phoneNumber.trim(),
@@ -96,28 +96,50 @@ export default function PersonalInformation() {
 
     setSaving(true);
     try {
-      // Clerk's PATCH /v1/me only accepts first_name/last_name when the "First and
-      // last name" attribute is enabled in the Dashboard; otherwise it fails with
-      // 422 form_param_unknown and the whole update is rejected. Names are stored in
-      // unsafeMetadata instead, which this screen and ProfileScreen read first.
-      await user.update({
-        unsafeMetadata: { ...user.unsafeMetadata, ...next },
-      });
+      const updatedMetadata: Record<string, unknown> = {
+        ...((user.unsafeMetadata as Record<string, unknown>) || {}),
+        ...next,
+      };
+
+      await user.update({ unsafeMetadata: updatedMetadata });
+
+      // Best-effort sync to Sanity user record
+      try {
+        const fullName = `${next.firstName} ${next.lastName}`.trim();
+        const sanityUser = await client.fetch<{ _id: string } | null>(
+          `*[_type == "users" && clerkId == $clerkId][0]{ _id }`,
+          { clerkId: user.id }
+        );
+        if (sanityUser?._id) {
+          const patch: Record<string, string> = {};
+          if (fullName) {
+            patch.name = fullName;
+            patch.userName = fullName;
+          }
+          if (next.phoneNumber) {
+            patch.phone = next.phoneNumber;
+          }
+          if (Object.keys(patch).length > 0) {
+            await client.patch(sanityUser._id).set(patch).commit();
+          }
+        }
+      } catch (sanityErr) {
+        console.warn("Could not sync profile to Sanity:", sanityErr);
+      }
+
+      await user.reload();
       setFields(next);
       setSavedFields(next);
       setEditing(false);
       showAlert("Saved", "Your account details have been updated.");
-      // Refresh Clerk in the background; a failed reload must not report the save as failed.
-      user.reload().catch((reloadError) => {
-        console.warn("Profile saved, but refreshing the Clerk user failed:", reloadError);
-      });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Could not update profile information:", error);
-      const clerkError = (error as any)?.errors?.[0];
-      showAlert(
-        "Could not save changes",
-        clerkError?.longMessage || clerkError?.message || "Please check your connection and try again.",
-      );
+      const detail =
+        error?.errors?.[0]?.longMessage ||
+        error?.errors?.[0]?.message ||
+        error?.message ||
+        "Please check your connection and try again.";
+      showAlert("Could not save changes", detail);
     } finally {
       setSaving(false);
     }
