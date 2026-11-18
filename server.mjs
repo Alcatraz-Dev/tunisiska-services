@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import os from "os";
 import crypto from "node:crypto";
 import { createClient } from "@sanity/client";
+import { startBridge, bridgeStatus, requestPairingCode, sendBridgeText, logoutBridge } from "./whatsapp-bridge.mjs";
 
 dotenv.config();
 
@@ -397,25 +398,20 @@ app.post("/create-checkout-session", async (req, res) => {
 });
 
 // ─── WhatsApp gateway ────────────────────────────────────────────────────────
-// Inbound WhatsApp media becomes News. An allowlisted admin sends a photo or
-// video to the business number, Meta calls this webhook, the media is copied
-// into Sanity and published as an `announcement` — the same document the app's
-// News tab already reads.
+// Inbound WhatsApp media becomes News. The server holds a WhatsApp Web session
+// (Baileys, Hermes-style): an allowlisted admin sends a photo or video to the
+// linked business number, the media is copied into Sanity and published as an
+// `announcement` — the same document the app's News tab already reads.
+// No Meta app, no tokens, no webhook URL: pairing happens once by QR or code.
 
-// Overridable so the self-test can stand in for the Graph API.
-const WHATSAPP_API = process.env.WHATSAPP_GRAPH_BASE || "https://graph.facebook.com/v21.0";
-/** Meta caps inbound images at 5 MB and video at 16 MB. */
+/** Cap inbound media at 16 MB. */
 const WHATSAPP_MAX_BYTES = 16 * 1024 * 1024;
 
 function whatsappConfig() {
   return {
-    token: process.env.WHATSAPP_TOKEN || "",
-    phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || "",
-    verifyToken: process.env.WHATSAPP_VERIFY_TOKEN || "",
-    appSecret: process.env.WHATSAPP_APP_SECRET || "",
     admins: (process.env.WHATSAPP_ADMIN_NUMBERS || "")
       .split(",")
-      .map((number) => number.replace(/[^0-9]/g, ""))
+      .map((number) => number.trim() === "*" ? "*" : number.replace(/[^0-9]/g, ""))
       .filter(Boolean),
   };
 }
@@ -427,16 +423,6 @@ function sanityWriteClient() {
   const token = process.env.EXPO_PUBLIC_SANITY_TOKEN;
   if (!projectId || !dataset || !token) return null;
   return createClient({ projectId, dataset, token, apiVersion: "2023-05-03", useCdn: false });
-}
-
-function verifyWhatsappSignature(req, appSecret) {
-  const received = req.get("x-hub-signature-256") || "";
-  if (!req.rawBody || !received) return false;
-  const expected =
-    "sha256=" + crypto.createHmac("sha256", appSecret).update(req.rawBody).digest("hex");
-  const a = Buffer.from(received);
-  const b = Buffer.from(expected);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
 function slugify(value) {
@@ -457,69 +443,26 @@ function extensionFor(contentType) {
   return type.startsWith("video/") ? "mp4" : "jpg";
 }
 
-/** Resolve a WhatsApp media id to bytes through the Graph API. */
-async function downloadWhatsappMedia(mediaId, token, kind) {
-  const lookup = await fetch(`${WHATSAPP_API}/${mediaId}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!lookup.ok) {
-    throw new Error(`Media lookup failed (${lookup.status})`);
-  }
+/** Turn one inbound photo/video into a published announcement. */
+export async function publishWhatsappMedia({ from, messageId, kind, buffer, contentType, filename, caption }, client) {
+  if (!buffer || !buffer.byteLength) return { skipped: "message carried no media" };
+  if (buffer.byteLength > WHATSAPP_MAX_BYTES) return { skipped: "media is larger than 16 MB" };
 
-  const info = await lookup.json();
-  if (!info?.url) throw new Error("Media lookup returned no URL");
-  if (info.file_size && info.file_size > WHATSAPP_MAX_BYTES) {
-    throw new Error("Media is larger than 16 MB");
-  }
-
-  const download = await fetch(info.url, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!download.ok) {
-    throw new Error(`Media download failed (${download.status})`);
-  }
-
-  const buffer = Buffer.from(await download.arrayBuffer());
-  if (buffer.byteLength > WHATSAPP_MAX_BYTES) {
-    throw new Error("Media is larger than 16 MB");
-  }
-
-  const contentType =
-    info.mime_type || (kind === "image" ? "image/jpeg" : "video/mp4");
-  return {
-    buffer,
-    contentType,
-    filename: `${mediaId.replace(/[^a-zA-Z0-9]/g, "")}.${extensionFor(contentType)}`,
-  };
-}
-
-/** Turn one inbound image/video message into a published announcement. */
-async function publishWhatsappMessage(message, client) {
-  const kind =
-    message?.type === "image" ? "image" : message?.type === "video" ? "video" : null;
-  if (!kind) return { skipped: `unsupported message type: ${message?.type || "unknown"}` };
-
-  const mediaId =
-    kind === "image" ? message.image?.id : message.video?.id;
-  if (!mediaId) return { skipped: "message carried no media id" };
-
-  // One document per WhatsApp message: Meta retries webhooks, and a retry must
+  // One document per WhatsApp message: a retry or duplicate delivery must
   // update nothing rather than publish the same photo twice.
-  const docId = `whatsapp-${String(message.id || mediaId).replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  const docId = `whatsapp-${String(messageId || Date.now()).replace(/[^a-zA-Z0-9_-]/g, "-")}`;
   const existing = await client.getDocument(docId).catch(() => null);
   if (existing) return { skipped: "already published", docId };
 
-  const media = await downloadWhatsappMedia(mediaId, whatsappConfig().token, kind);
+  const safeName = String(filename || "").replace(/[^a-zA-Z0-9_.-]/g, "").slice(-64);
   const asset = await client.assets.upload(
     kind === "image" ? "image" : "file",
-    media.buffer,
-    { filename: media.filename, contentType: media.contentType },
+    buffer,
+    { filename: safeName || `${docId}.${extensionFor(contentType)}`, contentType },
   );
 
-  const caption = String(
-    (kind === "image" ? message.image?.caption : message.video?.caption) || "",
-  ).trim();
-  const title = caption.split("\n")[0].slice(0, 90).trim() || (kind === "image" ? "Nytt foto" : "Ny video");
+  const cleanCaption = String(caption || "").trim();
+  const title = cleanCaption.split("\n")[0].slice(0, 90).trim() || (kind === "image" ? "Nytt foto" : "Ny video");
   const publishedAt = new Date().toISOString();
 
   await client.createIfNotExists({
@@ -527,15 +470,15 @@ async function publishWhatsappMessage(message, client) {
     _type: "announcement",
     title,
     slug: { _type: "slug", current: `${slugify(title) || "nytt-inlagg"}-${docId.slice(-6)}` },
-    message: caption,
-    description: caption,
+    message: cleanCaption,
+    description: cleanCaption,
     date: publishedAt,
     publishedAt,
     status: "published",
     isImportant: false,
     icon: "logo-whatsapp",
     source: "whatsapp",
-    whatsappSender: message.from,
+    whatsappSender: from,
     media: {
       _type: "media",
       type: kind,
@@ -545,11 +488,9 @@ async function publishWhatsappMessage(message, client) {
     },
   });
 
-  console.log(`✅ [WHATSAPP] Published ${kind} from ${message.from} as ${docId}`);
+  console.log(`✅ [WHATSAPP] Published ${kind} from ${from} as ${docId}`);
   return { docId };
 }
-
-const VERIFICATION_TTL_MS = 10 * 60 * 1000;
 
 function normalizePhone(value) {
   return String(value || "").replace(/[^0-9]/g, "");
@@ -560,121 +501,76 @@ function maskPhone(phone) {
   return digits.length > 4 ? `${digits.slice(0, 3)}•••${digits.slice(-3)}` : digits;
 }
 
-/** Env allowlist, or a number that completed the code handshake. */
+/** Env allowlist, a number added through the panel, or "any number" mode. */
 async function isAuthorizedSender(sender, config, client) {
-  if (config.admins.includes(sender)) return true;
+  // `*` in WHATSAPP_ADMIN_NUMBERS, or the panel's "any number" switch.
+  if (config.admins.includes("*")) return true;
+  const settings = await client
+    .fetch('*[_type == "whatsappSettings" && !(_id in path("drafts.**"))][0]{allowAll}')
+    .catch(() => null);
+  if (settings?.allowAll === true) return true;
   const record = await client
     .fetch('*[_type == "whatsappAdmin" && phone == $phone][0]{verifiedAt}', { phone: sender })
     .catch(() => null);
   return Boolean(record?.verifiedAt);
 }
 
-/**
- * A text message is a verification attempt when it is the 6-digit code we
- * handed out for that sender. On a match the number becomes a publisher.
- */
-async function verifyWhatsappCode(sender, text, client) {
-  const code = String(text || "").trim();
-  if (!/^\d{6}$/.test(code)) return null;
-
-  const record = await client
-    .fetch('*[_type == "whatsappAdmin" && phone == $phone][0]{_id, code, codeExpiresAt}', { phone: sender })
-    .catch(() => null);
-  if (!record?._id || record.code !== code) return null;
-  if (record.codeExpiresAt && new Date(record.codeExpiresAt).getTime() < Date.now()) return null;
-
-  await client
-    .patch(record._id)
-    .set({ verifiedAt: new Date().toISOString() })
-    .unset(["code", "codeExpiresAt"])
-    .commit();
-  return sender;
-}
-
-/** Best-effort confirmation reply; never blocks publishing. */
-async function sendWhatsappText(to, body, config) {
-  if (!config.token || !config.phoneNumberId) return;
-  await fetch(`${WHATSAPP_API}/${config.phoneNumberId}/messages`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${config.token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ messaging_product: "whatsapp", to, type: "text", text: { body } }),
-  }).catch(() => {});
-}
-
-async function handleWhatsappPayload(body, config) {
+async function handleBridgeMessage({ from, messageId, kind, text, ...media }) {
   const client = sanityWriteClient();
-  if (!client) throw new Error("Sanity write token is not configured");
+  if (!client) {
+    console.error("❌ [WHATSAPP] Sanity write token is not configured");
+    return { error: "Sanity write token is not configured" };
+  }
+  const config = whatsappConfig();
 
-  const results = [];
-  const entries = Array.isArray(body?.entry) ? body.entry : [];
-
-  for (const entry of entries) {
-    for (const change of entry?.changes || []) {
-      const value = change?.value;
-      if (value?.metadata?.phone_number_id && config.phoneNumberId && value.metadata.phone_number_id !== config.phoneNumberId) {
-        results.push({ skipped: "message belongs to another phone number" });
-        continue;
-      }
-
-      for (const message of value?.messages || []) {
-        const sender = normalizePhone(message?.from);
-
-        // Verification comes first: this is how a number joins the allowlist
-        // without anyone editing environment variables.
-        if (message?.type === "text") {
-          const verified = await verifyWhatsappCode(sender, message.text?.body, client);
-          if (verified) {
-            results.push({ verified: maskPhone(sender) });
-            await sendWhatsappText(
-              sender,
-              "✅ Verified. Send a photo or video to publish it in the app's News.",
-              config,
-            );
-          } else {
-            results.push({ skipped: "text message without a matching verification code" });
-          }
-          continue;
-        }
-
-        if (!(await isAuthorizedSender(sender, config, client))) {
-          // Anyone can find the business number; only verified admins publish.
-          results.push({ skipped: "sender is not verified", from: maskPhone(sender) });
-          continue;
-        }
-
-        try {
-          results.push(await publishWhatsappMessage(message, client));
-        } catch (error) {
-          console.error("❌ [WHATSAPP] Could not publish message:", error);
-          results.push({ error: error.message, from: maskPhone(sender) });
-        }
-      }
-    }
+  if (!(await isAuthorizedSender(from, config, client))) {
+    // Anyone can find the business number; only allowed numbers publish.
+    return { skipped: "sender is not allowed", from: maskPhone(from) };
   }
 
-  return results;
+  // Plain texts never publish. The sender gets a hint back so they know
+  // what to do; anything else is ignored quietly.
+  if (kind === "text") {
+    await sendBridgeText(from, "Send a photo or video here and it will be published in the app's News.");
+    return { noted: "replied with a publishing hint" };
+  }
+
+  try {
+    return await publishWhatsappMedia({ from, messageId, kind, ...media }, client);
+  } catch (error) {
+    console.error("❌ [WHATSAPP] Could not publish message:", error);
+    return { error: error.message, from: maskPhone(from) };
+  }
 }
 
-// Meta's verification handshake, run once when the webhook URL is saved.
-app.get("/api/whatsapp/webhook", (req, res) => {
-  const { verifyToken } = whatsappConfig();
-  if (!verifyToken) return res.status(503).send("WhatsApp gateway is not configured");
+// QR for first-time pairing; null once the session is linked.
+app.get("/api/whatsapp/qr", (req, res) => {
+  res.json(bridgeStatus());
+});
 
-  const mode = req.query["hub.mode"];
-  const token = req.query["hub.verify_token"];
-  const challenge = req.query["hub.challenge"];
-
-  if (mode === "subscribe" && token === verifyToken) {
-    return res.status(200).send(String(challenge ?? ""));
+// Pairing-code login: returns an 8-digit code to enter on the phone at
+// WhatsApp → Linked devices → Link with phone number instead.
+app.post("/api/whatsapp/pair", async (req, res) => {
+  try {
+    const code = await requestPairingCode(req.body?.phone);
+    console.log(`📱 [WHATSAPP] Pairing code issued for ${maskPhone(req.body?.phone)} — enter it on that phone now, it expires fast.`);
+    res.json({ code });
+  } catch (error) {
+    res.status(400).json({ error: error?.message || "Could not issue a pairing code" });
   }
-  return res.status(403).send("Verification failed");
+});
+
+// Log out and wipe the session so the server pairs fresh.
+app.post("/api/whatsapp/logout", async (req, res) => {
+  await logoutBridge();
+  res.json({ loggedOut: true });
 });
 
 // Configuration summary for the admin panel. Never returns secret values.
 app.get("/api/whatsapp/status", async (req, res) => {
   const config = whatsappConfig();
   const client = sanityWriteClient();
-  const baseUrl = (process.env.EXPO_PUBLIC_SERVER_URL || `${req.protocol}://${req.get("host")}`).replace(/\/$/, "");
+  const bridge = bridgeStatus();
 
   const numbers = client
     ? await client
@@ -682,28 +578,45 @@ app.get("/api/whatsapp/status", async (req, res) => {
         .catch(() => [])
     : [];
 
+  const settings = client
+    ? await client
+        .fetch('*[_type == "whatsappSettings" && !(_id in path("drafts.**"))][0]{allowAll}')
+        .catch(() => null)
+    : null;
+
   res.json({
-    webhookUrl: `${baseUrl}/api/whatsapp/webhook`,
-    businessNumber: process.env.WHATSAPP_BUSINESS_NUMBER || process.env.EXPO_PUBLIC_SUPPORT_WHATSAPP || null,
-    verifyTokenConfigured: Boolean(config.verifyToken),
-    appSecretConfigured: Boolean(config.appSecret),
-    accessTokenConfigured: Boolean(config.token),
-    phoneNumberIdConfigured: Boolean(config.phoneNumberId),
+    connected: bridge.connected,
+    businessNumber: bridge.businessNumber || process.env.WHATSAPP_BUSINESS_NUMBER || null,
+    lastError: bridge.lastError,
     sanityWritable: Boolean(client),
-    adminNumbers: config.admins.length,
+    allowAll: settings?.allowAll === true || config.admins.includes("*"),
+    adminNumbers: config.admins.filter((number) => number !== "*").length,
     numbers: Array.isArray(numbers) ? numbers : [],
-    ready: Boolean(
-      config.verifyToken &&
-        config.appSecret &&
-        config.token &&
-        (config.admins.length || numbers.length) &&
-        client,
-    ),
+    ready: Boolean(bridge.connected && client),
   });
 });
 
-// Step 1 of the connect flow: hand the admin a code to send from WhatsApp.
-app.post("/api/whatsapp/verify/start", async (req, res) => {
+// "Any number may publish" — no list to maintain. Admin-gated by the app.
+app.post("/api/whatsapp/settings", async (req, res) => {
+  const client = sanityWriteClient();
+  if (!client) return res.status(503).json({ error: "Sanity write access is not configured" });
+
+  const allowAll = req.body?.allowAll === true;
+  await client.createOrReplace({
+    _id: "whatsapp-settings",
+    _type: "whatsappSettings",
+    allowAll,
+    updatedAt: new Date().toISOString(),
+  });
+
+  res.json({ allowAll });
+});
+
+// The panel is admin-gated and Meta asserts the sender number on every
+// delivery, so adding a number here is all it takes: only the real owner of
+// that number can publish from it. No codes, no expiry, nothing to type on
+// the phone.
+app.post("/api/whatsapp/numbers", async (req, res) => {
   const client = sanityWriteClient();
   if (!client) return res.status(503).json({ error: "Sanity write access is not configured" });
 
@@ -712,23 +625,17 @@ app.post("/api/whatsapp/verify/start", async (req, res) => {
     return res.status(400).json({ error: "Enter a phone number with the country code" });
   }
 
-  const code = String(Math.floor(100000 + Math.random() * 900000));
-  const expiresAt = new Date(Date.now() + VERIFICATION_TTL_MS).toISOString();
-
   await client.createOrReplace({
     _id: `whatsapp-admin-${phone}`,
     _type: "whatsappAdmin",
     phone,
-    code,
-    codeExpiresAt: expiresAt,
+    verifiedAt: new Date().toISOString(),
     requestedAt: new Date().toISOString(),
   });
 
   res.json({
     phone,
     masked: maskPhone(phone),
-    code,
-    expiresAt,
     businessNumber: process.env.WHATSAPP_BUSINESS_NUMBER || process.env.EXPO_PUBLIC_SUPPORT_WHATSAPP || null,
   });
 });
@@ -743,25 +650,20 @@ app.delete("/api/whatsapp/numbers/:phone", async (req, res) => {
   res.json({ removed: maskPhone(phone) });
 });
 
-app.post("/api/whatsapp/webhook", async (req, res) => {
-  const config = whatsappConfig();
-
-  if (!config.appSecret || !config.token) {
-    return res.status(503).json({ error: "WhatsApp gateway is not configured" });
-  }
-  if (!verifyWhatsappSignature(req, config.appSecret)) {
-    return res.status(401).json({ error: "Invalid signature" });
-  }
-
-  try {
-    const results = await handleWhatsappPayload(req.body, config);
-    res.status(200).json({ received: true, results });
-  } catch (error) {
-    console.error("❌ [WHATSAPP] Webhook failed:", error);
-    // 200 keeps Meta from replaying a payload we already failed to process.
-    res.status(200).json({ received: true, error: error.message });
-  }
-});
+// The bridge holds a live WhatsApp Web session, so it only starts where the
+// process stays up (local `npm run server`, a VPS, …). Vercel serverless
+// cannot keep the socket, so it skips the bridge and only serves the API.
+if (!process.env.VERCEL && process.env.WHATSAPP_BRIDGE_ENABLED !== "false") {
+  startBridge({
+    onMessage: async (payload) => {
+      try {
+        await handleBridgeMessage(payload);
+      } catch (error) {
+        console.error("❌ [WHATSAPP] Could not handle a message:", error?.message || error);
+      }
+    },
+  });
+}
 
 // Export for Vercel serverless deployment
 export default app;

@@ -16,5 +16,6 @@ import notificationHistory from "./notificationHistory";
 import whatsappAdmin from "./whatsappAdmin";
 import support from "./support";
 import helpSupport from "./helpSupport";
+import whatsappSettings from "./whatsappSettings";
 
-export const schemaTypes = [user , liveStatus, announcement, friendRequest, footer, terms, policy, taxiOrder, moveOrder, moveCleaningOrder, shippingOrder, shippingSchedule, containerShippingOrder, containerShippingSchedule, notificationHistory, whatsappAdmin, support, helpSupport ];
+export const schemaTypes = [user , liveStatus, announcement, friendRequest, footer, terms, policy, taxiOrder, moveOrder, moveCleaningOrder, shippingOrder, shippingSchedule, containerShippingOrder, containerShippingSchedule, notificationHistory, whatsappAdmin, whatsappSettings, support, helpSupport ];

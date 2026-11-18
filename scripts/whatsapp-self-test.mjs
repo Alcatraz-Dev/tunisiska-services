@@ -1,35 +1,34 @@
 /**
- * WhatsApp gateway self-test.
+ * WhatsApp gateway self-test (Baileys bridge).
  *
- * Boots the real admin server against a stand-in Graph API and drives the whole
- * flow: handshake, signature check, code verification, publishing from a
- * verified number, Sanity upload, visibility in the news query, retry
- * idempotency and revocation.
+ * Boots the real admin server with the live session disabled and drives the
+ * HTTP surface: status, QR, input validation, adding a number, the full
+ * publish pipeline (media → announcement → news query → idempotency) and
+ * revocation — then deletes what it created.
  *
  *   node scripts/whatsapp-self-test.mjs            # run and clean up after itself
- *   node scripts/whatsapp-self-test.mjs --keep     # leave the test posts in Sanity
+ *   node scripts/whatsapp-self-test.mjs --keep     # leave the test post in Sanity
  */
 import "dotenv/config";
 import { spawn } from "node:child_process";
-import crypto from "node:crypto";
 import fs from "node:fs";
-import http from "node:http";
 import path from "node:path";
 import { createClient } from "@sanity/client";
 
+// Importing the server must not open a port or start Baileys in this process;
+// the child below gets its own env without VERCEL so it does listen.
+process.env.VERCEL = "1";
+const { publishWhatsappMedia } = await import("../server.mjs");
+
 const APP_PORT = 3211;
-const STUB_PORT = 4311;
 const BASE = `http://127.0.0.1:${APP_PORT}`;
-const SECRET = "self-test-app-secret";
-const VERIFY = "self-test-verify-token";
-const ADMIN = "46737778737";
 const NEW_NUMBER = "46709998877";
 
 const KEEP = process.argv.includes("--keep");
 const results = [];
 
 function record(name, ok, detail = "") {
-  results.push({ name, ok, detail });
+  results.push({ name, ok });
   console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`);
 }
 
@@ -52,42 +51,12 @@ const samplePath = findSampleImage();
 const sample = fs.readFileSync(samplePath);
 const sampleType = path.extname(samplePath).toLowerCase() === ".png" ? "image/png" : "image/jpeg";
 
-const stub = http.createServer((req, res) => {
-  if (req.url.startsWith("/media-")) {
-    res.setHeader("Content-Type", "application/json");
-    res.end(JSON.stringify({
-      url: `http://127.0.0.1:${STUB_PORT}/file`,
-      mime_type: sampleType,
-      file_size: sample.length,
-    }));
-    return;
-  }
-  if (req.url === "/file") {
-    res.setHeader("Content-Type", sampleType);
-    res.end(sample);
-    return;
-  }
-  // Message sends are fire-and-forget in the gateway; ack them so it stays quiet.
-  if (req.url.endsWith("/messages")) {
-    res.setHeader("Content-Type", "application/json");
-    res.end("{}");
-    return;
-  }
-  res.statusCode = 404;
-  res.end("{}");
-});
-
+const { VERCEL: _dropped, ...baseEnv } = process.env;
 const server = spawn(process.execPath, ["server.mjs"], {
   env: {
-    ...process.env,
+    ...baseEnv,
     PORT: String(APP_PORT),
-    WHATSAPP_GRAPH_BASE: `http://127.0.0.1:${STUB_PORT}`,
-    WHATSAPP_TOKEN: "self-test-token",
-    WHATSAPP_VERIFY_TOKEN: VERIFY,
-    WHATSAPP_APP_SECRET: SECRET,
-    WHATSAPP_ADMIN_NUMBERS: ADMIN,
-    WHATSAPP_PHONE_NUMBER_ID: "self-test-phone-id",
-    WHATSAPP_BUSINESS_NUMBER: "46737778737",
+    WHATSAPP_BRIDGE_ENABLED: "false",
   },
   stdio: ["ignore", "pipe", "pipe"],
 });
@@ -111,34 +80,6 @@ async function waitForHealth() {
   throw new Error(`Admin server never became healthy.\n${serverLog.slice(-1500)}`);
 }
 
-function envelope(message) {
-  return {
-    object: "whatsapp_business_account",
-    entry: [{
-      changes: [{
-        value: { metadata: { phone_number_id: "self-test-phone-id" }, messages: [message] },
-      }],
-    }],
-  };
-}
-
-const imageMessage = ({ from, messageId, caption }) => ({
-  from,
-  id: messageId,
-  type: "image",
-  image: { id: "media-self-test", mime_type: sampleType, caption },
-});
-
-async function postWebhook(body, { sign = true } = {}) {
-  const raw = JSON.stringify(body);
-  const headers = { "Content-Type": "application/json" };
-  if (sign) {
-    headers["X-Hub-Signature-256"] = "sha256=" + crypto.createHmac("sha256", SECRET).update(raw).digest("hex");
-  }
-  const response = await fetch(`${BASE}/api/whatsapp/webhook`, { method: "POST", headers, body: raw });
-  return { status: response.status, json: await response.json().catch(() => null) };
-}
-
 const sanity = createClient({
   projectId: process.env.EXPO_PUBLIC_SANITY_PROJECT_ID,
   dataset: process.env.EXPO_PUBLIC_SANITY_DATASET,
@@ -150,63 +91,75 @@ const sanity = createClient({
 const createdDocs = [];
 
 try {
-  await new Promise((resolve) => stub.listen(STUB_PORT, resolve));
   await waitForHealth();
   record("admin server boots and answers /health", true);
 
   const status = await fetch(`${BASE}/api/whatsapp/status`).then((r) => r.json());
   record(
-    "status endpoint reports the gateway ready",
-    status.ready === true && status.webhookUrl.endsWith("/api/whatsapp/webhook"),
-    status.webhookUrl,
+    "status reports the session state",
+    status.connected === false && Array.isArray(status.numbers),
+    `connected=${status.connected}`,
   );
 
-  const handshake = await fetch(`${BASE}/api/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=${VERIFY}&hub.challenge=challenge-123`);
-  record("verification handshake echoes the challenge", handshake.status === 200 && (await handshake.text()) === "challenge-123");
+  const qr = await fetch(`${BASE}/api/whatsapp/qr`).then((r) => r.json());
+  record("qr endpoint answers while unlinked", qr.connected === false && qr.qr === null);
 
-  const rejected = await fetch(`${BASE}/api/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=wrong&hub.challenge=x`);
-  record("handshake rejects a wrong verify token", rejected.status === 403);
+  const invalid = await fetch(`${BASE}/api/whatsapp/numbers`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone: "123" }),
+  });
+  record("short numbers are rejected", invalid.status === 400);
 
-  const unsigned = await postWebhook(envelope(imageMessage({ from: ADMIN, messageId: "wamid.SELFTEST-unsigned", caption: "no signature" })), { sign: false });
-  record("unsigned delivery is rejected", unsigned.status === 401);
+  record("any-number mode starts off", status.allowAll === false);
 
-  const stranger = await postWebhook(envelope(imageMessage({ from: "999000111", messageId: "wamid.SELFTEST-stranger", caption: "hi" })));
+  const allowAllOn = await fetch(`${BASE}/api/whatsapp/settings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ allowAll: true }),
+  });
+  const statusAllowAll = await fetch(`${BASE}/api/whatsapp/status`).then((r) => r.json());
   record(
-    "an unverified sender cannot publish",
-    stranger.status === 200 && String(stranger.json?.results?.[0]?.skipped || "").includes("not verified"),
+    "the panel can let any number publish",
+    allowAllOn.status === 200 && statusAllowAll.allowAll === true,
   );
 
-  // Connect flow: ask for a code, then send it from WhatsApp.
-  const start = await fetch(`${BASE}/api/whatsapp/verify/start`, {
+  await fetch(`${BASE}/api/whatsapp/settings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ allowAll: false }),
+  });
+  const statusAllowAllOff = await fetch(`${BASE}/api/whatsapp/status`).then((r) => r.json());
+  record("any-number mode can be turned off again", statusAllowAllOff.allowAll === false);
+
+  const add = await fetch(`${BASE}/api/whatsapp/numbers`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ phone: "+46 70 999 88 77" }),
   });
-  const startJson = await start.json().catch(() => null);
-  record("the panel is handed a 6-digit code", start.status === 200 && /^\d{6}$/.test(startJson?.code || ""), startJson?.code);
-
-  const verifyDelivery = await postWebhook(envelope({
-    from: NEW_NUMBER,
-    id: `wamid.SELFTEST-code-${Date.now()}`,
-    type: "text",
-    text: { body: startJson?.code },
-  }));
-  record("sending the code from WhatsApp verifies the number", Boolean(verifyDelivery.json?.results?.[0]?.verified));
+  const addJson = await add.json().catch(() => null);
+  record("the panel can add a number directly", add.status === 200 && addJson?.phone === NEW_NUMBER, addJson?.phone);
 
   const statusAfter = await fetch(`${BASE}/api/whatsapp/status`).then((r) => r.json());
   record(
-    "the verified number is listed for the panel",
+    "the added number is listed for the panel",
     (statusAfter.numbers || []).some((item) => item.phone === NEW_NUMBER),
   );
 
-  const verifiedMessageId = `wamid.SELFTEST-verified-${Date.now()}`;
-  const verifiedPublish = await postWebhook(envelope(imageMessage({
-    from: NEW_NUMBER,
-    messageId: verifiedMessageId,
-    caption: "Leverans på fredag",
-  })));
-  const documentId = verifiedPublish.json?.results?.[0]?.docId ?? null;
-  record("a verified number publishes media", Boolean(documentId), documentId || JSON.stringify(verifiedPublish.json));
+  const messageId = `selftest-${Date.now()}`;
+  const published = await publishWhatsappMedia(
+    {
+      from: NEW_NUMBER,
+      messageId,
+      kind: "image",
+      buffer: sample,
+      contentType: sampleType,
+      caption: "Leverans på fredag",
+    },
+    sanity,
+  );
+  const documentId = published?.docId ?? null;
+  record("media publishes to an announcement", Boolean(documentId), documentId || JSON.stringify(published));
 
   const doc = documentId ? await sanity.getDocument(documentId) : null;
   if (documentId) createdDocs.push({ id: documentId, assetId: doc?.media?.image?.asset?._ref });
@@ -219,8 +172,18 @@ try {
     : 0;
   record("the post is visible to the app's news query", inNews === 1);
 
-  const retry = await postWebhook(envelope(imageMessage({ from: NEW_NUMBER, messageId: verifiedMessageId, caption: "Leverans på fredag" })));
-  record("a Meta retry does not publish twice", String(retry.json?.results?.[0]?.skipped || "").includes("already published"));
+  const retry = await publishWhatsappMedia(
+    {
+      from: NEW_NUMBER,
+      messageId,
+      kind: "image",
+      buffer: sample,
+      contentType: sampleType,
+      caption: "Leverans på fredag",
+    },
+    sanity,
+  );
+  record("a duplicate delivery does not publish twice", String(retry?.skipped || "").includes("already published"));
 
   const removed = await fetch(`${BASE}/api/whatsapp/numbers/${NEW_NUMBER}`, { method: "DELETE" });
   const statusFinal = await fetch(`${BASE}/api/whatsapp/status`).then((r) => r.json());
@@ -240,9 +203,7 @@ try {
     if (item.assetId) await sanity.delete(item.assetId).catch(() => {});
     console.log(`\nCleaned up test post ${item.id}`);
   }
-  await sanity.delete(`whatsapp-admin-${NEW_NUMBER}`).catch(() => {});
   server.kill();
-  stub.close();
 }
 
 const failed = results.filter((item) => !item.ok);

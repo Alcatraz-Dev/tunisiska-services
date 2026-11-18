@@ -12,6 +12,7 @@ web-build/
 .env*
 .env*.production
 .env*.local
+!.env.whatsapp.example
 /ios
 /android
 
@@ -27,3 +28,6 @@ expo-env.d.ts
 
 # Google Play service account key (sensitive - never commit)
 google-service-account.json
+
+# WhatsApp bridge session (equivalent to a logged-in WhatsApp Web - never commit)
+baileys-auth/

@@ -1,10 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Image, RefreshControl, ScrollView, View } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, Image, RefreshControl, ScrollView, Switch, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import Constants from "expo-constants";
-import * as Clipboard from "expo-clipboard";
 import AppIcon from "@/app/components/ui/AppIcon";
 import Badge, { type BadgeTone } from "@/app/components/ui/Badge";
 import Input from "@/app/components/ui/Input";
@@ -23,19 +22,15 @@ import { showAlert } from "@/app/utils/showAlert";
 type VerifiedNumber = { phone: string; verifiedAt?: string };
 
 type GatewayStatus = {
-  webhookUrl: string;
+  connected: boolean;
   businessNumber?: string | null;
-  verifyTokenConfigured: boolean;
-  appSecretConfigured: boolean;
-  accessTokenConfigured: boolean;
-  phoneNumberIdConfigured: boolean;
+  lastError?: string | null;
   sanityWritable: boolean;
+  allowAll: boolean;
   adminNumbers: number;
   numbers: VerifiedNumber[];
   ready: boolean;
 };
-
-type PendingCode = { phone: string; code: string; expiresAt: string; businessNumber?: string | null };
 
 type WhatsappNews = {
   id: string;
@@ -80,11 +75,11 @@ function maskPhone(phone: string) {
 }
 
 /**
- * Connect a number, verify it, publish.
+ * Link a number, then publish.
  *
- * The panel never asks for tokens or webhook details: an admin types the number
- * that may publish, sends the generated code from WhatsApp to the business
- * number, and the gateway adds it to the allowed senders.
+ * No Meta app, no tokens, no webhook: the server holds a WhatsApp session.
+ * Link it once by scanning the QR (or by pairing code), add the numbers that
+ * may publish, and anything they send to the business number appears in News.
  */
 export default function AdminWhatsappScreen() {
   const theme = useThemeColors();
@@ -98,13 +93,14 @@ export default function AdminWhatsappScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [phone, setPhone] = useState("");
-  const [pending, setPending] = useState<PendingCode | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [advanced, setAdvanced] = useState(false);
+  const [qr, setQr] = useState<string | null>(null);
+  const [pairPhone, setPairPhone] = useState("");
+  const [pairCode, setPairCode] = useState<string | null>(null);
+  const [pairBusy, setPairBusy] = useState(false);
 
-  const pendingRef = useRef<PendingCode | null>(null);
-  pendingRef.current = pending;
+  const [phone, setPhone] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [settingsBusy, setSettingsBusy] = useState(false);
 
   const probe = useCallback(async (): Promise<{ status: GatewayStatus; base: string }> => {
     let lastError: unknown = new Error("No admin server is configured");
@@ -120,6 +116,17 @@ export default function AdminWhatsappScreen() {
     throw lastError;
   }, []);
 
+  const loadQr = useCallback(async () => {
+    try {
+      const response = await fetch(`${serverBase}/api/whatsapp/qr`);
+      if (!response.ok) return;
+      const payload = await response.json().catch(() => null);
+      setQr(payload?.qr ?? null);
+    } catch {
+      /* keep the previous QR */
+    }
+  }, [serverBase]);
+
   const load = useCallback(
     async (refresh = false) => {
       if (refresh) setRefreshing(true);
@@ -130,18 +137,9 @@ export default function AdminWhatsappScreen() {
       ]);
 
       if (statusResult.status === "fulfilled") {
-        const next = statusResult.value.status;
-        setStatus(next);
+        setStatus(statusResult.value.status);
         setServerBase(statusResult.value.base);
         setStatusError(false);
-
-        // Stop waiting once the code has been accepted.
-        const waiting = pendingRef.current;
-        if (waiting && (next.numbers || []).some((item) => item.phone === waiting.phone)) {
-          setPending(null);
-          setPhone("");
-          showAlert("Connected", `${maskPhone(waiting.phone)} can now publish news.`);
-        }
       } else {
         setStatus(null);
         setServerBase(serverCandidates()[0] ?? localServerUrl());
@@ -159,14 +157,80 @@ export default function AdminWhatsappScreen() {
     void load();
   }, [load]);
 
-  // Poll while a code is outstanding, so the screen flips to Connected on its own.
-  useEffect(() => {
-    if (!pending) return;
-    const timer = setInterval(() => void load(), 5000);
-    return () => clearInterval(timer);
-  }, [pending, load]);
+  // A light status check that does not touch the news list.
+  const refreshStatus = useCallback(async () => {
+    try {
+      const response = await fetch(`${serverBase}/api/whatsapp/status`);
+      if (!response.ok) return;
+      setStatus((await response.json()) as GatewayStatus);
+    } catch {
+      /* keep the previous state */
+    }
+  }, [serverBase]);
 
-  const startVerification = async () => {
+  // While the session is not linked, keep the QR fresh (codes rotate) and
+  // watch for the moment pairing succeeds, so the panel flips on its own.
+  useEffect(() => {
+    if (!status || status.connected || statusError) return;
+    void loadQr();
+    const timer = setInterval(() => {
+      void loadQr();
+      void refreshStatus();
+    }, 8000);
+    return () => clearInterval(timer);
+  }, [status, statusError, loadQr, refreshStatus]);
+
+  // The QR is single-use: once linked, stop showing the old one.
+  useEffect(() => {
+    if (status?.connected) {
+      setQr(null);
+      setPairCode(null);
+    }
+  }, [status?.connected]);
+
+  const requestCode = async () => {
+    const trimmed = pairPhone.trim();
+    if (trimmed.replace(/[^0-9]/g, "").length < 8) {
+      showAlert("Check the number", "Enter the business number including the country code.");
+      return;
+    }
+    setPairBusy(true);
+    try {
+      const response = await fetch(`${serverBase}/api/whatsapp/pair`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: trimmed }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || `Server answered ${response.status}`);
+      setPairCode(String(payload.code));
+    } catch (error: any) {
+      showAlert("Could not get a code", error?.message || "The admin server did not respond.");
+    } finally {
+      setPairBusy(false);
+    }
+  };
+
+  const logout = () => {
+    showAlert("Log out", "The server will unlink WhatsApp. Scan a new QR to link again.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Log out",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await fetch(`${serverBase}/api/whatsapp/logout`, { method: "POST" });
+            setPairCode(null);
+            await load();
+          } catch {
+            showAlert("Could not log out", "The admin server did not respond.");
+          }
+        },
+      },
+    ]);
+  };
+
+  const addNumber = async () => {
     const trimmed = phone.trim();
     if (trimmed.replace(/[^0-9]/g, "").length < 8) {
       showAlert("Check the number", "Enter the full number including the country code.");
@@ -175,7 +239,7 @@ export default function AdminWhatsappScreen() {
 
     setBusy(true);
     try {
-      const response = await fetch(`${serverBase}/api/whatsapp/verify/start`, {
+      const response = await fetch(`${serverBase}/api/whatsapp/numbers`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: trimmed }),
@@ -183,19 +247,34 @@ export default function AdminWhatsappScreen() {
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.error || `Server answered ${response.status}`);
 
-      setPending({
-        phone: payload.phone,
-        code: payload.code,
-        expiresAt: payload.expiresAt,
-        businessNumber: payload.businessNumber ?? status?.businessNumber ?? null,
-      });
-      setStatus((current) =>
-        current ? { ...current, businessNumber: payload.businessNumber ?? current.businessNumber } : current,
+      setPhone("");
+      showAlert(
+        "Number added",
+        `${maskPhone(payload.phone)} can now publish news by sending a photo or video to the business number.`,
       );
+      await load();
     } catch (error: any) {
-      showAlert("Could not start verification", error?.message || "The admin server did not respond.");
+      showAlert("Could not add number", error?.message || "The admin server did not respond.");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const setAllowAll = async (value: boolean) => {
+    setSettingsBusy(true);
+    setStatus((current) => (current ? { ...current, allowAll: value } : current)); // optimistic
+    try {
+      const response = await fetch(`${serverBase}/api/whatsapp/settings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ allowAll: value }),
+      });
+      if (!response.ok) throw new Error(`Server answered ${response.status}`);
+    } catch (error: any) {
+      setStatus((current) => (current ? { ...current, allowAll: !value } : current));
+      showAlert("Could not save", error?.message || "The admin server did not respond.");
+    } finally {
+      setSettingsBusy(false);
     }
   };
 
@@ -221,35 +300,22 @@ export default function AdminWhatsappScreen() {
     );
   };
 
-  const copyWebhook = async () => {
-    await Clipboard.setStringAsync(status?.webhookUrl || `${serverBase}/api/whatsapp/webhook`);
-    showAlert("Copied", "The webhook URL is on your clipboard.");
-  };
-
   const numbers = status?.numbers ?? [];
-  const connected = numbers.length > 0;
+  const connected = Boolean(status?.connected);
   const stateLabel = loading
     ? "Checking"
     : connected
       ? "Connected"
       : statusError
         ? "Server offline"
-        : "Not connected";
+        : "Not linked";
   const stateTone: BadgeTone = loading ? "info" : connected ? "success" : statusError ? "danger" : "warning";
-
-  const requirements = [
-    { label: "Access token", done: status?.accessTokenConfigured, env: "WHATSAPP_TOKEN" },
-    { label: "Phone number ID", done: status?.phoneNumberIdConfigured, env: "WHATSAPP_PHONE_NUMBER_ID" },
-    { label: "Verify token", done: status?.verifyTokenConfigured, env: "WHATSAPP_VERIFY_TOKEN" },
-    { label: "App secret", done: status?.appSecretConfigured, env: "WHATSAPP_APP_SECRET" },
-    { label: "Sanity write access", done: status?.sanityWritable, env: "EXPO_PUBLIC_SANITY_TOKEN" },
-  ];
 
   return (
     <SafeAreaView edges={["top", "left", "right"]} style={{ flex: 1, backgroundColor: theme.canvas }}>
       <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
-      <ScreenHeader title="WhatsApp news" subtitle="Verify a number, then just send media" showBack />
+      <ScreenHeader title="WhatsApp news" subtitle="Link a number, then just send media" showBack />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -258,7 +324,7 @@ export default function AdminWhatsappScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} tintColor={theme.primary} />
         }
       >
-        {/* Connect / verify */}
+        {/* Link / allowed numbers */}
         <View
           style={{
             padding: spacing.lg,
@@ -283,9 +349,13 @@ export default function AdminWhatsappScreen() {
               <AppIcon name="logo-whatsapp" size={21} color={theme.primary} />
             </View>
             <View style={{ flex: 1 }}>
-              <ThemedText variant="headline">{connected ? "Connected" : "Connect a number"}</ThemedText>
+              <ThemedText variant="headline">{connected ? "Connected" : "Link WhatsApp"}</ThemedText>
               <ThemedText variant="caption" tone="secondary" style={{ marginTop: 2 }}>
-                {connected ? "Verified numbers can publish" : "Two steps, no settings to copy"}
+                {connected
+                  ? status?.businessNumber
+                    ? `Linked as +${status.businessNumber}`
+                    : "Session is live"
+                  : "Scan the QR or pair with the number"}
               </ThemedText>
             </View>
             <Badge label={stateLabel} tone={stateTone} />
@@ -297,71 +367,141 @@ export default function AdminWhatsappScreen() {
             </ThemedText>
           ) : null}
 
-          {pending ? (
-            <View style={{ marginTop: spacing.lg }}>
-              <ThemedText variant="bodySm" tone="secondary">
-                1. Send this code from WhatsApp
-              </ThemedText>
-              <ThemedText
-                variant="title1"
-                translate={false}
-                style={{ letterSpacing: 6, marginTop: spacing.sm, marginBottom: spacing.md }}
-              >
-                {pending.code}
-              </ThemedText>
-              <ThemedText variant="bodySm" tone="secondary">
-                {`2. To ${pending.businessNumber ? `+${String(pending.businessNumber).replace(/[^0-9]/g, "")}` : "the business number"} from +${pending.phone}`}
+          {!connected && !statusError ? (
+            <View style={{ marginTop: spacing.lg, alignItems: "center", gap: spacing.md }}>
+              {qr ? (
+                <Image
+                  source={{ uri: qr }}
+                  style={{ width: 220, height: 220, borderRadius: radii.md, backgroundColor: "#fff" }}
+                />
+              ) : (
+                <View style={{ paddingVertical: spacing.xl }}>
+                  <ActivityIndicator size="large" color={theme.primary} />
+                </View>
+              )}
+              <ThemedText variant="bodySm" tone="secondary" align="center">
+                WhatsApp → Linked devices → Link a device, then scan the code.
               </ThemedText>
 
-              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.lg }}>
-                <ActivityIndicator size="small" color={theme.primary} />
-                <ThemedText variant="caption" tone="tertiary" style={{ flex: 1 }}>
-                  Waiting for your message…
-                </ThemedText>
-                <PressableScale
-                  onPress={() => setPending(null)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Cancel verification"
-                  haptic="light"
-                  style={{
-                    paddingHorizontal: spacing.md,
-                    paddingVertical: 8,
-                    borderRadius: radii.md,
-                    backgroundColor: theme.surfaceAlt,
-                  }}
-                >
-                  <ThemedText variant="caption" tone="secondary">
-                    Cancel
-                  </ThemedText>
-                </PressableScale>
-              </View>
-            </View>
-          ) : (
-            <View style={{ marginTop: spacing.lg }}>
-              <ThemedText variant="bodySm" style={{ fontWeight: "700", marginBottom: spacing.sm }}>
-                WhatsApp number
+              <ThemedText variant="caption" tone="tertiary">
+                No camera handy? Pair with the number instead:
               </ThemedText>
-              <Input
-                placeholder="+46 70 123 45 67"
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
-              />
-              <PrimaryButton
-                label={connected ? "Verify another number" : "Get verification code"}
-                onPress={startVerification}
-                loading={busy}
-                disabled={busy}
-                style={{ marginTop: spacing.md }}
+              <View style={{ flexDirection: "row", gap: spacing.sm, width: "100%" }}>
+                <View style={{ flex: 1 }}>
+                  <Input
+                    placeholder="+46 70 123 45 67"
+                    value={pairPhone}
+                    onChangeText={setPairPhone}
+                    keyboardType="phone-pad"
+                  />
+                </View>
+                <PrimaryButton
+                  label="Get code"
+                  onPress={requestCode}
+                  loading={pairBusy}
+                  disabled={pairBusy}
+                />
+              </View>
+              {pairCode ? (
+                <View style={{ alignItems: "center", gap: 4 }}>
+                  <ThemedText
+                    variant="title1"
+                    translate={false}
+                    style={{ letterSpacing: 5 }}
+                  >
+                    {pairCode}
+                  </ThemedText>
+                  <ThemedText variant="caption" tone="secondary" align="center">
+                    {`${pairCode.length} characters. On the phone: Linked devices → Link with phone number instead, then type this code.`}
+                  </ThemedText>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+
+          {/* Who may publish: any number, admin-approved. Works whether or not
+              the session is linked yet, so numbers can be prepared up front. */}
+          <View style={{ marginTop: spacing.lg }}>
+            <ThemedText variant="bodySm" style={{ fontWeight: "700", marginBottom: spacing.sm }}>
+              Who can publish
+            </ThemedText>
+
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing.md,
+                paddingVertical: spacing.xs,
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <ThemedText variant="bodySm">Any WhatsApp number</ThemedText>
+                <ThemedText variant="caption" tone="secondary" style={{ marginTop: 2 }}>
+                  No list to maintain — everyone can publish.
+                </ThemedText>
+              </View>
+              <Switch
+                value={Boolean(status?.allowAll)}
+                onValueChange={setAllowAll}
+                disabled={settingsBusy || statusError || !status}
+                trackColor={{ true: theme.primary, false: theme.border }}
               />
             </View>
-          )}
+
+            {!status?.allowAll ? (
+              <>
+                <View
+                  style={{
+                    height: 1,
+                    backgroundColor: theme.borderSubtle,
+                    marginVertical: spacing.sm,
+                  }}
+                />
+                <ThemedText variant="caption" tone="secondary" style={{ marginBottom: spacing.sm }}>
+                  Or allow only the numbers you add:
+                </ThemedText>
+                <Input
+                  placeholder="+46 70 987 65 43"
+                  value={phone}
+                  onChangeText={setPhone}
+                  keyboardType="phone-pad"
+                />
+                <PrimaryButton
+                  label={numbers.length ? "Add another number" : "Add number"}
+                  onPress={addNumber}
+                  loading={busy}
+                  disabled={busy}
+                  style={{ marginTop: spacing.md }}
+                />
+              </>
+            ) : null}
+
+            <ThemedText variant="caption" tone="secondary" style={{ marginTop: spacing.sm }}>
+              {status?.businessNumber
+                ? `Either way, they publish by sending a photo or video to +${String(status.businessNumber).replace(/[^0-9]/g, "")}.`
+                : "Either way, they publish by sending a photo or video to the linked number."}
+            </ThemedText>
+
+            {connected ? (
+              <PressableScale
+                onPress={logout}
+                accessibilityRole="button"
+                accessibilityLabel="Log out of WhatsApp"
+                haptic="light"
+                style={{ marginTop: spacing.sm, alignSelf: "flex-start" }}
+              >
+                <ThemedText variant="caption" tone="secondary" style={{ textDecorationLine: "underline" }}>
+                  Log out and link a different number
+                </ThemedText>
+              </PressableScale>
+            ) : null}
+          </View>
         </View>
 
-        {/* Verified numbers */}
+        {/* Allowed numbers */}
         {numbers.length ? (
           <View style={{ marginTop: spacing.xl }}>
-            <SectionHeader title="Verified numbers" subtitle="They can publish by sending media" />
+            <SectionHeader title="Allowed numbers" subtitle="They can publish by sending media" />
             <View style={{ gap: spacing.sm }}>
               {numbers.map((item) => (
                 <View
@@ -385,7 +525,7 @@ export default function AdminWhatsappScreen() {
                     <ThemedText variant="caption" tone="tertiary" translate={false} style={{ marginTop: 2 }}>
                       {item.verifiedAt
                         ? formatRelativeTime(item.verifiedAt, new Date(), currentDateLocale())
-                        : "Verified"}
+                        : "Allowed"}
                     </ThemedText>
                   </View>
                   <PressableScale
@@ -488,82 +628,12 @@ export default function AdminWhatsappScreen() {
                   align="center"
                   style={{ marginTop: spacing.sm, paddingHorizontal: spacing.lg }}
                 >
-                  Verified numbers can send a photo or video; it appears here and in News.
+                  Allowed numbers can send a photo or video; it appears here and in News.
                 </ThemedText>
               </View>
             ) : null}
           </View>
         </View>
-
-        {/* One-time server setup, collapsed */}
-        <PressableScale
-          onPress={() => setAdvanced((value) => !value)}
-          accessibilityRole="button"
-          accessibilityLabel="Advanced setup"
-          haptic="light"
-          style={{
-            marginTop: spacing.xl,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: spacing.sm,
-            paddingVertical: spacing.sm,
-          }}
-        >
-          <AppIcon name={advanced ? "chevron-down" : "chevron-forward"} size={15} color={theme.textTertiary} />
-          <ThemedText variant="caption" tone="secondary">
-            Advanced setup
-          </ThemedText>
-        </PressableScale>
-
-        {advanced ? (
-          <View style={{ gap: spacing.sm }}>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: spacing.md,
-                padding: spacing.md,
-                borderRadius: radii.lg,
-                borderWidth: 1,
-                borderColor: theme.borderSubtle,
-                backgroundColor: theme.surface,
-              }}
-            >
-              <ThemedText variant="caption" tone="secondary" translate={false} style={{ flex: 1 }}>
-                {status?.webhookUrl || `${serverBase}/api/whatsapp/webhook`}
-              </ThemedText>
-              <PressableScale
-                onPress={copyWebhook}
-                accessibilityRole="button"
-                accessibilityLabel="Copy webhook URL"
-                haptic="light"
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 11,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  backgroundColor: theme.primarySoft,
-                }}
-              >
-                <AppIcon name="copy-outline" size={16} color={theme.primary} />
-              </PressableScale>
-            </View>
-
-            {requirements.map((item) => (
-              <View key={item.env} style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.sm }}>
-                <AppIcon
-                  name={item.done ? "checkmark-circle" : "alert-circle-outline"}
-                  size={15}
-                  color={item.done ? theme.primary : theme.textQuaternary}
-                />
-                <ThemedText variant="caption" tone="tertiary" translate={false} style={{ flex: 1 }}>
-                  {`${item.label} · ${item.env}`}
-                </ThemedText>
-              </View>
-            ))}
-          </View>
-        ) : null}
       </ScrollView>
     </SafeAreaView>
   );

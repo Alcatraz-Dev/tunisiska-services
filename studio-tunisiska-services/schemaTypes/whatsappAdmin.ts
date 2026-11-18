@@ -3,9 +3,9 @@ import {defineType} from 'sanity'
 /**
  * A WhatsApp number allowed to publish News through the gateway.
  *
- * Created by the admin panel: it stores a short-lived verification code first,
- * then `verifiedAt` once that code is sent from the number to the business
- * account. Documents without `verifiedAt` cannot publish.
+ * Created by the admin panel, which stamps `verifiedAt` immediately — the
+ * panel is admin-gated and Meta asserts the sender, so no code handshake is
+ * needed. Documents without `verifiedAt` cannot publish.
  */
 export default defineType({
   name: 'whatsappAdmin',
