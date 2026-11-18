@@ -30,6 +30,7 @@ let connected = false;
 let businessNumber = "";
 let qrDataUrl = "";
 let lastError = "";
+let activeOnMessage = null;
 
 function digitsOf(value) {
   return String(value || "").replace(/[^0-9]/g, "");
@@ -111,7 +112,10 @@ async function connect(onMessage) {
 
   sock.ev.on("connection.update", async (update) => {
     const { connection, lastDisconnect, qr } = update;
-    if (qr) await renderQr(qr);
+    if (qr) {
+      await renderQr(qr);
+      lastError = "";
+    }
     if (connection === "open") {
       connected = true;
       qrDataUrl = "";
@@ -122,26 +126,39 @@ async function connect(onMessage) {
     if (connection === "close") {
       connected = false;
       const code = lastDisconnect?.error?.output?.statusCode;
-      if (code === DisconnectReason.loggedOut) {
-        // Pairing was revoked on the phone: wipe and wait for a fresh pair.
+      const isLoggedOut = code === DisconnectReason.loggedOut;
+      const isBadSession = code === DisconnectReason.badSession;
+
+      if (isLoggedOut || isBadSession) {
+        // Pairing was revoked on the phone or session is corrupt: wipe and wait for a fresh pair.
         try {
           fs.rmSync(AUTH_DIR, { recursive: true, force: true });
         } catch {}
         sock = null;
         starting = null;
-        console.log("⚠️ [WHATSAPP] Logged out — scan a new QR or pair again.");
+        qrDataUrl = "";
+        businessNumber = "";
+        lastError = isLoggedOut ? "logged out" : "bad session";
+        console.log(`⚠️ [WHATSAPP] ${isLoggedOut ? "Logged out" : "Bad session"} — scan a new QR or pair again.`);
+        setTimeout(() => {
+          startBridge({ onMessage: activeOnMessage }).catch(() => {});
+        }, 1500);
         return;
       }
+
       // Transient drop: reconnect after a pause.
+      const isRestartRequired = code === DisconnectReason.restartRequired;
+      const isTimeout = code === DisconnectReason.timedOut;
       console.log(`⚠️ [WHATSAPP] Disconnected (${code || "unknown"}) — retrying…`);
-      lastError = `disconnected (${code || "unknown"})`;
+      lastError = isTimeout ? "QR expired — refreshing" : `disconnected (${code || "unknown"})`;
       sock = null;
       starting = null;
+      const retryDelay = isRestartRequired ? 500 : 3000;
       setTimeout(() => {
-        startBridge({ onMessage }).catch((error) => {
+        startBridge({ onMessage: activeOnMessage }).catch((error) => {
           console.error("❌ [WHATSAPP] Reconnect failed:", error?.message || error);
         });
-      }, 5000);
+      }, retryDelay);
     }
   });
 
@@ -180,10 +197,11 @@ async function connect(onMessage) {
 }
 
 /** Start (or reuse) the session. Safe to call repeatedly. */
-export function startBridge({ onMessage }) {
+export function startBridge({ onMessage } = {}) {
+  if (onMessage) activeOnMessage = onMessage;
   if (sock && connected) return Promise.resolve();
   if (starting) return starting;
-  starting = connect(onMessage).catch((error) => {
+  starting = connect(activeOnMessage).catch((error) => {
     starting = null;
     lastError = error?.message || String(error);
     console.error("❌ [WHATSAPP] Could not start:", lastError);
@@ -212,7 +230,13 @@ export function bridgeStatus() {
 export async function requestPairingCode(phone) {
   const digits = digitsOf(phone);
   if (digits.length < 8) throw new Error("Enter a phone number with the country code.");
-  await startBridge({ onMessage: async () => {} });
+  await startBridge();
+  if (starting) {
+    await Promise.race([
+      starting,
+      new Promise((resolve) => setTimeout(resolve, 5000)),
+    ]);
+  }
   if (!sock) throw new Error("The WhatsApp session is not running.");
   if (sock.authState?.creds?.registered) throw new Error("This server is already linked — log out first to re-pair.");
   // WhatsApp consumes exactly 8 characters (e.g. "3F7K9Q2M"); show them as-is.
@@ -242,4 +266,5 @@ export async function logoutBridge() {
   connected = false;
   businessNumber = "";
   qrDataUrl = "";
+  lastError = "";
 }

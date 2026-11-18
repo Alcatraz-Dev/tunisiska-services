@@ -141,21 +141,34 @@ export default function AdminWhatsappScreen() {
     const answered: { status: GatewayStatus; base: string }[] = [];
     const tried: { base: string; ok: boolean; error?: string }[] = [];
 
-    for (const base of bases) {
-      try {
-        const status = await fetchJson<GatewayStatus>(`${base}/api/whatsapp/status`, undefined, 5000);
-        answered.push({ status, base });
+    const checks = await Promise.allSettled(
+      bases.map(async (base) => {
+        const res = await fetchJson<GatewayStatus>(`${base}/api/whatsapp/status`, undefined, 4000);
+        return { base, status: res };
+      })
+    );
+
+    checks.forEach((check, index) => {
+      const base = bases[index];
+      if (check.status === "fulfilled") {
+        answered.push({ status: check.value.status, base: check.value.base });
         tried.push({ base, ok: true });
-      } catch (error: any) {
-        tried.push({ base, ok: false, error: error?.message || "unreachable" });
+      } else {
+        tried.push({ base, ok: false, error: check.reason?.message || "unreachable" });
       }
-    }
+    });
+
     setAttempts(tried);
+
+    // Prefer manualAddress if provided and it has bridgeActive
+    const manualResult = answered.find((item) => item.base === manualAddress);
+    if (manualResult && manualResult.status.bridgeActive) return manualResult;
 
     // Prefer the server that actually holds the session: a deployed API can
     // answer this call while having no WhatsApp bridge at all.
     const withBridge = answered.find((item) => item.status.bridgeActive);
     if (withBridge) return withBridge;
+    if (manualResult) return manualResult;
     if (answered.length) return answered[0];
     throw new Error(tried.map((item) => `${item.base}: ${item.error}`).join(" · "));
   }, [manualAddress]);
@@ -223,7 +236,27 @@ export default function AdminWhatsappScreen() {
     } catch {
       /* storage is best-effort */
     }
-    // Changing the address re-creates `probe`, which re-runs `load`.
+    if (value) {
+      setLoading(true);
+      try {
+        const testStatus = await fetchJson<GatewayStatus>(`${value}/api/whatsapp/status`, undefined, 4000);
+        setStatus(testStatus);
+        setServerBase(value);
+        setStatusError(false);
+        showAlert(
+          "Ansluten",
+          testStatus.bridgeActive
+            ? "Servern är ansluten och WhatsApp-sessionen är aktiv!"
+            : "Servern svarade, men WhatsApp-bryggan körs inte på den adressen."
+        );
+      } catch (err: any) {
+        showAlert("Kunde inte ansluta", `Kunde inte nå ${value}: ${err?.message || "unreachable"}`);
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      void load(true);
+    }
   };
 
   // A light status check that does not touch the news list.

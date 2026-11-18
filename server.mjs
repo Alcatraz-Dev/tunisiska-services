@@ -80,7 +80,10 @@ const getLocalIPs = () => {
 // Log available IP addresses for real device testing
 const localIPs = getLocalIPs();
 console.log("🌐 Available local IP addresses for real device testing:");
-localIPs.forEach(ip => console.log(`   http://${ip}:${PORT}`));
+localIPs.forEach(ip => {
+  console.log(`   API: http://${ip}:${PORT}`);
+  console.log(`   WhatsApp Gateway: http://${ip}:${GATEWAY_PORT}`);
+});
 console.log("💡 For real devices, use one of these IPs instead of localhost");
 
 // Middleware
@@ -566,6 +569,9 @@ app.post("/api/whatsapp/pair", async (req, res) => {
 // Log out and wipe the session so the server pairs fresh.
 app.post("/api/whatsapp/logout", async (req, res) => {
   await logoutBridge();
+  if (!process.env.VERCEL && process.env.WHATSAPP_BRIDGE_ENABLED !== "false") {
+    startWhatsappBridge();
+  }
   res.json({ loggedOut: true });
 });
 
