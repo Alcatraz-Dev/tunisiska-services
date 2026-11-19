@@ -103,7 +103,7 @@ export default function NewsScreen() {
           </Animated.View>
         ) : (
           announcements.map((item, index) => {
-            const featured = index === 0 && !!item.media?.imageUrl;
+            const hasMedia = Boolean(item.media?.imageUrl || item.media?.videoUrl);
             return (
               <Animated.View
                 key={item.id || item.slug}
@@ -111,7 +111,7 @@ export default function NewsScreen() {
               >
                 <NewsCard
                   item={item}
-                  featured={featured}
+                  featured={hasMedia}
                   onPress={() => router.push(`/(home)/announcements/${item.slug}`)}
                 />
               </Animated.View>
@@ -147,13 +147,23 @@ function NewsCard({
   const iconBg = important ? theme.accentSoft : theme.primarySoft;
   const iconColor = important ? theme.accent : theme.primary;
 
+  const isGenericTitle =
+    !item.title ||
+    item.title === "Nytt foto" ||
+    item.title === "Ny video" ||
+    item.title === "Bild-uppdatering" ||
+    item.title === "Video-uppdatering";
+  const hasText = summary.length > 0 || !isGenericTitle;
+  const hasVideo = item.media?.type === "video" || Boolean(item.media?.videoUrl);
+  const mediaUri = item.media?.imageUrl || item.media?.videoUrl;
+
   const timestamp = item.publishedAt ? (
     <View
       style={{
         flexDirection: "row",
         alignItems: "center",
         gap: 6,
-        marginTop: 10,
+        marginTop: hasText ? 10 : 0,
       }}
     >
       <AppIcon name="time-outline" size={13} color={theme.textTertiary} />
@@ -176,49 +186,147 @@ function NewsCard({
         shadows.md,
       ]}
     >
-      {featured ? (
+      {featured && mediaUri ? (
         <>
-          <View style={{ position: "relative" }}>
-            <Image
-              source={{ uri: item.media!.imageUrl }}
-              style={styles.media}
-              resizeMode="cover"
-              accessibilityIgnoresInvertColors
-            />
+          <View style={{ position: "relative", backgroundColor: "#0a0a0a" }}>
+            {item.media?.imageUrl ? (
+              <Image
+                source={{ uri: item.media.imageUrl }}
+                style={styles.media}
+                resizeMode={hasText ? "cover" : "contain"}
+                accessibilityIgnoresInvertColors
+              />
+            ) : (
+              <View style={[styles.media, { alignItems: "center", justifyContent: "center", backgroundColor: "#111827" }]}>
+                <AppIcon name="videocam" size={48} color={theme.primary} />
+              </View>
+            )}
+
+            {hasVideo && (
+              <View
+                style={[
+                  StyleSheet.absoluteFill,
+                  {
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: "rgba(0,0,0,0.25)",
+                  },
+                ]}
+              >
+                <View
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: 26,
+                    backgroundColor: "rgba(0,0,0,0.65)",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderWidth: 1.5,
+                    borderColor: "rgba(255,255,255,0.7)",
+                  }}
+                >
+                  <AppIcon name="play" size={24} color="#FFFFFF" style={{ marginLeft: 3 }} />
+                </View>
+              </View>
+            )}
+
             <LinearGradient
               pointerEvents="none"
-              colors={["transparent", "rgba(6,16,31,0.24)"]}
-              locations={[0.55, 1]}
+              colors={["transparent", "rgba(6,16,31,0.65)"]}
+              locations={[0.5, 1]}
               style={StyleSheet.absoluteFill}
             />
-            {important ? (
-              <View style={[styles.importantBadge, { backgroundColor: theme.accent }]}>
-                <AppIcon name="alert-circle" size={13} color="#FFFFFF" />
-                <ThemedText
-                  variant="overline"
-                  style={{ color: "#FFFFFF", marginLeft: 4 }}
+
+            {/* Badges on top of media */}
+            <View
+              style={{
+                position: "absolute",
+                top: 12,
+                left: 12,
+                right: 12,
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              {important ? (
+                <View style={[styles.importantBadge, { backgroundColor: theme.accent }]}>
+                  <AppIcon name="alert-circle" size={13} color="#FFFFFF" />
+                  <ThemedText variant="overline" style={{ color: "#FFFFFF", marginLeft: 4 }}>
+                    Important
+                  </ThemedText>
+                </View>
+              ) : <View />}
+
+              {item.icon === "logo-whatsapp" ? (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 12,
+                    backgroundColor: "rgba(0,0,0,0.6)",
+                    gap: 4,
+                  }}
                 >
-                  Important
-                </ThemedText>
+                  <AppIcon name="logo-whatsapp" size={14} color="#25D366" />
+                  <ThemedText variant="caption" style={{ color: "#fff", fontSize: 11, fontWeight: "600" }}>
+                    WhatsApp
+                  </ThemedText>
+                </View>
+              ) : null}
+            </View>
+
+            {/* If no custom text, overlay timestamp inside media so card looks complete */}
+            {!hasText && item.publishedAt ? (
+              <View
+                style={{
+                  position: "absolute",
+                  bottom: 12,
+                  left: 14,
+                  right: 14,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <AppIcon name="time-outline" size={13} color="rgba(255,255,255,0.9)" />
+                  <ThemedText variant="footnote" style={{ color: "rgba(255,255,255,0.9)" }} translate={false}>
+                    {formatRelativeTime(item.publishedAt, new Date(), currentDateLocale(language))}
+                  </ThemedText>
+                </View>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                  <ThemedText variant="caption" style={{ color: "rgba(255,255,255,0.8)", fontSize: 12, fontWeight: "600" }}>
+                    Visa
+                  </ThemedText>
+                  <AppIcon name="chevron-forward" size={13} color="rgba(255,255,255,0.8)" />
+                </View>
               </View>
             ) : null}
           </View>
-          <View style={styles.body}>
-            <ThemedText variant="title3" numberOfLines={2} style={{ lineHeight: 27 }}>
-              {item.title}
-            </ThemedText>
-            {summary ? (
-              <ThemedText
-                variant="bodySm"
-                tone="secondary"
-                numberOfLines={2}
-                style={{ marginTop: 6 }}
-              >
-                {summary}
-              </ThemedText>
-            ) : null}
-            {timestamp}
-          </View>
+
+          {hasText ? (
+            <View style={styles.body}>
+              {!isGenericTitle ? (
+                <ThemedText variant="title3" numberOfLines={2} style={{ lineHeight: 26, fontWeight: "700" }}>
+                  {item.title}
+                </ThemedText>
+              ) : null}
+              {summary ? (
+                <ThemedText
+                  variant="bodySm"
+                  tone="secondary"
+                  numberOfLines={3}
+                  style={{ marginTop: !isGenericTitle ? 6 : 0 }}
+                >
+                  {summary}
+                </ThemedText>
+              ) : null}
+              {timestamp}
+            </View>
+          ) : null}
         </>
       ) : (
         <View style={styles.compact}>
@@ -274,7 +382,8 @@ const styles = {
   get media() {
     return {
       width: "100%" as const,
-      height: 204,
+      height: 240,
+      backgroundColor: "#0d1117",
     };
   },
   get importantBadge() {

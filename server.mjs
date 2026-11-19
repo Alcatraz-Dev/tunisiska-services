@@ -530,7 +530,7 @@ async function isAuthorizedSender(sender, config, client) {
   return Boolean(record?.verifiedAt);
 }
 
-async function handleBridgeMessage({ from, messageId, kind, text, ...media }) {
+async function handleBridgeMessage({ from, messageId, kind, text, isSelf, ...media }) {
   const client = sanityWriteClient();
   if (!client) {
     console.error("❌ [WHATSAPP] Sanity write token is not configured");
@@ -543,22 +543,25 @@ async function handleBridgeMessage({ from, messageId, kind, text, ...media }) {
     return { skipped: "sender is not allowed", from: maskPhone(from) };
   }
 
-  // Plain texts never publish. The sender gets a hint back so they know
-  // what to do; anything else is ignored quietly.
+  // Plain texts never publish. Only reply with a hint to other users, NEVER to self
   if (kind === "text") {
-    await sendBridgeText(from, "Skicka ett foto eller en video här så publiceras det direkt som en nyhet i appen.");
-    return { noted: "replied with a publishing hint" };
+    if (!isSelf) {
+      await sendBridgeText(from, "Skicka ett foto eller en video här så publiceras det direkt som en nyhet i appen.");
+    }
+    return { noted: "ignored plain text" };
   }
 
   try {
     const result = await publishWhatsappMedia({ from, messageId, kind, ...media }, client);
-    if (result?.docId) {
+    if (result?.docId && !result?.skipped) {
       await sendBridgeText(from, `✅ Publicerat som nyhet i appen!\n\n"${result.title || 'Nyhet'}"`);
     }
     return result;
   } catch (error) {
     console.error("❌ [WHATSAPP] Could not publish message:", error);
-    await sendBridgeText(from, `❌ Kunde inte publicera: ${error?.message || error}`);
+    if (!isSelf) {
+      await sendBridgeText(from, `❌ Kunde inte publicera: ${error?.message || error}`);
+    }
     return { error: error.message, from: maskPhone(from) };
   }
 }

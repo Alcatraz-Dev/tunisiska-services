@@ -32,6 +32,7 @@ let qrDataUrl = "";
 let lastError = "";
 let activeOnMessage = null;
 let activeOnConnected = null;
+const sentBotTexts = new Set();
 
 function digitsOf(value) {
   return String(value || "").replace(/[^0-9]/g, "");
@@ -225,29 +226,37 @@ async function connect(onMessage) {
         const fromMe = Boolean(msg.key?.fromMe);
         const toSelf = isSelfMessage(msg);
         const remote = String(msg?.key?.remoteJid || "");
-        console.log(`📩 [WHATSAPP] Event: type=${type}, remote=${remote}, fromMe=${fromMe}, toSelf=${toSelf}`);
+
+        const text = unwrap(msg.message)?.conversation
+          || unwrap(msg.message)?.extendedTextMessage?.text
+          || "";
+
+        // Anti-loop guard 1: Ignore messages sent by the bot itself
+        if (text && sentBotTexts.has(text.trim())) {
+          continue;
+        }
+
+        const attached = mediaOf(msg);
+
+        // Anti-loop guard 2: Never process plain text from self in self-chat
+        if (fromMe && toSelf && !attached) {
+          continue;
+        }
 
         // If fromMe and NOT sent to self, only allow if explicitly marked with #news
         if (fromMe && !toSelf) {
           const captionOrText = msg.message?.imageMessage?.caption
             || msg.message?.videoMessage?.caption
-            || unwrap(msg.message)?.conversation
-            || unwrap(msg.message)?.extendedTextMessage?.text
-            || "";
+            || text;
           if (!captionOrText.toLowerCase().includes("#news")) {
-            console.log(`ℹ️ [WHATSAPP] Skipped outgoing chat to ${remote} (add #news to publish)`);
             continue;
           }
         }
 
         const from = senderOf(msg) || ownNumber() || "unknown";
-        const attached = mediaOf(msg);
-        const text = unwrap(msg.message)?.conversation
-          || unwrap(msg.message)?.extendedTextMessage?.text
-          || "";
         const messageId = String(msg.key?.id || `${Date.now()}`);
 
-        console.log(`📷 [WHATSAPP] Inbound ${attached ? attached.kind : text ? 'text' : 'event'} from +${from} (fromMe: ${fromMe}, toSelf: ${toSelf})`);
+        console.log(`📷 [WHATSAPP] Inbound ${attached ? attached.kind : 'text'} from +${from} (fromMe: ${fromMe}, toSelf: ${toSelf})`);
 
         if (attached) {
           let buffer;
@@ -261,18 +270,23 @@ async function connect(onMessage) {
             buffer = await downloadMediaMessage(msg, "buffer", {});
           }
 
-          await onMessage({
-            from,
-            messageId,
-            kind: attached.kind,
-            buffer: Buffer.from(buffer),
-            contentType: attached.kind === "image" ? "image/jpeg" : "video/mp4",
-            filename: attached.filename,
-            caption: String(attached.caption || ""),
-            pushName: msg.pushName,
-          });
+          if (buffer && buffer.length) {
+            await onMessage({
+              from,
+              messageId,
+              kind: attached.kind,
+              buffer: Buffer.from(buffer),
+              contentType: attached.kind === "image" ? "image/jpeg" : "video/mp4",
+              filename: attached.filename,
+              caption: String(attached.caption || ""),
+              pushName: msg.pushName,
+              isSelf: toSelf,
+            });
+          }
         } else if (String(text).trim()) {
-          await onMessage({ from, messageId, kind: "text", text: String(text).trim(), pushName: msg.pushName });
+          if (!toSelf) {
+            await onMessage({ from, messageId, kind: "text", text: String(text).trim(), pushName: msg.pushName, isSelf: false });
+          }
         }
       } catch (error) {
         console.error("❌ [WHATSAPP] Could not handle a message:", error?.message || error);
@@ -340,6 +354,14 @@ export async function requestPairingCode(phone) {
 export async function sendBridgeText(to, body) {
   try {
     if (!sock || !connected) return;
+    const cleanBody = String(body || "").trim();
+    if (cleanBody) {
+      sentBotTexts.add(cleanBody);
+      if (sentBotTexts.size > 50) {
+        const first = sentBotTexts.values().next().value;
+        sentBotTexts.delete(first);
+      }
+    }
     await sock.sendMessage(`${digitsOf(to)}@s.whatsapp.net`, { text: body });
   } catch {}
 }

@@ -98,20 +98,36 @@ export default function AnnouncementDetails() {
     }
   };
 
+  const isGenericTitle =
+    !announcement.title ||
+    announcement.title === "Nytt foto" ||
+    announcement.title === "Ny video" ||
+    announcement.title === "Bild-uppdatering" ||
+    announcement.title === "Video-uppdatering";
+  const displayTitle = isGenericTitle
+    ? (announcement.message ? announcement.message.slice(0, 60) : "Nyhet")
+    : announcement.title;
+
   const AnnouncementMedia = ({ media }: { media?: AnnouncementMedia }) => {
     if (!media) return null;
 
     if (media.type === "video" && media.videoUrl) {
-      return <VideoPlayer uri={media.videoUrl} muted={false} />;
+      return (
+        <View style={{ width: "100%", height: 260, borderRadius: 16, overflow: "hidden", backgroundColor: "#000", marginBottom: 16 }}>
+          <VideoPlayer uri={media.videoUrl} muted={false} />
+        </View>
+      );
     }
 
     if (media.type === "image" && media.imageUrl) {
       return (
-        <Image
-          source={{ uri: media.imageUrl }}
-          style={{ width: "100%", height: 200, borderRadius: 12 }}
-          resizeMode="cover"
-        />
+        <View style={{ width: "100%", borderRadius: 16, overflow: "hidden", backgroundColor: "#0a0a0a", marginBottom: 16 }}>
+          <Image
+            source={{ uri: media.imageUrl }}
+            style={{ width: "100%", height: 340 }}
+            resizeMode="contain"
+          />
+        </View>
       );
     }
 
@@ -121,8 +137,8 @@ export default function AnnouncementDetails() {
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-dark" : "bg-light"}`}>
       {/* Header */}
-      <View className="px-6 pt-6 pb-4">
-        <View className="flex-row items-center justify-center relative mb-4">
+      <View className="px-6 pt-6 pb-2">
+        <View className="flex-row items-center justify-center relative mb-2">
           <TouchableOpacity
             onPress={() => router.back()}
             className="absolute left-0 p-2"
@@ -138,23 +154,26 @@ export default function AnnouncementDetails() {
               isDark ? "text-white" : "text-gray-900"
             }`}
           >
-            {announcement.title}
+            {displayTitle}
           </AutoText>
         </View>
-        <AutoText
-          className={`text-sm text-center mt-3 ${
-            isDark ? "text-gray-500" : "text-gray-500"
-          }`}
-        >
-          {announcement.message}
-        </AutoText>
+        {announcement.message && announcement.message !== displayTitle ? (
+          <AutoText
+            className={`text-sm text-center mt-2 ${
+              isDark ? "text-gray-400" : "text-gray-600"
+            }`}
+          >
+            {announcement.message}
+          </AutoText>
+        ) : null}
       </View>
 
       <Animated.View
-        entering={FadeInUp.delay(200 * parseInt(announcement.id))}
+        entering={FadeInUp.delay(200 * (parseInt(announcement.id) || 1))}
         exiting={FadeOutDown}
+        style={{ flex: 1 }}
       >
-        <ScrollView className="px-6 mt-10">
+        <ScrollView className="px-6 mt-4" contentContainerStyle={{ paddingBottom: 60 }}>
           {/* Media */}
           {announcement.media && (
             <AnnouncementMedia media={announcement.media} />
