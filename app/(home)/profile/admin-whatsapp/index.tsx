@@ -291,7 +291,7 @@ export default function AdminWhatsappScreen() {
   const requestCode = async () => {
     const trimmed = pairPhone.trim();
     if (trimmed.replace(/[^0-9]/g, "").length < 8) {
-      showAlert("Check the number", "Enter the business number including the country code.");
+      showAlert("Kontrollera numret", "Ange företagets nummer inklusive landsnummer.");
       return;
     }
     setPairBusy(true);
@@ -303,17 +303,17 @@ export default function AdminWhatsappScreen() {
       }, 20000);
       setPairCode(String(payload.code));
     } catch (error: any) {
-      showAlert("Could not get a code", error?.message || "The admin server did not respond.");
+      showAlert("Kunde inte hämta kod", error?.message || "Administratörsservern svarade inte.");
     } finally {
       setPairBusy(false);
     }
   };
 
   const logout = () => {
-    showAlert("Log out", "The server will unlink WhatsApp. Scan a new QR to link again.", [
-      { text: "Cancel", style: "cancel" },
+    showAlert("Logga ut", "Servern kopplar bort WhatsApp. Skanna en ny QR-kod för att länka igen.", [
+      { text: "Avbryt", style: "cancel" },
       {
-        text: "Log out",
+        text: "Logga ut",
         style: "destructive",
         onPress: async () => {
           try {
@@ -321,7 +321,7 @@ export default function AdminWhatsappScreen() {
             setPairCode(null);
             await load();
           } catch {
-            showAlert("Could not log out", "The admin server did not respond.");
+            showAlert("Kunde inte logga ut", "Administratörsservern svarade inte.");
           }
         },
       },
@@ -331,7 +331,7 @@ export default function AdminWhatsappScreen() {
   const addNumber = async () => {
     const trimmed = phone.trim();
     if (trimmed.replace(/[^0-9]/g, "").length < 8) {
-      showAlert("Check the number", "Enter the full number including the country code.");
+      showAlert("Kontrollera numret", "Ange hela numret inklusive landsnummer.");
       return;
     }
 
@@ -345,12 +345,12 @@ export default function AdminWhatsappScreen() {
 
       setPhone("");
       showAlert(
-        "Number added",
-        `${maskPhone(payload.phone)} can now publish news by sending a photo or video to the business number.`,
+        "Nummer tillagt",
+        `${maskPhone(payload.phone)} kan nu publicera nyheter genom att skicka ett foto eller en video till företagsnumret.`,
       );
       await load();
     } catch (error: any) {
-      showAlert("Could not add number", error?.message || "The admin server did not respond.");
+      showAlert("Kunde inte lägga till nummer", error?.message || "Administratörsservern svarade inte.");
     } finally {
       setBusy(false);
     }
@@ -367,7 +367,7 @@ export default function AdminWhatsappScreen() {
       });
     } catch (error: any) {
       setStatus((current) => (current ? { ...current, allowAll: !value } : current));
-      showAlert("Could not save", error?.message || "The admin server did not respond.");
+      showAlert("Kunde inte spara", error?.message || "Administratörsservern svarade inte.");
     } finally {
       setSettingsBusy(false);
     }
@@ -375,19 +375,19 @@ export default function AdminWhatsappScreen() {
 
   const revoke = (number: VerifiedNumber) => {
     showAlert(
-      "Remove number",
-      `${maskPhone(number.phone)} will no longer be able to publish from WhatsApp.`,
+      "Ta bort nummer",
+      `${maskPhone(number.phone)} kan inte längre publicera via WhatsApp.`,
       [
-        { text: "Cancel", style: "cancel" },
+        { text: "Avbryt", style: "cancel" },
         {
-          text: "Remove",
+          text: "Ta bort",
           style: "destructive",
           onPress: async () => {
             try {
               await fetchJson(`${serverBase}/api/whatsapp/numbers/${number.phone}`, { method: "DELETE" });
               await load();
             } catch {
-              showAlert("Could not remove", "The admin server did not respond.");
+              showAlert("Kunde inte ta bort", "Administratörsservern svarade inte.");
             }
           },
         },
@@ -400,19 +400,19 @@ export default function AdminWhatsappScreen() {
   // The server answered but has no WhatsApp session (e.g. the Vercel API).
   const bridgeDown = Boolean(!connected && status && status.bridgeActive === false);
   const stateLabel = loading
-    ? "Checking"
+    ? "Kontrollerar"
     : connected
-      ? "Connected"
+      ? "Ansluten"
       : statusError
-        ? "Server offline"
-        : "Not linked";
+        ? "Servern offline"
+        : "Inte länkat";
   const stateTone: BadgeTone = loading ? "info" : connected ? "success" : statusError ? "danger" : "warning";
 
   return (
     <SafeAreaView edges={["top", "left", "right"]} style={{ flex: 1, backgroundColor: theme.canvas }}>
       <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
-      <ScreenHeader title="WhatsApp news" subtitle="Link a number, then just send media" showBack />
+      <ScreenHeader title="WhatsApp-nyheter" subtitle="Länka ett nummer, skicka sedan media" showBack />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -446,13 +446,13 @@ export default function AdminWhatsappScreen() {
               <AppIcon name="logo-whatsapp" size={21} color={theme.primary} />
             </View>
             <View style={{ flex: 1 }}>
-              <ThemedText variant="headline">{connected ? "Connected" : "Link WhatsApp"}</ThemedText>
+              <ThemedText variant="headline">{connected ? "Ansluten" : "Länka WhatsApp"}</ThemedText>
               <ThemedText variant="caption" tone="secondary" style={{ marginTop: 2 }}>
                 {connected
                   ? status?.businessNumber
-                    ? `Linked as +${status.businessNumber}`
-                    : "Session is live"
-                  : "Scan the QR or pair with the number"}
+                    ? `Länkad som +${status.businessNumber}`
+                    : "Sessionen är aktiv"
+                  : "Skanna QR-koden eller para ihop med numret"}
               </ThemedText>
             </View>
             <Badge label={stateLabel} tone={stateTone} />
@@ -460,7 +460,7 @@ export default function AdminWhatsappScreen() {
 
           {statusError && !loading ? (
             <ThemedText variant="bodySm" tone="secondary" style={{ marginTop: spacing.md }}>
-              {`No admin server answered at ${serverCandidates().join(" or ")}. Start it with npm run server.`}
+              {`Ingen administratörsserver svarade på ${serverCandidates().join(" eller ")}. Starta den med npm run server.`}
             </ThemedText>
           ) : null}
 
@@ -476,14 +476,14 @@ export default function AdminWhatsappScreen() {
               }}
             >
               <ThemedText variant="bodySm" style={{ fontWeight: "700" }}>
-                The gateway isn't running on this server
+                Gatewayen körs inte på denna server
               </ThemedText>
               <ThemedText variant="caption" tone="secondary">
                 {status?.bridgeNote
-                  || `Start it with npm run server on the machine that should hold the WhatsApp session, then pull to refresh. This screen is talking to ${serverBase}.`}
+                  || `Starta den med npm run server på maskinen som ska hålla WhatsApp-sessionen, dra sedan nedåt för att uppdatera. Denna vy kommunicerar med ${serverBase}.`}
               </ThemedText>
               {status?.lastError ? (
-                <ThemedText variant="caption" tone="tertiary">{`Last error: ${status.lastError}`}</ThemedText>
+                <ThemedText variant="caption" tone="tertiary">{`Senaste fel: ${status.lastError}`}</ThemedText>
               ) : null}
             </View>
           ) : null}
@@ -500,17 +500,17 @@ export default function AdminWhatsappScreen() {
                   <ActivityIndicator size="large" color={theme.primary} />
                   <ThemedText variant="caption" tone="tertiary" align="center">
                     {status?.lastError
-                      ? `Retrying after: ${status.lastError}`
-                      : "Starting the WhatsApp session…"}
+                      ? `Försöker igen efter: ${status.lastError}`
+                      : "Startar WhatsApp-sessionen…"}
                   </ThemedText>
                 </View>
               )}
               <ThemedText variant="bodySm" tone="secondary" align="center">
-                WhatsApp → Linked devices → Link a device, then scan the code.
+                WhatsApp → Länkade enheter → Länka en enhet, skanna sedan koden.
               </ThemedText>
 
               <ThemedText variant="caption" tone="tertiary">
-                No camera handy? Pair with the number instead:
+                Ingen kamera till hands? Para ihop med telefonnummer istället:
               </ThemedText>
               <View style={{ flexDirection: "row", gap: spacing.sm, width: "100%" }}>
                 <View style={{ flex: 1 }}>
@@ -522,7 +522,7 @@ export default function AdminWhatsappScreen() {
                   />
                 </View>
                 <PrimaryButton
-                  label="Get code"
+                  label="Hämta kod"
                   onPress={requestCode}
                   loading={pairBusy}
                   disabled={pairBusy}
@@ -538,7 +538,7 @@ export default function AdminWhatsappScreen() {
                     {pairCode}
                   </ThemedText>
                   <ThemedText variant="caption" tone="secondary" align="center">
-                    {`${pairCode.length} characters. On the phone: Linked devices → Link with phone number instead, then type this code.`}
+                    {`${pairCode.length} tecken. På telefonen: Länkade enheter → Länka med telefonnummer istället, ange sedan denna kod.`}
                   </ThemedText>
                 </View>
               ) : null}
@@ -549,7 +549,7 @@ export default function AdminWhatsappScreen() {
               the session is linked yet, so numbers can be prepared up front. */}
           <View style={{ marginTop: spacing.lg }}>
             <ThemedText variant="bodySm" style={{ fontWeight: "700", marginBottom: spacing.sm }}>
-              Who can publish
+              Vem kan publicera
             </ThemedText>
 
             <View
@@ -561,9 +561,9 @@ export default function AdminWhatsappScreen() {
               }}
             >
               <View style={{ flex: 1 }}>
-                <ThemedText variant="bodySm">Any WhatsApp number</ThemedText>
+                <ThemedText variant="bodySm">Alla WhatsApp-nummer</ThemedText>
                 <ThemedText variant="caption" tone="secondary" style={{ marginTop: 2 }}>
-                  No list to maintain — everyone can publish.
+                  Ingen lista behövs — alla kan publicera.
                 </ThemedText>
               </View>
               <Switch
@@ -584,7 +584,7 @@ export default function AdminWhatsappScreen() {
                   }}
                 />
                 <ThemedText variant="caption" tone="secondary" style={{ marginBottom: spacing.sm }}>
-                  Or allow only the numbers you add:
+                  Eller tillåt endast nummer du lägger till:
                 </ThemedText>
                 <Input
                   placeholder="+46 70 987 65 43"
@@ -593,7 +593,7 @@ export default function AdminWhatsappScreen() {
                   keyboardType="phone-pad"
                 />
                 <PrimaryButton
-                  label={numbers.length ? "Add another number" : "Add number"}
+                  label={numbers.length ? "Lägg till ytterligare ett nummer" : "Lägg till nummer"}
                   onPress={addNumber}
                   loading={busy}
                   disabled={busy}
@@ -604,20 +604,20 @@ export default function AdminWhatsappScreen() {
 
             <ThemedText variant="caption" tone="secondary" style={{ marginTop: spacing.sm }}>
               {status?.businessNumber
-                ? `Either way, they publish by sending a photo or video to +${String(status.businessNumber).replace(/[^0-9]/g, "")}.`
-                : "Either way, they publish by sending a photo or video to the linked number."}
+                ? `Oavsett vilket publicerar de genom att skicka ett foto eller en video till +${String(status.businessNumber).replace(/[^0-9]/g, "")}.`
+                : "Oavsett vilket publicerar de genom att skicka ett foto eller en video till det länkade numret."}
             </ThemedText>
 
             {connected ? (
               <PressableScale
                 onPress={logout}
                 accessibilityRole="button"
-                accessibilityLabel="Log out of WhatsApp"
+                accessibilityLabel="Logga ut från WhatsApp"
                 haptic="light"
                 style={{ marginTop: spacing.sm, alignSelf: "flex-start" }}
               >
                 <ThemedText variant="caption" tone="secondary" style={{ textDecorationLine: "underline" }}>
-                  Log out and link a different number
+                  Logga ut och länka ett annat nummer
                 </ThemedText>
               </PressableScale>
             ) : null}
@@ -627,8 +627,8 @@ export default function AdminWhatsappScreen() {
         {/* Gateway address: for when the phone cannot guess the computer's IP. */}
         <View style={{ marginTop: spacing.xl }}>
           <SectionHeader
-            title="Gateway address"
-            subtitle={serverBase ? `Using ${serverBase}` : "Not set"}
+            title="Gateway-adress"
+            subtitle={serverBase ? `Använder ${serverBase}` : "Inte inställd"}
           />
           <Input
             placeholder="http://192.168.8.44:4100"
@@ -639,7 +639,7 @@ export default function AdminWhatsappScreen() {
             keyboardType="url"
           />
           <PrimaryButton
-            label="Use this address"
+            label="Använd denna adress"
             onPress={saveAddress}
             style={{ marginTop: spacing.md }}
           />
@@ -662,7 +662,7 @@ export default function AdminWhatsappScreen() {
         {/* Allowed numbers */}
         {numbers.length ? (
           <View style={{ marginTop: spacing.xl }}>
-            <SectionHeader title="Allowed numbers" subtitle="They can publish by sending media" />
+            <SectionHeader title="Tillåtna nummer" subtitle="De kan publicera genom att skicka media" />
             <View style={{ gap: spacing.sm }}>
               {numbers.map((item) => (
                 <View
@@ -686,13 +686,13 @@ export default function AdminWhatsappScreen() {
                     <ThemedText variant="caption" tone="tertiary" translate={false} style={{ marginTop: 2 }}>
                       {item.verifiedAt
                         ? formatRelativeTime(item.verifiedAt, new Date(), currentDateLocale())
-                        : "Allowed"}
+                        : "Tillåten"}
                     </ThemedText>
                   </View>
                   <PressableScale
                     onPress={() => revoke(item)}
                     accessibilityRole="button"
-                    accessibilityLabel={`Remove ${maskPhone(item.phone)}`}
+                    accessibilityLabel={`Ta bort ${maskPhone(item.phone)}`}
                     haptic="light"
                     style={{
                       width: 34,
@@ -714,8 +714,8 @@ export default function AdminWhatsappScreen() {
         {/* Published from WhatsApp */}
         <View style={{ marginTop: spacing.xl }}>
           <SectionHeader
-            title="Published from WhatsApp"
-            subtitle={news.length ? `${news.length} live in the app` : "Send a photo or video to start"}
+            title="Publicerat från WhatsApp"
+            subtitle={news.length ? `${news.length} aktiva i appen` : "Skicka ett foto eller en video för att börja"}
           />
           <View style={{ gap: spacing.sm }}>
             {news.map((item) => (
@@ -789,7 +789,7 @@ export default function AdminWhatsappScreen() {
                   align="center"
                   style={{ marginTop: spacing.sm, paddingHorizontal: spacing.lg }}
                 >
-                  Allowed numbers can send a photo or video; it appears here and in News.
+                  Tillåtna nummer kan skicka ett foto eller en video; det visas här och i Nyheter.
                 </ThemedText>
               </View>
             ) : null}

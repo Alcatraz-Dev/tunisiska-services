@@ -86,9 +86,9 @@ export default function NewsScreen() {
           <Animated.View entering={FadeIn.duration(260)} style={{ flex: 1 }}>
             <EmptyState
               icon="cloud-offline-outline"
-              title="Couldn't load news"
-              description="Check your connection and try again."
-              action={<PrimaryButton label="Try again" onPress={refresh} fullWidth={false} />}
+              title="Kunde inte ladda nyheter"
+              description="Kontrollera din anslutning och försök igen."
+              action={<PrimaryButton label="Försök igen" onPress={refresh} fullWidth={false} />}
               style={{ flex: 1 }}
             />
           </Animated.View>
@@ -96,8 +96,8 @@ export default function NewsScreen() {
           <Animated.View entering={FadeIn.duration(260)}>
             <EmptyState
               icon="newspaper-outline"
-              title="No news yet"
-              description="Company updates, new departures and campaigns will appear here."
+              title="Inga nyheter ännu"
+              description="Företagsuppdateringar, nya avgångar och kampanjer visas här."
               style={{ flex: 1 }}
             />
           </Animated.View>
@@ -253,7 +253,7 @@ function NewsCard({
                 <View style={[styles.importantBadge, { backgroundColor: theme.accent }]}>
                   <AppIcon name="alert-circle" size={13} color="#FFFFFF" />
                   <ThemedText variant="overline" style={{ color: "#FFFFFF", marginLeft: 4 }}>
-                    Important
+                    Viktigt
                   </ThemedText>
                 </View>
               ) : <View />}

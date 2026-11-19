@@ -194,7 +194,7 @@ export default function AnnouncementDetails() {
             >
               <AppIcon name="alert-circle" size={14} color="#FFFFFF" />
               <AutoText className="text-white" style={{ marginLeft: 5 }}>
-                Important
+                Viktigt
               </AutoText>
             </View>
           ) : null}
