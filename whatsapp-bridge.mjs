@@ -31,9 +31,37 @@ let businessNumber = "";
 let qrDataUrl = "";
 let lastError = "";
 let activeOnMessage = null;
+let activeOnConnected = null;
 
 function digitsOf(value) {
   return String(value || "").replace(/[^0-9]/g, "");
+}
+
+function ownNumber() {
+  const id = sock?.user?.id || "";
+  return digitsOf(id.split("@")[0].split(":")[0]);
+}
+
+function ownLid() {
+  const lid = sock?.user?.lid || "";
+  return digitsOf(lid.split("@")[0].split(":")[0]);
+}
+
+/** Check if this message was sent to the self-chat ("Message yourself" / Note to self). */
+function isSelfMessage(msg) {
+  if (!msg?.key?.fromMe) return false;
+  const remote = String(msg?.key?.remoteJid || "");
+  if (remote === "status@broadcast" || remote.endsWith("@g.us")) return false;
+
+  const own = ownNumber();
+  const lid = ownLid();
+  const remoteDigits = digitsOf(remote.split("@")[0].split(":")[0]);
+
+  if (own && remoteDigits === own) return true;
+  if (lid && remoteDigits === lid) return true;
+  if (remote.endsWith("@lid") && lid && remote.startsWith(lid)) return true;
+  if (remote.endsWith("@s.whatsapp.net") && own && remote.startsWith(own)) return true;
+  return false;
 }
 
 /** Who sent this DM, as country-code digits — null when it cannot be told. */
@@ -41,38 +69,36 @@ function senderOf(msg) {
   const jid = String(msg?.key?.remoteJid || "");
   if (jid === "status@broadcast") return null;
   if (jid.endsWith("@g.us")) return null; // groups never publish
+
+  // If sent from the linked device itself (fromMe)
+  if (msg?.key?.fromMe) {
+    return ownNumber() || null;
+  }
+
   if (jid.endsWith("@s.whatsapp.net")) {
     const digits = digitsOf(jid.split("@")[0].split(":")[0]);
     return digits.length >= 8 ? digits : null;
   }
+
   // Check participant (for forwarded messages or LID contexts)
   const participant = String(msg?.key?.participant || "");
   if (participant.endsWith("@s.whatsapp.net")) {
     const digits = digitsOf(participant.split("@")[0].split(":")[0]);
     if (digits.length >= 8) return digits;
   }
+
   // Privacy-numbered chats expose the real number on the key.
   const fallback = digitsOf(msg?.key?.senderPn || "");
   if (fallback.length >= 8) return fallback;
 
-  // If sent from the linked device itself
-  if (msg?.key?.fromMe) {
-    return ownNumber() || null;
+  // LID chat fallback: if remoteJid ends with @lid
+  if (jid.endsWith("@lid")) {
+    const lidDigits = digitsOf(jid.split("@")[0].split(":")[0]);
+    if (lidDigits === ownLid()) return ownNumber();
+    return lidDigits.length >= 8 ? lidDigits : null;
   }
-  return null;
-}
 
-/** Check if this message was sent to the self-chat ("Message yourself" / Note to self). */
-function isSelfMessage(msg) {
-  if (!msg?.key?.fromMe) return false;
-  const own = ownNumber();
-  const remote = String(msg?.key?.remoteJid || "");
-  const remoteDigits = digitsOf(remote.split("@")[0].split(":")[0]);
-  if (own && remoteDigits === own) return true;
-  if (remote === "status@broadcast" || remote.endsWith("@g.us")) return false;
-  const sockJid = String(sock?.user?.id || "");
-  if (sockJid && remote.split(":")[0] === sockJid.split(":")[0]) return true;
-  return false;
+  return null;
 }
 
 /** Unwrap ephemeral / view-once containers to the real payload. */
@@ -118,11 +144,6 @@ async function renderQr(qr) {
   }
 }
 
-function ownNumber() {
-  const id = sock?.user?.id || "";
-  return digitsOf(id.split("@")[0].split(":")[0]);
-}
-
 async function connect(onMessage) {
   sessionStarted = true;
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
@@ -149,6 +170,11 @@ async function connect(onMessage) {
       lastError = "";
       businessNumber = ownNumber();
       console.log(`✅ [WHATSAPP] Linked as +${businessNumber || "unknown"}`);
+      if (typeof activeOnConnected === "function") {
+        try {
+          activeOnConnected(businessNumber);
+        } catch {}
+      }
     }
     if (connection === "close") {
       connected = false;
@@ -198,28 +224,30 @@ async function connect(onMessage) {
 
         const fromMe = Boolean(msg.key?.fromMe);
         const toSelf = isSelfMessage(msg);
+        const remote = String(msg?.key?.remoteJid || "");
+        console.log(`📩 [WHATSAPP] Event: type=${type}, remote=${remote}, fromMe=${fromMe}, toSelf=${toSelf}`);
 
         // If fromMe and NOT sent to self, only allow if explicitly marked with #news
         if (fromMe && !toSelf) {
           const captionOrText = msg.message?.imageMessage?.caption
             || msg.message?.videoMessage?.caption
             || unwrap(msg.message)?.conversation
+            || unwrap(msg.message)?.extendedTextMessage?.text
             || "";
           if (!captionOrText.toLowerCase().includes("#news")) {
+            console.log(`ℹ️ [WHATSAPP] Skipped outgoing chat to ${remote} (add #news to publish)`);
             continue;
           }
         }
 
-        const from = senderOf(msg) || (fromMe ? ownNumber() : null);
-        if (!from) continue;
-
+        const from = senderOf(msg) || ownNumber() || "unknown";
         const attached = mediaOf(msg);
         const text = unwrap(msg.message)?.conversation
           || unwrap(msg.message)?.extendedTextMessage?.text
           || "";
         const messageId = String(msg.key?.id || `${Date.now()}`);
 
-        console.log(`📩 [WHATSAPP] Inbound ${attached ? attached.kind : text ? 'text' : 'event'} from +${from} (fromMe: ${fromMe}, toSelf: ${toSelf})`);
+        console.log(`📷 [WHATSAPP] Inbound ${attached ? attached.kind : text ? 'text' : 'event'} from +${from} (fromMe: ${fromMe}, toSelf: ${toSelf})`);
 
         if (attached) {
           let buffer;
@@ -254,9 +282,15 @@ async function connect(onMessage) {
 }
 
 /** Start (or reuse) the session. Safe to call repeatedly. */
-export function startBridge({ onMessage } = {}) {
+export function startBridge({ onMessage, onConnected } = {}) {
   if (onMessage) activeOnMessage = onMessage;
-  if (sock && connected) return Promise.resolve();
+  if (onConnected) activeOnConnected = onConnected;
+  if (sock && connected) {
+    if (businessNumber && typeof activeOnConnected === "function") {
+      try { activeOnConnected(businessNumber); } catch {}
+    }
+    return Promise.resolve();
+  }
   if (starting) return starting;
   starting = connect(activeOnMessage).catch((error) => {
     starting = null;

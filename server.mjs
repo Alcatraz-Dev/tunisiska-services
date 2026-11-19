@@ -509,6 +509,15 @@ function maskPhone(phone) {
 
 /** Env allowlist, a number added through the panel, or "any number" mode. */
 async function isAuthorizedSender(sender, config, client) {
+  // The currently connected WhatsApp number is ALWAYS authorized
+  const currentBusiness = normalizePhone(bridgeStatus().businessNumber || "");
+  const senderDigits = normalizePhone(sender);
+  if (currentBusiness && senderDigits) {
+    if (currentBusiness === senderDigits || senderDigits.endsWith(currentBusiness) || currentBusiness.endsWith(senderDigits)) {
+      return true;
+    }
+  }
+
   // `*` in WHATSAPP_ADMIN_NUMBERS, or the panel's "any number" switch.
   if (config.admins.includes("*")) return true;
   const settings = await client
@@ -677,6 +686,25 @@ app.delete("/api/whatsapp/numbers/:phone", async (req, res) => {
   res.json({ removed: maskPhone(phone) });
 });
 
+export async function syncConnectedNumberToSanity(number) {
+  if (!number) return;
+  const client = sanityWriteClient();
+  if (!client) return;
+  const digits = normalizePhone(number);
+  const formatted = digits.startsWith("+") ? digits : `+${digits}`;
+  try {
+    const docs = await client.fetch('*[_type in ["helpSupport", "support"]]{_id, whatsapp}').catch(() => []);
+    for (const doc of docs) {
+      if (doc._id && doc.whatsapp !== formatted) {
+        await client.patch(doc._id).set({ whatsapp: formatted }).commit();
+        console.log(`📲 [SANITY] Dynamically updated ${doc._id}.whatsapp to ${formatted}`);
+      }
+    }
+  } catch (err) {
+    console.warn("⚠️ [SANITY] Could not sync dynamic WhatsApp number:", err?.message);
+  }
+}
+
 // The bridge holds a live WhatsApp Web session, so it only starts where the
 // process stays up (local `npm run server`, a VPS, …). Vercel serverless
 // cannot keep the socket, so it skips the bridge and only serves the API.
@@ -696,6 +724,10 @@ function startWhatsappBridge() {
   }
   console.log("🔌 [WHATSAPP] Starting the WhatsApp session (scan the QR in the admin panel)…");
   startBridge({
+    onConnected: async (number) => {
+      console.log(`🔄 [WHATSAPP] Dynamic number linked: +${number}`);
+      await syncConnectedNumberToSanity(number);
+    },
     onMessage: async (payload) => {
       try {
         await handleBridgeMessage(payload);
