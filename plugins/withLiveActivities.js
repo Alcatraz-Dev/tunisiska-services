@@ -27,7 +27,12 @@ const GROUP_NAME = "Embed App Extensions";
 
 /** Resolve the project root (the folder holding package.json). */
 function getProjectRoot(config) {
-  return config?._internal?.projectRoot ?? path.resolve(__dirname, "..");
+  return (
+    config?._internal?.projectRoot ??
+    config?.modRequest?.projectRoot ??
+    process.cwd() ??
+    path.resolve(__dirname, "..")
+  );
 }
 
 /**
@@ -58,22 +63,23 @@ function copyWidgetSources(projectRoot, iosRoot) {
     fs.copyFileSync(path.join(source, file), path.join(destination, file));
   }
 
-  // The attributes type must be compiled into the widget target as well as
-  // the app. The app gets it through the Expo module pod; the widget gets a
-  // copy here. Both declare the same `activityType`, which is how ActivityKit
-  // matches a running activity to the widget that renders it.
-  const attributesSource = path.join(
-    projectRoot,
-    "modules",
-    "tunisiska-live-activity",
-    "ios",
-    "NextDepartureAttributes.swift",
-  );
-  if (fs.existsSync(attributesSource)) {
-    fs.copyFileSync(
-      attributesSource,
-      path.join(destination, "NextDepartureAttributes.swift"),
+  // Ensure NextDepartureAttributes.swift exists in destination
+  const targetAttributesPath = path.join(destination, "NextDepartureAttributes.swift");
+  if (!fs.existsSync(targetAttributesPath)) {
+    const fallbackAttributes = path.join(
+      projectRoot,
+      "modules",
+      "tunisiska-live-activity",
+      "ios",
+      "NextDepartureAttributes.swift",
     );
+    if (fs.existsSync(fallbackAttributes)) {
+      fs.copyFileSync(fallbackAttributes, targetAttributesPath);
+    } else {
+      throw new Error(
+        `[withLiveActivities] NextDepartureAttributes.swift is missing in both widget/ and ios/ folders at ${projectRoot}`
+      );
+    }
   }
 
   fs.writeFileSync(
@@ -176,7 +182,7 @@ function addWidgetTarget(projectRoot, project, config) {
     const widgetGroup = widgetGroupKey ? groups[widgetGroupKey] : null;
     const sourcePhase = target?.buildPhases?.map((phase) => project.hash.project.objects.PBXSourcesBuildPhase?.[phase.value]).find(Boolean);
     if (widgetGroup && sourcePhase) {
-      for (const fileName of ["NextDepartureHomeWidget.swift"]) {
+      for (const fileName of ["NextDepartureHomeWidget.swift", "NextDepartureAttributes.swift"]) {
         const alreadyAdded = Object.keys(project.pbxFileReferenceSection()).some((key) => !key.endsWith("_comment") && project.pbxFileReferenceSection()[key]?.path === fileName);
         if (alreadyAdded) continue;
         const fileRef = project.generateUuid();
