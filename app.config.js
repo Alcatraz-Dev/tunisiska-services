@@ -29,6 +29,11 @@ module.exports = {
         : IS_PREVIEW
           ? "com.alcatrazdev.tunisiskaservices.preview"
           : "com.alcatrazdev.tunisiskaservices",
+      entitlements: {
+        "com.apple.security.application-groups": [
+          "group.com.alcatrazdev.tunisiskaservices",
+        ],
+      },
       infoPlist: {
         CFBundleDisplayName: IS_DEV
           ? "Tunisiska Mega Dev"
@@ -200,6 +205,27 @@ module.exports = {
       router: {},
       eas: {
         projectId: "febc1a59-7c3b-4754-a888-3246bca56018",
+        build: {
+          experimental: {
+            ios: {
+              appExtensions: [
+                {
+                  targetName: "TunisiskaLiveActivityWidget",
+                  bundleIdentifier: IS_DEV
+                    ? "com.alcatrazdev.tunisiskaservices.dev.NextDeparture"
+                    : IS_PREVIEW
+                      ? "com.alcatrazdev.tunisiskaservices.preview.NextDeparture"
+                      : "com.alcatrazdev.tunisiskaservices.NextDeparture",
+                  entitlements: {
+                    "com.apple.security.application-groups": [
+                      "group.com.alcatrazdev.tunisiskaservices",
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        },
       },
       // Expose Sanity config so it's available at runtime on device/web.
       // The API token is deliberately NOT exposed here: a second copy in the
