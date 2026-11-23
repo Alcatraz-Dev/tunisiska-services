@@ -4,7 +4,7 @@
   "version": "1.0.4",
   "scripts": {
     "start": "concurrently \"npm run dev\" \"npm run server\"",
-    "dev": "expo start",
+    "dev": "concurrently \"expo start\" \"npm run server\"",
     "server": "node server.mjs",
     "server:dev": "nodemon server.mjs",
     "server:check": "curl -s http://localhost:3000|| echo 'Server not running'",

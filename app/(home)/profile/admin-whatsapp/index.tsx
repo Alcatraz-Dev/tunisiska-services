@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { ActivityIndicator, Image, RefreshControl, ScrollView, Switch, View } from "react-native";
+import { ActivityIndicator, Image, Linking, RefreshControl, ScrollView, Switch, View } from "react-native";
+import * as Clipboard from "expo-clipboard";
+import * as Haptics from "expo-haptics";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
@@ -124,9 +126,12 @@ export default function AdminWhatsappScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [qr, setQr] = useState<string | null>(null);
-  const [pairPhone, setPairPhone] = useState("");
+  const defaultBusinessPhone = (process.env.EXPO_PUBLIC_SUPPORT_WHATSAPP || "+46737778737").replace(/[^0-9+]/g, "");
+  const [pairPhone, setPairPhone] = useState(defaultBusinessPhone);
   const [pairCode, setPairCode] = useState<string | null>(null);
   const [pairBusy, setPairBusy] = useState(false);
+  const [pairMode, setPairMode] = useState<"direct" | "qr">("direct");
+  const [codeCopied, setCodeCopied] = useState(false);
 
   const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState(false);
@@ -288,6 +293,37 @@ export default function AdminWhatsappScreen() {
     }
   }, [status?.connected]);
 
+  const copyCode = async (codeToUse?: string) => {
+    const code = codeToUse || pairCode;
+    if (!code) return;
+    try {
+      await Clipboard.setStringAsync(code);
+      setCodeCopied(true);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      setTimeout(() => setCodeCopied(false), 3000);
+    } catch {}
+  };
+
+  const openWhatsApp = async (codeToUse?: string) => {
+    const code = codeToUse || pairCode;
+    if (code) {
+      await copyCode(code);
+    }
+    const url = "whatsapp://app";
+    try {
+      const can = await Linking.canOpenURL(url).catch(() => false);
+      if (can) {
+        await Linking.openURL(url);
+      } else {
+        await Linking.openURL("https://wa.me/").catch(() => {
+          showAlert("WhatsApp", "Kunde inte öppna WhatsApp automatiskt. Öppna WhatsApp manuellt på din telefon.");
+        });
+      }
+    } catch (err: any) {
+      showAlert("WhatsApp", "Kunde inte öppna WhatsApp: " + (err?.message || err));
+    }
+  };
+
   const requestCode = async () => {
     const trimmed = pairPhone.trim();
     if (trimmed.replace(/[^0-9]/g, "").length < 8) {
@@ -301,7 +337,20 @@ export default function AdminWhatsappScreen() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: trimmed }),
       }, 20000);
-      setPairCode(String(payload.code));
+      const code = String(payload.code).toUpperCase();
+      setPairCode(code);
+      await copyCode(code);
+      showAlert(
+        "Parkopplingskod genererad!",
+        `Koden ${code} har kopierats till urklipp.\n\nKlicka på "Öppna WhatsApp" för att gå till WhatsApp → Inställningar → Länkade enheter → Länka med telefonnummer och klistra in koden.`,
+        [
+          { text: "Stäng", style: "cancel" },
+          {
+            text: "Öppna WhatsApp nu",
+            onPress: () => void openWhatsApp(code),
+          },
+        ]
+      );
     } catch (error: any) {
       showAlert("Kunde inte hämta kod", error?.message || "Administratörsservern svarade inte.");
     } finally {
@@ -489,59 +538,200 @@ export default function AdminWhatsappScreen() {
           ) : null}
 
           {!connected && !statusError && !bridgeDown ? (
-            <View style={{ marginTop: spacing.lg, alignItems: "center", gap: spacing.md }}>
-              {qr ? (
-                <Image
-                  source={{ uri: qr }}
-                  style={{ width: 220, height: 220, borderRadius: radii.md, backgroundColor: "#fff" }}
-                />
+            <View style={{ marginTop: spacing.lg, gap: spacing.md }}>
+              {/* Flikar: Direktanslutning vs Skanna QR-kod */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  borderRadius: radii.md,
+                  backgroundColor: theme.surfaceAlt,
+                  padding: 3,
+                  gap: 4,
+                }}
+              >
+                <PressableScale
+                  onPress={() => setPairMode("direct")}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 10,
+                    borderRadius: radii.sm,
+                    backgroundColor: pairMode === "direct" ? theme.primary : "transparent",
+                    alignItems: "center",
+                    flexDirection: "row",
+                    justifyContent: "center",
+                    gap: 6,
+                  }}
+                >
+                  <AppIcon
+                    name="phone-portrait-outline"
+                    size={16}
+                    color={pairMode === "direct" ? "#FFFFFF" : theme.textSecondary}
+                  />
+                  <ThemedText
+                    variant="caption"
+                    style={{
+                      color: pairMode === "direct" ? "#FFFFFF" : theme.textSecondary,
+                      fontWeight: "700",
+                    }}
+                  >
+                    Direktanslutning
+                  </ThemedText>
+                </PressableScale>
+
+                <PressableScale
+                  onPress={() => setPairMode("qr")}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 10,
+                    borderRadius: radii.sm,
+                    backgroundColor: pairMode === "qr" ? theme.primary : "transparent",
+                    alignItems: "center",
+                    flexDirection: "row",
+                    justifyContent: "center",
+                    gap: 6,
+                  }}
+                >
+                  <AppIcon
+                    name="qr-code-outline"
+                    size={16}
+                    color={pairMode === "qr" ? "#FFFFFF" : theme.textSecondary}
+                  />
+                  <ThemedText
+                    variant="caption"
+                    style={{
+                      color: pairMode === "qr" ? "#FFFFFF" : theme.textSecondary,
+                      fontWeight: "700",
+                    }}
+                  >
+                    Skanna QR-kod
+                  </ThemedText>
+                </PressableScale>
+              </View>
+
+              {pairMode === "direct" ? (
+                <View style={{ gap: spacing.md, marginTop: spacing.xs }}>
+                  <ThemedText variant="bodySm" tone="secondary">
+                    Länka WhatsApp direkt på den här enheten med ett klick utan att behöva en kamera:
+                  </ThemedText>
+
+                  <View style={{ gap: spacing.xs }}>
+                    <ThemedText variant="caption" tone="tertiary">
+                      Telefonnummer för WhatsApp:
+                    </ThemedText>
+                    <Input
+                      placeholder="+46 70 123 45 67"
+                      value={pairPhone}
+                      onChangeText={setPairPhone}
+                      keyboardType="phone-pad"
+                    />
+                  </View>
+
+                  <PrimaryButton
+                    label={pairCode ? "Generera ny kod" : "Generera kod & anslut"}
+                    icon="logo-whatsapp"
+                    onPress={requestCode}
+                    loading={pairBusy}
+                    disabled={pairBusy}
+                  />
+
+                  {pairCode ? (
+                    <View
+                      style={{
+                        padding: spacing.md,
+                        borderRadius: radii.md,
+                        backgroundColor: theme.surfaceAlt,
+                        borderWidth: 1,
+                        borderColor: theme.borderSubtle,
+                        alignItems: "center",
+                        gap: spacing.sm,
+                        marginTop: spacing.xs,
+                      }}
+                    >
+                      <ThemedText variant="caption" tone="secondary">
+                        Din parkopplingskod:
+                      </ThemedText>
+
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+                        <ThemedText
+                          variant="title1"
+                          translate={false}
+                          style={{
+                            letterSpacing: 6,
+                            fontWeight: "800",
+                            color: theme.primary,
+                          }}
+                        >
+                          {pairCode}
+                        </ThemedText>
+                        <PressableScale
+                          onPress={() => void copyCode()}
+                          haptic="light"
+                          style={{
+                            padding: spacing.xs,
+                            backgroundColor: theme.surface,
+                            borderRadius: radii.sm,
+                            borderWidth: 1,
+                            borderColor: theme.borderSubtle,
+                          }}
+                        >
+                          <AppIcon
+                            name={codeCopied ? "checkmark-circle" : "copy-outline"}
+                            size={18}
+                            color={codeCopied ? "#10B981" : theme.primary}
+                          />
+                        </PressableScale>
+                      </View>
+
+                      {codeCopied ? (
+                        <ThemedText variant="caption" style={{ color: "#10B981", fontWeight: "600" }}>
+                          ✓ Koden har kopierats till urklipp!
+                        </ThemedText>
+                      ) : null}
+
+                      {/* Direktknapp som öppnar WhatsApp */}
+                      <PrimaryButton
+                        label="Öppna WhatsApp nu för att ansluta"
+                        icon="arrow-forward"
+                        onPress={() => void openWhatsApp()}
+                        style={{ width: "100%", marginTop: spacing.xs }}
+                      />
+
+                      <View style={{ marginTop: spacing.xs, gap: 4, width: "100%" }}>
+                        <ThemedText variant="caption" tone="secondary">
+                          1. Tryck på knappen ovan för att öppna WhatsApp.
+                        </ThemedText>
+                        <ThemedText variant="caption" tone="secondary">
+                          2. Gå till Inställningar → Länkade enheter → Länka med telefonnummer.
+                        </ThemedText>
+                        <ThemedText variant="caption" tone="secondary">
+                          3. Klistra in koden ({pairCode}).
+                        </ThemedText>
+                      </View>
+                    </View>
+                  ) : null}
+                </View>
               ) : (
-                <View style={{ paddingVertical: spacing.xl, alignItems: "center", gap: spacing.sm }}>
-                  <ActivityIndicator size="large" color={theme.primary} />
-                  <ThemedText variant="caption" tone="tertiary" align="center">
-                    {status?.lastError
-                      ? `Försöker igen efter: ${status.lastError}`
-                      : "Startar WhatsApp-sessionen…"}
+                <View style={{ alignItems: "center", gap: spacing.md, marginTop: spacing.xs }}>
+                  {qr ? (
+                    <Image
+                      source={{ uri: qr }}
+                      style={{ width: 220, height: 220, borderRadius: radii.md, backgroundColor: "#fff" }}
+                    />
+                  ) : (
+                    <View style={{ paddingVertical: spacing.xl, alignItems: "center", gap: spacing.sm }}>
+                      <ActivityIndicator size="large" color={theme.primary} />
+                      <ThemedText variant="caption" tone="tertiary" align="center">
+                        {status?.lastError
+                          ? `Försöker igen efter: ${status.lastError}`
+                          : "Startar WhatsApp-sessionen…"}
+                      </ThemedText>
+                    </View>
+                  )}
+                  <ThemedText variant="bodySm" tone="secondary" align="center">
+                    Öppna WhatsApp på en annan enhet: Inställningar → Länkade enheter → Länka en enhet, och skanna QR-koden ovan.
                   </ThemedText>
                 </View>
               )}
-              <ThemedText variant="bodySm" tone="secondary" align="center">
-                WhatsApp → Länkade enheter → Länka en enhet, skanna sedan koden.
-              </ThemedText>
-
-              <ThemedText variant="caption" tone="tertiary">
-                Ingen kamera till hands? Para ihop med telefonnummer istället:
-              </ThemedText>
-              <View style={{ flexDirection: "row", gap: spacing.sm, width: "100%" }}>
-                <View style={{ flex: 1 }}>
-                  <Input
-                    placeholder="+46 70 123 45 67"
-                    value={pairPhone}
-                    onChangeText={setPairPhone}
-                    keyboardType="phone-pad"
-                  />
-                </View>
-                <PrimaryButton
-                  label="Hämta kod"
-                  onPress={requestCode}
-                  loading={pairBusy}
-                  disabled={pairBusy}
-                />
-              </View>
-              {pairCode ? (
-                <View style={{ alignItems: "center", gap: 4 }}>
-                  <ThemedText
-                    variant="title1"
-                    translate={false}
-                    style={{ letterSpacing: 5 }}
-                  >
-                    {pairCode}
-                  </ThemedText>
-                  <ThemedText variant="caption" tone="secondary" align="center">
-                    {`${pairCode.length} tecken. På telefonen: Länkade enheter → Länka med telefonnummer istället, ange sedan denna kod.`}
-                  </ThemedText>
-                </View>
-              ) : null}
             </View>
           ) : null}
 
