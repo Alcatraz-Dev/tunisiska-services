@@ -7,15 +7,14 @@ module.exports = function (api) {
         "babel-preset-expo",
         {
           jsxImportSource: "nativewind",
-          unstable_transformProfile: "hermes-v0",
         },
       ],
       "nativewind/babel",
     ],
     plugins: [
-      ["@babel/plugin-transform-class-properties", { loose: true }],
-      ["@babel/plugin-transform-private-methods", { loose: true }],
-      ["@babel/plugin-transform-private-property-in-object", { loose: true }],
+      ["@babel/plugin-transform-class-properties", { loose: false }],
+      ["@babel/plugin-transform-private-methods", { loose: false }],
+      ["@babel/plugin-transform-private-property-in-object", { loose: false }],
     ],
   };
 };
