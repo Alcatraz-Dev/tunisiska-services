@@ -508,9 +508,29 @@ export default function AdminWhatsappScreen() {
           </View>
 
           {statusError && !loading ? (
-            <ThemedText variant="bodySm" tone="secondary" style={{ marginTop: spacing.md }}>
-              {`Ingen administratörsserver svarade på ${serverCandidates().join(" eller ")}. Starta den med npm run server.`}
-            </ThemedText>
+            <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
+              <ThemedText variant="bodySm" tone="secondary">
+                {`Ingen administratörsserver svarade på ${serverCandidates().join(" eller ")}.`}
+              </ThemedText>
+              <PressableScale
+                onPress={() => router.push("/(home)/profile/admin-announcements" as any)}
+                style={{
+                  backgroundColor: theme.primary,
+                  paddingVertical: 10,
+                  paddingHorizontal: 16,
+                  borderRadius: radii.md,
+                  alignItems: "center",
+                  flexDirection: "row",
+                  justifyContent: "center",
+                  gap: 8,
+                }}
+              >
+                <AppIcon name="megaphone-outline" size={18} color="#ffffff" />
+                <ThemedText variant="bodySm" style={{ color: "#ffffff", fontWeight: "700" }}>
+                  Publicera nyheter direkt i appen
+                </ThemedText>
+              </PressableScale>
+            </View>
           ) : null}
 
           {bridgeDown ? (
@@ -521,7 +541,7 @@ export default function AdminWhatsappScreen() {
                 borderRadius: radii.md,
                 borderWidth: 1,
                 borderColor: theme.borderSubtle,
-                gap: 4,
+                gap: 8,
               }}
             >
               <ThemedText variant="bodySm" style={{ fontWeight: "700" }}>
@@ -534,6 +554,25 @@ export default function AdminWhatsappScreen() {
               {status?.lastError ? (
                 <ThemedText variant="caption" tone="tertiary">{`Senaste fel: ${status.lastError}`}</ThemedText>
               ) : null}
+              <PressableScale
+                onPress={() => router.push("/(home)/profile/admin-announcements" as any)}
+                style={{
+                  backgroundColor: theme.primary,
+                  paddingVertical: 10,
+                  paddingHorizontal: 16,
+                  borderRadius: radii.md,
+                  alignItems: "center",
+                  flexDirection: "row",
+                  justifyContent: "center",
+                  gap: 8,
+                  marginTop: 4,
+                }}
+              >
+                <AppIcon name="megaphone-outline" size={18} color="#ffffff" />
+                <ThemedText variant="bodySm" style={{ color: "#ffffff", fontWeight: "700" }}>
+                  Publicera nyheter direkt i appen
+                </ThemedText>
+              </PressableScale>
             </View>
           ) : null}
 

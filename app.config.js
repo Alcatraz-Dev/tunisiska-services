@@ -12,7 +12,7 @@ module.exports = {
     display: "standalone",
     description:
       "Tunisiska Mega Service is a mobile app for booking and managing services.",
-    version: "1.0.4",
+    version: "1.0.5",
     orientation: "portrait",
     icon: "./app/assets/expo-icons/icon.png",
     userInterfaceStyle: "automatic",
@@ -188,9 +188,9 @@ module.exports = {
       // Makes a clean prebuild produce a buildable Podfile (modular headers
       // for the Google Sign-in pods, and pod deployment targets Xcode accepts).
       "./plugins/withPodfileFixes",
-      // Live Activities Widget extension requires manual provisioning profile and App Group
-      // setup in developer.apple.com before it can be signed for App Store distribution.
-      // "./plugins/withLiveActivities",
+      // Adds the WidgetKit extension that renders the next-departure Live
+      // Activity in the Dynamic Island and on the Lock Screen.
+      "./plugins/withLiveActivities",
     ],
 
     experiments: {

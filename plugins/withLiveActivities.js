@@ -22,7 +22,7 @@ const path = require("path");
 
 const TARGET_NAME = "TunisiskaLiveActivityWidget";
 const BUNDLE_ID_SUFFIX = ".NextDeparture";
-const DEPLOYMENT_TARGET = "16.2";
+const DEPLOYMENT_TARGET = "16.4";
 const GROUP_NAME = "Embed App Extensions";
 
 /** Resolve the project root (the folder holding package.json). */
@@ -123,11 +123,13 @@ function addFramework(project, name, frameworksGroup) {
 /**
  * Add the Widget Extension target to the Xcode project.
  */
-function addWidgetTarget(projectRoot, project) {
+function addWidgetTarget(projectRoot, project, config) {
   const iosRoot = path.join(projectRoot, "ios");
   const widgetDir = copyWidgetSources(projectRoot, iosRoot);
 
   const appTargetUuid = project.getFirstTarget().uuid;
+  const appVersion = config?.version || "1.0.5";
+  const appBuildNumber = config?.ios?.buildNumber || "1";
 
   // The widget sources are always refreshed above. The *project structure*
   // only needs to be created once — adding it again would duplicate the
@@ -147,6 +149,9 @@ function addWidgetTarget(projectRoot, project) {
         buildConfiguration.buildSettings.CODE_SIGN_ENTITLEMENTS = `"${TARGET_NAME}/${TARGET_NAME}.entitlements"`;
         buildConfiguration.buildSettings.CODE_SIGN_STYLE = "Automatic";
         buildConfiguration.buildSettings.DEVELOPMENT_TEAM = '"8436MWNDM3"';
+        buildConfiguration.buildSettings.IPHONEOS_DEPLOYMENT_TARGET = DEPLOYMENT_TARGET;
+        buildConfiguration.buildSettings.CURRENT_PROJECT_VERSION = `"${appBuildNumber}"`;
+        buildConfiguration.buildSettings.MARKETING_VERSION = `"${appVersion}"`;
         delete buildConfiguration.buildSettings.CODE_SIGNING_ALLOWED;
         delete buildConfiguration.buildSettings.CODE_SIGNING_REQUIRED;
       }
@@ -247,8 +252,8 @@ function addWidgetTarget(projectRoot, project) {
     SKIP_INSTALL: "YES",
     CODE_SIGN_STYLE: "Automatic",
     DEVELOPMENT_TEAM: '"8436MWNDM3"',
-    CURRENT_PROJECT_VERSION: "1",
-    MARKETING_VERSION: "1.0",
+    CURRENT_PROJECT_VERSION: `"${appBuildNumber}"`,
+    MARKETING_VERSION: `"${appVersion}"`,
     GENERATE_INFOPLIST_FILE: "NO",
     LD_RUNPATH_SEARCH_PATHS:
       '"$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"',
@@ -456,7 +461,7 @@ module.exports = function withLiveActivities(config) {
   config = withXcodeProject(config, (cfg) => {
     const project = cfg.modResults;
     bumpDeploymentTarget(project);
-    addWidgetTarget(projectRoot, project);
+    addWidgetTarget(projectRoot, project, cfg);
     return cfg;
   });
 
