@@ -7,24 +7,27 @@ import { requireOptionalNativeModule } from "expo-modules-core";
  * Optional lookup lets Expo Go and other builds without it load the app
  * normally; the facade in `app/lib/liveActivity.ts` then degrades gracefully.
  */
+export type StartActivityParams = {
+  tripId: string;
+  routeLabel: string;
+  origin: string;
+  destination: string;
+  vehicle: string;
+  language: string;
+  status: string;
+  timeZoneIdentifier: string;
+  /** Departure time as a millisecond epoch. */
+  departureDate: number;
+  departureTimestamp?: number;
+  capacity: number;
+  available: number;
+};
+
 export type TunisiskaLiveActivityModule = {
   /** Whether the device supports Live Activities. */
   areActivitiesEnabled?(): Promise<boolean>;
   /** Start (or replace) the Live Activity for a departure. */
-  start?(
-    tripId: string,
-    routeLabel: string,
-    origin: string,
-    destination: string,
-    vehicle: string,
-    language: string,
-    status: string,
-    timeZoneIdentifier: string,
-    /** Departure time as a millisecond epoch. */
-    departureDate: number,
-    capacity: number,
-    available: number,
-  ): Promise<string | null>;
+  start?(params: StartActivityParams): Promise<string | null>;
   /** Update a running activity. */
   update?(
     id: string,

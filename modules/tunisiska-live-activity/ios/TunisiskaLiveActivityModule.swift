@@ -17,6 +17,21 @@ import WidgetKit
  * returned as a silent `nil`, so a missing entitlement, a disabled setting or a
  * missing widget extension is visible in the device log.
  */
+internal struct StartActivityOptions: Record {
+  @Field var tripId: String = ""
+  @Field var routeLabel: String = ""
+  @Field var origin: String = ""
+  @Field var destination: String = ""
+  @Field var vehicle: String = ""
+  @Field var language: String = ""
+  @Field var status: String = ""
+  @Field var timeZoneIdentifier: String = ""
+  @Field var departureDate: Double = 0
+  @Field var departureTimestamp: Double = 0
+  @Field var capacity: Int = 0
+  @Field var available: Int = 0
+}
+
 public final class TunisiskaLiveActivityModule: Module {
   private static let logPrefix = "TunisiskaLiveActivity"
   private let appGroup = "group.com.alcatrazdev.tunisiskaservices"
@@ -31,16 +46,14 @@ public final class TunisiskaLiveActivityModule: Module {
       return await Self.activitiesEnabled()
     }
 
-    AsyncFunction("start") {
-      (tripId: String, routeLabel: String, origin: String, destination: String,
-       vehicle: String, language: String, status: String, timeZoneIdentifier: String,
-       departureTimestamp: Double, capacity: Int, available: Int) async -> String? in
+    AsyncFunction("start") { (options: StartActivityOptions) async -> String? in
       guard #available(iOS 16.2, *) else { return nil }
+      let departureTime = options.departureTimestamp > 0 ? options.departureTimestamp : options.departureDate
       return await Self.start(
-        tripId: tripId, routeLabel: routeLabel, origin: origin,
-        destination: destination, vehicle: vehicle, language: language,
-        status: status, timeZoneIdentifier: timeZoneIdentifier,
-        departureTimestamp: departureTimestamp, capacity: capacity, available: available
+        tripId: options.tripId, routeLabel: options.routeLabel, origin: options.origin,
+        destination: options.destination, vehicle: options.vehicle, language: options.language,
+        status: options.status, timeZoneIdentifier: options.timeZoneIdentifier,
+        departureTimestamp: departureTime, capacity: options.capacity, available: options.available
       )
     }
 

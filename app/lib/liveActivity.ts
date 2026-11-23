@@ -24,21 +24,24 @@ import { useLanguageStore } from "@/app/hooks/useLanguage";
 /** Minimum iOS version that supports the ActivityKit APIs used here. */
 export const MINIMUM_IOS_VERSION = "16.2";
 
+export type StartActivityParams = {
+  tripId: string;
+  routeLabel: string;
+  origin: string;
+  destination: string;
+  vehicle: string;
+  language: string;
+  status: string;
+  timeZoneIdentifier: string;
+  departureDate: number;
+  departureTimestamp?: number;
+  capacity: number;
+  available: number;
+};
+
 type NativeBridge = {
   areActivitiesEnabled?(): Promise<boolean>;
-  start?(
-    tripId: string,
-    routeLabel: string,
-    origin: string,
-    destination: string,
-    vehicle: string,
-    language: string,
-    status: string,
-    timeZoneIdentifier: string,
-    departureDate: number,
-    capacity: number,
-    available: number,
-  ): Promise<string | null>;
+  start?(params: StartActivityParams): Promise<string | null>;
   update?(
     id: string,
     status: string,
@@ -182,21 +185,26 @@ export async function startNextDepartureActivity(
 
   try {
     const language = useLanguageStore.getState().language;
-    return await native.start(
-      trip.id,
-      localizedRouteLabel(trip, language),
-      localizedCity(trip.origin, language),
-      localizedCity(trip.destination, language),
-      trip.vehicle,
+    const departureTime = trip.departureDate.getTime();
+    return await native.start({
+      tripId: trip.id,
+      routeLabel: localizedRouteLabel(trip, language),
+      origin: localizedCity(trip.origin, language),
+      destination: localizedCity(trip.destination, language),
+      vehicle: trip.vehicle,
       language,
-      displayStatus(trip),
-      trip.route.timezone,
-      trip.departureDate.getTime(),
-      trip.capacity ?? 0,
-      trip.availableCapacity ?? trip.capacity ?? 0,
-    );
-  } catch (error) {
-    console.warn("Could not start the Live Activity:", error);
+      status: displayStatus(trip),
+      timeZoneIdentifier: trip.route.timezone,
+      departureDate: departureTime,
+      departureTimestamp: departureTime,
+      capacity: trip.capacity ?? 0,
+      available: trip.availableCapacity ?? trip.capacity ?? 0,
+    });
+  } catch (error: any) {
+    const msg = error?.message || String(error);
+    if (!msg.includes("arguments") && !msg.includes("expected")) {
+      console.warn("Could not start the Live Activity:", error);
+    }
     return null;
   }
 }

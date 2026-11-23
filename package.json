@@ -1,7 +1,7 @@
 {
   "name": "clerk-expo-quickstart",
   "main": "expo-router/entry",
-  "version": "1.0.6",
+  "version": "1.0.5",
   "scripts": {
     "start": "concurrently \"npm run dev\" \"npm run server\"",
     "dev": "concurrently \"expo start\" \"npm run server\"",
@@ -112,9 +112,6 @@
   },
   "devDependencies": {
     "@babel/core": "^7.26.10",
-    "@babel/plugin-transform-class-properties": "^7.29.7",
-    "@babel/plugin-transform-private-methods": "^7.29.7",
-    "@babel/plugin-transform-private-property-in-object": "^7.29.7",
     "@types/cookies": "^0.9.2",
     "@types/mapbox__polyline": "^1.0.5",
     "@types/pako": "^2.0.4",
